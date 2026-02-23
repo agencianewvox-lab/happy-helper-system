@@ -22,12 +22,17 @@ Deno.serve(async (req) => {
     // Suporta payload único ou array de mensagens
     const mensagens = Array.isArray(body) ? body : [body];
 
+    // Remove prefixo "=" que o n8n pode adicionar nos valores
+    const clean = (val: any) =>
+      typeof val === "string" && val.startsWith("=") ? val.slice(1) : val;
+
     const registros = mensagens.map((msg: any) => ({
-      telefone: msg.telefone || msg.phone || msg.from || null,
-      nome_contato: msg.nome_contato || msg.name || msg.pushName || null,
-      mensagem: msg.mensagem || msg.message || msg.text || msg.body || null,
-      direcao: msg.direcao || msg.direction || "entrada",
-      status: msg.status || "recebida",
+      telefone: clean(msg.telefone || msg.phone || msg.from) || null,
+      nome_contato: clean(msg.nome_contato || msg.name || msg.pushName) || null,
+      mensagem: clean(msg.mensagem || msg.message || msg.text || msg.body) || null,
+      group_id: clean(msg.group_id) || null,
+      direcao: clean(msg.direcao || msg.direction) || "entrada",
+      status: clean(msg.status) || "recebida",
       dados_extras: msg,
     }));
 

@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           dados_extras: Json | null
           direcao: string | null
+          group_id: string | null
           id: string
           mensagem: string | null
           nome_contato: string | null
@@ -30,6 +31,7 @@ export type Database = {
           created_at?: string
           dados_extras?: Json | null
           direcao?: string | null
+          group_id?: string | null
           id?: string
           mensagem?: string | null
           nome_contato?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           created_at?: string
           dados_extras?: Json | null
           direcao?: string | null
+          group_id?: string | null
           id?: string
           mensagem?: string | null
           nome_contato?: string | null
