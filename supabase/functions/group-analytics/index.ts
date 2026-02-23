@@ -44,6 +44,8 @@ interface GroupAnalytics {
   churn_risk: number; // 0-100
   total_client_msgs: number;
   total_team_msgs: number;
+  has_pending_demands: boolean;
+  pending_demand_terms: string[];
 }
 
 function countKeywordMatches(text: string, keywords: string[]): { count: number; matched: string[] } {
@@ -177,6 +179,26 @@ Deno.serve(async (req) => {
       }
       churnRisk = Math.max(0, Math.min(100, churnRisk));
 
+      // 6. Pending demands - client sent demand keywords and last msg is from client (no team response yet)
+      const lastMsgIsClient = msgs.length > 0 && msgs[msgs.length - 1].direcao === "entrada";
+      const { matched: pendingDemandTerms } = countKeywordMatches(
+        lastMsgIsClient ? (msgs[msgs.length - 1].mensagem || "") : "",
+        DEMAND_KEYWORDS
+      );
+      // Also check last 3 client msgs for demand keywords without subsequent team response
+      const lastClientMsgs = msgs.slice(-5).filter((m: any) => m.direcao === "entrada");
+      const lastTeamMsg = [...msgs].reverse().find((m: any) => m.direcao === "saida");
+      const lastTeamTime = lastTeamMsg ? new Date(lastTeamMsg.created_at).getTime() : 0;
+      const unresolvedDemands: string[] = [];
+      for (const cm of lastClientMsgs) {
+        if (new Date(cm.created_at).getTime() > lastTeamTime) {
+          const { matched } = countKeywordMatches(cm.mensagem || "", [...DEMAND_KEYWORDS, ...COMPLAINT_KEYWORDS]);
+          unresolvedDemands.push(...matched);
+        }
+      }
+      const uniquePendingTerms = [...new Set([...pendingDemandTerms, ...unresolvedDemands])].slice(0, 5);
+      const hasPendingDemands = uniquePendingTerms.length > 0 || (lastMsgIsClient && demandCount > 0 && clientMsgs.length > teamMsgs.length);
+
       analytics[groupId] = {
         group_id: groupId,
         avg_frt_minutes: avgFrt,
@@ -190,6 +212,8 @@ Deno.serve(async (req) => {
         churn_risk: Math.round(churnRisk),
         total_client_msgs: clientMsgs.length,
         total_team_msgs: teamMsgs.length,
+        has_pending_demands: hasPendingDemands,
+        pending_demand_terms: uniquePendingTerms,
       };
     }
 

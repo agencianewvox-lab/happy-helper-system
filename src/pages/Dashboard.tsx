@@ -8,7 +8,7 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle } from "lucide-react";
 
 export default function Dashboard() {
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
@@ -26,7 +26,8 @@ export default function Dashboard() {
       ? Math.round(avgFrtAll.reduce((s, g) => s + (g.analytics!.avg_frt_minutes || 0), 0) / avgFrtAll.length)
       : null;
     const positiveSent = allGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
-    return { total, totalMsgs, comMsgs, highRisk, avgFrt, positiveSent };
+    const pendencias = allGrupos.filter((g) => g.analytics?.has_pending_demands).length;
+    return { total, totalMsgs, comMsgs, highRisk, avgFrt, positiveSent, pendencias };
   }, [allGrupos]);
 
   // Filter groups by clicked metric
@@ -37,6 +38,7 @@ export default function Dashboard() {
       case "totalMsgs": return grupos.filter(g => g.total_mensagens > 0);
       case "ativos": return grupos.filter(g => g.total_mensagens > 0);
       case "highRisk": return grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60);
+      case "pendencias": return grupos.filter(g => g.analytics?.has_pending_demands);
       case "frt": return grupos.filter(g => g.analytics?.avg_frt_minutes != null);
       case "positive": return grupos.filter(g => g.analytics?.sentiment === "positivo");
       default: return grupos;
@@ -48,6 +50,7 @@ export default function Dashboard() {
     totalMsgs: "Com Mensagens",
     ativos: "Grupos Ativos",
     highRisk: "Risco Alto",
+    pendencias: "Pendências",
     frt: "Com FRT",
     positive: "Sentimento Positivo",
   };
@@ -80,12 +83,13 @@ export default function Dashboard() {
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
             { key: "total", label: "Total Grupos", value: stats.total, icon: Users, color: "text-primary" },
             { key: "totalMsgs", label: "Total Mensagens", value: stats.totalMsgs, icon: MessageSquare, color: "text-emerald-500" },
             { key: "ativos", label: "Grupos Ativos", value: stats.comMsgs, icon: Activity, color: "text-amber-500" },
             { key: "highRisk", label: "Risco Alto", value: stats.highRisk, icon: AlertTriangle, color: "text-red-500" },
+            { key: "pendencias", label: "Pendências", value: stats.pendencias, icon: AlertCircle, color: "text-orange-500" },
             { key: "frt", label: "FRT Médio", value: stats.avgFrt != null ? `${stats.avgFrt}min` : "—", icon: Timer, color: "text-blue-500" },
             { key: "positive", label: "Sentimento +", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
           ].map(({ key, label, value, icon: Icon, color }) => (
