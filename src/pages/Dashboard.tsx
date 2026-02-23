@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useClientData } from "@/hooks/useClientData";
+import { AIChatPanel } from "@/components/AIChatPanel";
 import { ClientCard } from "@/components/ClientCard";
 import { ClientDetailModal } from "@/components/ClientDetailModal";
 import { DashboardFilters } from "@/components/DashboardFilters";
@@ -106,6 +107,8 @@ export default function Dashboard() {
           onClose={() => setTvMode(false)}
         />
       )}
+
+      <AIChatPanel />
     </div>
   );
 }
