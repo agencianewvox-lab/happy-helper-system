@@ -1,84 +1,75 @@
-import { Cliente } from "@/types/client";
+import { Grupo } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Clock, Star, AlertTriangle } from "lucide-react";
+import { MessageSquare, Clock, Users } from "lucide-react";
 
 interface ClientCardProps {
-  cliente: Cliente;
-  onClick: (cliente: Cliente) => void;
+  grupo: Grupo;
+  onClick: (grupo: Grupo) => void;
   compact?: boolean;
 }
 
-const satisfacaoConfig = {
-  positivo: { color: "bg-emerald-500", text: "text-emerald-400", label: "Positivo" },
-  neutro: { color: "bg-amber-500", text: "text-amber-400", label: "Neutro" },
-  negativo: { color: "bg-red-500", text: "text-red-400", label: "Negativo" },
+const categoriaConfig: Record<string, { color: string; icon: string }> = {
+  "Clientes / Operação": { color: "bg-blue-500", icon: "🚗" },
+  "Clínicas": { color: "bg-emerald-500", icon: "🦷" },
+  "Internos / Gestão": { color: "bg-purple-500", icon: "🧠" },
 };
 
-const riscoConfig = {
-  baixo: { variant: "outline" as const, className: "border-emerald-500/50 text-emerald-400" },
-  medio: { variant: "outline" as const, className: "border-amber-500/50 text-amber-400 bg-amber-500/10" },
-  alto: { variant: "outline" as const, className: "border-red-500/50 text-red-400 bg-red-500/10 animate-pulse" },
-};
-
-function isAlerta(cliente: Cliente) {
-  return cliente.conversas_iniciadas === 0 || cliente.risco_churn === "medio" || cliente.risco_churn === "alto";
-}
-
-export function ClientCard({ cliente, onClick, compact }: ClientCardProps) {
-  const alerta = isAlerta(cliente);
-  const sat = satisfacaoConfig[cliente.satisfacao];
-  const risco = riscoConfig[cliente.risco_churn];
+export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
+  const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
+  const temMensagens = grupo.total_mensagens > 0;
 
   return (
     <Card
-      onClick={() => onClick(cliente)}
+      onClick={() => onClick(grupo)}
       className={cn(
         "cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2",
         "bg-card/80 backdrop-blur-sm",
-        alerta
-          ? "border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.15)]"
-          : "border-border/50 hover:border-primary/30",
+        temMensagens
+          ? "border-border/50 hover:border-primary/30"
+          : "border-border/20 opacity-70 hover:opacity-100",
         compact && "text-sm"
       )}
     >
       <CardHeader className={cn("pb-2", compact ? "p-3" : "p-4")}>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className={cn("truncate", compact ? "text-sm" : "text-base")}>
-            {cliente.nome}
+            <span className="mr-1.5">{catConfig.icon}</span>
+            {grupo.nome}
           </CardTitle>
-          <div className={cn("w-3 h-3 rounded-full shrink-0", sat.color)} />
+          <div className={cn("w-3 h-3 rounded-full shrink-0", catConfig.color)} />
         </div>
       </CardHeader>
       <CardContent className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className={cn("font-medium", sat.text)}>{sat.label}</span>
-          <span className="truncate ml-2 max-w-[120px]">{cliente.sentimento}</span>
-        </div>
+        {grupo.categoria && (
+          <Badge variant="secondary" className="text-[10px]">
+            {grupo.categoria}
+          </Badge>
+        )}
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex items-center gap-1.5">
             <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className={cn(cliente.conversas_iniciadas === 0 && "text-red-400 font-bold")}>
-              {cliente.conversas_iniciadas} conversas
+            <span className={cn(!temMensagens && "text-muted-foreground")}>
+              {grupo.total_mensagens} msg
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-            <span>{cliente.tempo_medio_resposta}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 text-amber-400" />
-            <span className="font-semibold">{cliente.nota_gestor}/10</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-muted-foreground" />
-            <Badge className={cn("text-[10px] px-1.5 py-0", risco.className)}>
-              {cliente.risco_churn}
-            </Badge>
-          </div>
+          {grupo.ultimo_horario && (
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="truncate">
+                {new Date(grupo.ultimo_horario).toLocaleDateString("pt-BR")}
+              </span>
+            </div>
+          )}
         </div>
+
+        {grupo.ultima_mensagem && (
+          <p className="text-xs text-muted-foreground truncate italic">
+            "{grupo.ultima_mensagem}"
+          </p>
+        )}
       </CardContent>
     </Card>
   );
