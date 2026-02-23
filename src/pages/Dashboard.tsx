@@ -9,6 +9,7 @@ import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle } from "lucide-react";
+import newvoxLogo from "@/assets/newvox-logo.jpg";
 
 export default function Dashboard() {
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
@@ -62,9 +63,9 @@ export default function Dashboard() {
         <div className="max-w-[1600px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Activity className="w-6 h-6 text-primary" />
+              <img src={newvoxLogo} alt="New Vox" className="w-8 h-8 rounded object-cover" />
               <div>
-                <h1 className="text-lg font-bold tracking-tight">Central de Operações CS</h1>
+                <h1 className="text-lg font-bold tracking-tight">Painel de Controle New Vox</h1>
                 <p className="text-xs text-muted-foreground">
                   Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
                 </p>
