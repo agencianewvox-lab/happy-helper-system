@@ -11,6 +11,8 @@ export interface GroupAnalytics {
   churn_risk: number;
   total_client_msgs: number;
   total_team_msgs: number;
+  has_pending_demands: boolean;
+  pending_demand_terms: string[];
 }
 
 export interface Grupo {
