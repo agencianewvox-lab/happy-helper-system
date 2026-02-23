@@ -1,0 +1,206 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+// Negative sentiment keywords
+const COMPLAINT_KEYWORDS = [
+  "de novo", "sempre", "não resolveu", "ninguém responde", "ninguem responde",
+  "insatisfeito", "problema", "reclamação", "reclamacao", "absurdo",
+  "péssimo", "pessimo", "horrível", "horrivel", "demora", "cadê", "cade",
+  "não funciona", "nao funciona", "nunca", "pior", "falta de", "descaso",
+  "cancelar", "cancela", "insatisfação", "decepcionado", "decepcionada",
+];
+
+// Positive engagement keywords
+const POSITIVE_KEYWORDS = [
+  "👍", "obrigado", "obrigada", "perfeito", "excelente", "ótimo", "otimo",
+  "top", "parabéns", "parabens", "maravilhoso", "maravilhosa", "show",
+  "muito bom", "adorei", "incrível", "incrivel", "sensacional", "ficou ótimo",
+  "aprovado", "aprovada", "gostei", "amei", "mandou bem", "arrasou",
+  "valeu", "gratidão", "gratidao", "satisfeito", "satisfeita",
+];
+
+// Neutral/negative demand keywords
+const DEMAND_KEYWORDS = [
+  "quando fica pronto", "prazo", "urgente", "urgência", "urgencia",
+  "atrasado", "atraso", "cobra", "cobrando", "cadê", "cade",
+  "quanto tempo", "demora", "esperando", "aguardando",
+];
+
+interface GroupAnalytics {
+  group_id: string;
+  avg_frt_minutes: number | null;
+  sentiment: "positivo" | "neutro" | "negativo";
+  sentiment_score: number; // -100 to 100
+  complaint_count: number;
+  complaint_terms: string[];
+  positive_count: number;
+  demand_count: number;
+  engagement_type: "saudável" | "cobrança" | "misto" | "inativo";
+  churn_risk: number; // 0-100
+  total_client_msgs: number;
+  total_team_msgs: number;
+}
+
+function countKeywordMatches(text: string, keywords: string[]): { count: number; matched: string[] } {
+  const lower = text.toLowerCase();
+  let count = 0;
+  const matched: string[] = [];
+  for (const kw of keywords) {
+    const regex = new RegExp(kw.toLowerCase(), "gi");
+    const matches = lower.match(regex);
+    if (matches) {
+      count += matches.length;
+      if (!matched.includes(kw)) matched.push(kw);
+    }
+  }
+  return { count, matched };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Fetch all conversations (paginated to avoid 1000 limit)
+    let allConversas: any[] = [];
+    let offset = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from("whatsapp_conversas")
+        .select("group_id, nome_contato, mensagem, created_at, direcao")
+        .order("created_at", { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      allConversas = allConversas.concat(data);
+      if (data.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    // Group conversations by group_id
+    const groupedConvs = new Map<string, any[]>();
+    for (const c of allConversas) {
+      if (!c.group_id) continue;
+      if (!groupedConvs.has(c.group_id)) groupedConvs.set(c.group_id, []);
+      groupedConvs.get(c.group_id)!.push(c);
+    }
+
+    const analytics: Record<string, GroupAnalytics> = {};
+
+    for (const [groupId, msgs] of groupedConvs) {
+      const clientMsgs = msgs.filter((m: any) => m.direcao === "entrada");
+      const teamMsgs = msgs.filter((m: any) => m.direcao === "saida");
+
+      // 1. FRT - Average First Response Time
+      // Find pairs: first client msg followed by first team response
+      let totalFrt = 0;
+      let frtCount = 0;
+      let waitingForResponse = false;
+      let clientMsgTime: Date | null = null;
+
+      for (const msg of msgs) {
+        if (msg.direcao === "entrada" && !waitingForResponse) {
+          waitingForResponse = true;
+          clientMsgTime = new Date(msg.created_at);
+        } else if (msg.direcao === "saida" && waitingForResponse && clientMsgTime) {
+          const responseTime = new Date(msg.created_at);
+          const diffMinutes = (responseTime.getTime() - clientMsgTime.getTime()) / (1000 * 60);
+          if (diffMinutes > 0 && diffMinutes < 10080) { // max 7 days
+            totalFrt += diffMinutes;
+            frtCount++;
+          }
+          waitingForResponse = false;
+          clientMsgTime = null;
+        }
+      }
+
+      const avgFrt = frtCount > 0 ? Math.round(totalFrt / frtCount) : null;
+
+      // 2 & 3. Sentiment and complaint analysis
+      const allClientText = clientMsgs.map((m: any) => m.mensagem || "").join(" ");
+      const { count: complaintCount, matched: complaintTerms } = countKeywordMatches(allClientText, COMPLAINT_KEYWORDS);
+      const { count: positiveCount } = countKeywordMatches(allClientText, POSITIVE_KEYWORDS);
+      const { count: demandCount } = countKeywordMatches(allClientText, DEMAND_KEYWORDS);
+
+      // Sentiment score: -100 to 100
+      const totalSignals = positiveCount + complaintCount + demandCount || 1;
+      const sentimentScore = Math.round(((positiveCount - complaintCount - demandCount * 0.5) / totalSignals) * 100);
+      const sentiment: "positivo" | "neutro" | "negativo" =
+        sentimentScore > 20 ? "positivo" : sentimentScore < -20 ? "negativo" : "neutro";
+
+      // 4. Engagement type
+      let engagementType: "saudável" | "cobrança" | "misto" | "inativo";
+      if (clientMsgs.length === 0) {
+        engagementType = "inativo";
+      } else if (positiveCount > complaintCount + demandCount) {
+        engagementType = "saudável";
+      } else if (complaintCount + demandCount > positiveCount * 2) {
+        engagementType = "cobrança";
+      } else {
+        engagementType = "misto";
+      }
+
+      // 5. Churn risk score (0-100)
+      let churnRisk = 50; // base
+      // Higher complaints = higher risk
+      churnRisk += Math.min(complaintCount * 5, 25);
+      // More demands = higher risk
+      churnRisk += Math.min(demandCount * 3, 15);
+      // Positive signals reduce risk
+      churnRisk -= Math.min(positiveCount * 4, 30);
+      // Slow FRT increases risk
+      if (avgFrt !== null) {
+        if (avgFrt > 480) churnRisk += 15; // >8h
+        else if (avgFrt > 120) churnRisk += 8; // >2h
+        else if (avgFrt < 30) churnRisk -= 10; // <30min
+      }
+      // No team responses = high risk
+      if (teamMsgs.length === 0 && clientMsgs.length > 0) churnRisk += 20;
+      // Inactivity (no recent msgs)
+      const lastMsg = msgs[msgs.length - 1];
+      if (lastMsg) {
+        const daysSince = (Date.now() - new Date(lastMsg.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSince > 14) churnRisk += 15;
+        else if (daysSince > 7) churnRisk += 8;
+      }
+      churnRisk = Math.max(0, Math.min(100, churnRisk));
+
+      analytics[groupId] = {
+        group_id: groupId,
+        avg_frt_minutes: avgFrt,
+        sentiment,
+        sentiment_score: sentimentScore,
+        complaint_count: complaintCount,
+        complaint_terms: complaintTerms.slice(0, 5),
+        positive_count: positiveCount,
+        demand_count: demandCount,
+        engagement_type: engagementType,
+        churn_risk: Math.round(churnRisk),
+        total_client_msgs: clientMsgs.length,
+        total_team_msgs: teamMsgs.length,
+      };
+    }
+
+    return new Response(JSON.stringify({ analytics }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("Analytics error:", err);
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : "Erro interno" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

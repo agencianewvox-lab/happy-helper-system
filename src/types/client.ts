@@ -1,3 +1,18 @@
+export interface GroupAnalytics {
+  group_id: string;
+  avg_frt_minutes: number | null;
+  sentiment: "positivo" | "neutro" | "negativo";
+  sentiment_score: number;
+  complaint_count: number;
+  complaint_terms: string[];
+  positive_count: number;
+  demand_count: number;
+  engagement_type: "saudável" | "cobrança" | "misto" | "inativo";
+  churn_risk: number;
+  total_client_msgs: number;
+  total_team_msgs: number;
+}
+
 export interface Grupo {
   id: string;
   group_id: string;
@@ -7,4 +22,5 @@ export interface Grupo {
   total_mensagens: number;
   ultima_mensagem: string | null;
   ultimo_horario: string | null;
+  analytics?: GroupAnalytics;
 }

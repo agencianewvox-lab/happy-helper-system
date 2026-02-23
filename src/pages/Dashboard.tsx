@@ -7,7 +7,7 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer } from "lucide-react";
 
 export default function Dashboard() {
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
@@ -18,7 +18,13 @@ export default function Dashboard() {
     const total = allGrupos.length;
     const totalMsgs = allGrupos.reduce((sum, g) => sum + g.total_mensagens, 0);
     const comMsgs = allGrupos.filter((g) => g.total_mensagens > 0).length;
-    return { total, totalMsgs, comMsgs };
+    const highRisk = allGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length;
+    const avgFrtAll = allGrupos.filter((g) => g.analytics?.avg_frt_minutes != null);
+    const avgFrt = avgFrtAll.length > 0
+      ? Math.round(avgFrtAll.reduce((s, g) => s + (g.analytics!.avg_frt_minutes || 0), 0) / avgFrtAll.length)
+      : null;
+    const positiveSent = allGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
+    return { total, totalMsgs, comMsgs, highRisk, avgFrt, positiveSent };
   }, [allGrupos]);
 
   return (
@@ -49,20 +55,23 @@ export default function Dashboard() {
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
             { label: "Total Grupos", value: stats.total, icon: Users, color: "text-primary" },
-            { label: "Total Mensagens", value: stats.totalMsgs, icon: MessageSquare, color: "text-emerald-400" },
-            { label: "Grupos Ativos", value: stats.comMsgs, icon: Activity, color: "text-amber-400" },
+            { label: "Total Mensagens", value: stats.totalMsgs, icon: MessageSquare, color: "text-emerald-500" },
+            { label: "Grupos Ativos", value: stats.comMsgs, icon: Activity, color: "text-amber-500" },
+            { label: "Risco Alto", value: stats.highRisk, icon: AlertTriangle, color: "text-red-500" },
+            { label: "FRT Médio", value: stats.avgFrt != null ? `${stats.avgFrt}min` : "—", icon: Timer, color: "text-blue-500" },
+            { label: "Sentimento +", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
           ].map(({ label, value, icon: Icon, color }) => (
             <div
               key={label}
               className="bg-card/60 border border-border/30 rounded-lg p-4 flex items-center gap-3"
             >
-              <Icon className={`w-8 h-8 ${color}`} />
+              <Icon className={`w-7 h-7 ${color}`} />
               <div>
-                <p className="text-2xl font-black">{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-xl font-black">{value}</p>
+                <p className="text-[10px] text-muted-foreground">{label}</p>
               </div>
             </div>
           ))}

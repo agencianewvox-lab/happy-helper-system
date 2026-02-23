@@ -2,7 +2,7 @@ import { Grupo } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Clock, Users } from "lucide-react";
+import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface ClientCardProps {
   grupo: Grupo;
@@ -16,9 +16,38 @@ const categoriaConfig: Record<string, { color: string; icon: string }> = {
   "Internos / Gestão": { color: "bg-purple-500", icon: "🧠" },
 };
 
+const sentimentConfig = {
+  positivo: { icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Positivo" },
+  neutro: { icon: Minus, color: "text-amber-500", bg: "bg-amber-500/10", label: "Neutro" },
+  negativo: { icon: TrendingDown, color: "text-red-500", bg: "bg-red-500/10", label: "Negativo" },
+};
+
+function formatFrt(minutes: number | null | undefined): string {
+  if (minutes == null) return "—";
+  if (minutes < 60) return `${minutes}min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h${m}m` : `${h}h`;
+}
+
+function churnColor(risk: number): string {
+  if (risk >= 70) return "text-red-500";
+  if (risk >= 40) return "text-amber-500";
+  return "text-emerald-500";
+}
+
+function churnBg(risk: number): string {
+  if (risk >= 70) return "bg-red-500/10";
+  if (risk >= 40) return "bg-amber-500/10";
+  return "bg-emerald-500/10";
+}
+
 export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
+  const a = grupo.analytics;
+  const sent = a ? sentimentConfig[a.sentiment] : null;
+  const SentIcon = sent?.icon || Minus;
 
   return (
     <Card
@@ -38,7 +67,12 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
             <span className="mr-1.5">{catConfig.icon}</span>
             {grupo.nome}
           </CardTitle>
-          <div className={cn("w-3 h-3 rounded-full shrink-0", catConfig.color)} />
+          <div className="flex items-center gap-1.5">
+            {a && a.churn_risk >= 60 && (
+              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+            )}
+            <div className={cn("w-3 h-3 rounded-full shrink-0", catConfig.color)} />
+          </div>
         </div>
       </CardHeader>
       <CardContent className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}>
@@ -65,7 +99,26 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
           )}
         </div>
 
-        {grupo.ultima_mensagem && (
+        {/* Analytics badges */}
+        {a && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {/* Sentiment */}
+            <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", sent?.bg, sent?.color)}>
+              <SentIcon className="w-3 h-3" />
+              {sent?.label}
+            </span>
+            {/* FRT */}
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+              ⏱ {formatFrt(a.avg_frt_minutes)}
+            </span>
+            {/* Churn */}
+            <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", churnBg(a.churn_risk), churnColor(a.churn_risk))}>
+              🔥 {a.churn_risk}%
+            </span>
+          </div>
+        )}
+
+        {grupo.ultima_mensagem && !compact && (
           <p className="text-xs text-muted-foreground truncate italic">
             "{grupo.ultima_mensagem}"
           </p>
