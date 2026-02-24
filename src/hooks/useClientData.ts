@@ -85,6 +85,13 @@ export function useClientData() {
       .channel("conversas-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_conversas" }, () => {
         fetchData();
+        fetchAnalytics();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_grupos" }, () => {
+        fetchData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "pending_demand_resolutions" }, () => {
+        fetchAnalytics();
       })
       .subscribe();
 
