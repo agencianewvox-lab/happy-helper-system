@@ -202,36 +202,32 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
               </div>
             )}
 
-            {/* Pending Demands - Motivo Pendência */}
-            {a.has_pending_demands && (
-              <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-4 h-4 text-orange-500" />
-                  <span className="text-xs font-medium text-orange-500 uppercase tracking-wider">Motivo Pendência</span>
-                </div>
-                {a.pending_demand_details && a.pending_demand_details.length > 0 ? (
+            {/* Pending Demands - Motivo Pendência (hide resolved) */}
+            {a.has_pending_demands && (() => {
+              const unresolvedDetails = (a.pending_demand_details || []).filter((d) => {
+                const key = makeKey(d.term, d.requested_at);
+                return resolutions[key] !== true;
+              });
+              if (unresolvedDetails.length === 0) return null;
+              return (
+                <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    <span className="text-xs font-medium text-orange-500 uppercase tracking-wider">Motivo Pendência</span>
+                  </div>
                   <div className="space-y-2">
-                    {a.pending_demand_details.map((d, i) => {
+                    {unresolvedDetails.map((d, i) => {
                       const dt = new Date(d.requested_at);
                       const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
                       const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                       const key = makeKey(d.term, d.requested_at);
-                      const isResolved = resolutions[key] === true;
                       const isSaving = savingKey === key;
                       return (
-                        <div key={i} className={cn(
-                          "text-xs text-muted-foreground rounded p-2 border",
-                          isResolved
-                            ? "bg-emerald-500/5 border-emerald-500/20"
-                            : "bg-muted/30 border-border/20"
-                        )}>
+                        <div key={i} className="text-xs text-muted-foreground rounded p-2 border bg-muted/30 border-border/20">
                           <p>
-                            {isResolved && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 inline mr-1" />}
                             Cliente solicitou <strong className="text-orange-400">{d.term}</strong> em{" "}
                             <strong>{dateStr}</strong> às <strong>{timeStr}</strong>
-                            {isResolved
-                              ? <span className="text-emerald-500 font-medium"> — Resolvido ✓</span>
-                              : " e ainda não foi atendido."}
+                            {" e ainda não foi atendido."}
                           </p>
                           {d.message_excerpt && (
                             <p className="mt-1 italic text-[10px] text-muted-foreground/70 truncate">
@@ -241,11 +237,8 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                           <div className="flex gap-2 mt-2">
                             <Button
                               size="sm"
-                              variant={isResolved ? "default" : "outline"}
-                              className={cn(
-                                "h-6 text-[10px] px-2 gap-1",
-                                isResolved && "bg-emerald-600 hover:bg-emerald-700 text-white"
-                              )}
+                              variant="outline"
+                              className="h-6 text-[10px] px-2 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
                               disabled={isSaving}
                               onClick={() => handleResolve(d.term, d.requested_at, true)}
                             >
@@ -254,11 +247,8 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                             </Button>
                             <Button
                               size="sm"
-                              variant={resolutions[key] === false ? "default" : "outline"}
-                              className={cn(
-                                "h-6 text-[10px] px-2 gap-1",
-                                resolutions[key] === false && "bg-red-600 hover:bg-red-700 text-white"
-                              )}
+                              variant="outline"
+                              className="h-6 text-[10px] px-2 gap-1"
                               disabled={isSaving}
                               onClick={() => handleResolve(d.term, d.requested_at, false)}
                             >
@@ -270,13 +260,9 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                       );
                     })}
                   </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Cliente enviou mensagem há mais de 2 horas sem resposta da equipe.
-                  </p>
-                )}
-              </div>
-            )}
+                </div>
+              );
+            })()}
 
             {/* Message breakdown */}
             <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
