@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
 
     // Nomes do time New Vox — mensagens desses contatos são "saida"
     const TEAM_MEMBERS = [
+      "jader",
       "alisson", "alisson lima",
       "murilo", "murillo", "murilo araújo",
       "priscila", "priscilla", "priscila borges", "priscilla borges",
