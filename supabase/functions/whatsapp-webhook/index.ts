@@ -42,8 +42,13 @@ Deno.serve(async (req) => {
       const explicit = clean(msg.direcao || msg.direction);
       if (explicit && explicit !== "entrada" && explicit !== "") return explicit;
       
-      const name = (clean(msg.nome_contato || msg.name || msg.pushName) || "").toLowerCase().trim();
-      if (name && TEAM_MEMBERS.some((tm) => name.includes(tm))) {
+      // Clean the name first to remove "=" prefix from n8n, then normalize
+      const rawName = clean(msg.nome_contato || msg.name || msg.pushName) || "";
+      const name = rawName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      if (name && TEAM_MEMBERS.some((tm) => {
+        const normalizedTm = tm.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return name.includes(normalizedTm);
+      })) {
         return "saida";
       }
       return "entrada";
