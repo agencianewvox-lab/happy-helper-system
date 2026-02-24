@@ -71,10 +71,98 @@ const DEMAND_KEYWORDS = [
   "quanto tempo", "demora", "atrasado", "atraso",
 ];
 
+// Solution suggestions based on detected pending demand terms
+const SOLUTION_MAP: Record<string, string> = {
+  // Criativo / Arte
+  "criativo": "Equipe criar e enviar o criativo para o cliente",
+  "criativos": "Equipe criar e enviar os criativos para o cliente",
+  "arte": "Equipe produzir e enviar a arte solicitada",
+  "artes": "Equipe produzir e enviar as artes solicitadas",
+  "banner": "Equipe criar e enviar o banner para o cliente",
+  "post": "Equipe criar e enviar o post para aprovação",
+  "feed": "Equipe preparar o conteúdo do feed e enviar",
+  "stories": "Equipe criar os stories e enviar para aprovação",
+  "reels": "Equipe produzir o reels e enviar para o cliente",
+  // Verba / Orçamento
+  "verba": "Equipe enviar a recarga/verba para o cliente",
+  "orçamento": "Equipe enviar o orçamento solicitado",
+  "orcamento": "Equipe enviar o orçamento solicitado",
+  // Campanha
+  "campanha": "Equipe configurar/ajustar a campanha conforme solicitado",
+  "anúncio": "Equipe criar/ajustar o anúncio solicitado",
+  "anuncio": "Equipe criar/ajustar o anúncio solicitado",
+  "subir campanha": "Equipe subir a campanha no gerenciador",
+  "pausar campanha": "Equipe pausar a campanha conforme pedido",
+  "ativar": "Equipe ativar o item conforme solicitado",
+  "desativar": "Equipe desativar conforme pedido do cliente",
+  // Alterações
+  "alterar": "Equipe realizar a alteração solicitada pelo cliente",
+  "mudar": "Equipe realizar a mudança pedida",
+  "trocar": "Equipe fazer a troca solicitada",
+  "atualizar": "Equipe atualizar conforme pedido do cliente",
+  "ajustar": "Equipe ajustar conforme solicitação",
+  "modificar": "Equipe modificar conforme pedido",
+  // Envios / Solicitações
+  "preciso": "Equipe atender à necessidade do cliente",
+  "precisamos": "Equipe atender à necessidade do cliente",
+  "solicito": "Equipe atender à solicitação do cliente",
+  "solicitar": "Equipe processar a solicitação",
+  "pedido": "Equipe atender ao pedido do cliente",
+  "enviar": "Equipe enviar o material solicitado",
+  "me envia": "Equipe enviar o que foi pedido ao cliente",
+  "me manda": "Equipe enviar o material para o cliente",
+  "pode enviar": "Equipe enviar o que foi solicitado",
+  "pode mandar": "Equipe enviar o que foi solicitado",
+  // Urgência / Prazo
+  "urgente": "Equipe priorizar e resolver com urgência",
+  "urgência": "Equipe priorizar e resolver com urgência",
+  "urgencia": "Equipe priorizar e resolver com urgência",
+  "quando fica pronto": "Equipe informar prazo de entrega ao cliente",
+  "prazo": "Equipe informar/cumprir o prazo solicitado",
+  // Documentos / Relatórios
+  "relatório": "Equipe preparar e enviar o relatório",
+  "relatorio": "Equipe preparar e enviar o relatório",
+  "planilha": "Equipe preparar e enviar a planilha",
+  "proposta": "Equipe elaborar e enviar a proposta",
+  "briefing": "Equipe preencher/enviar o briefing",
+  // Digital
+  "logo": "Equipe criar/enviar o logo solicitado",
+  "logotipo": "Equipe criar/enviar o logotipo",
+  "vídeo": "Equipe produzir e enviar o vídeo",
+  "video": "Equipe produzir e enviar o vídeo",
+  "landing page": "Equipe criar/ajustar a landing page",
+  "site": "Equipe atualizar/criar o site conforme pedido",
+  "página": "Equipe atualizar a página solicitada",
+  "pagina": "Equipe atualizar a página solicitada",
+  "link": "Equipe enviar/corrigir o link solicitado",
+  "aprovação": "Equipe enviar material para aprovação do cliente",
+  "aprovacao": "Equipe enviar material para aprovação do cliente",
+  // Cobranças / Espera
+  "cadê": "Equipe responder e dar retorno ao cliente",
+  "cade": "Equipe responder e dar retorno ao cliente",
+  "esperando": "Equipe dar retorno ao cliente que está aguardando",
+  "aguardando": "Equipe dar retorno ao cliente que está aguardando",
+  "cobrando": "Equipe resolver a pendência cobrada pelo cliente",
+  "demora": "Equipe agilizar e dar retorno ao cliente",
+  "atrasado": "Equipe resolver o atraso e informar o cliente",
+  "atraso": "Equipe resolver o atraso e informar o cliente",
+  // Genérico
+  "sem resposta": "Equipe responder a mensagem do cliente",
+  "fazer": "Equipe executar o que foi solicitado",
+  "pode fazer": "Equipe atender ao pedido do cliente",
+  "consegue": "Equipe avaliar e responder a viabilidade",
+};
+
+function getSuggestedSolution(term: string, excerpt: string): string {
+  const lower = term.toLowerCase();
+  return SOLUTION_MAP[lower] || `Equipe dar retorno sobre "${term}" ao cliente`;
+}
+
 interface PendingDemandDetail {
   term: string;
   requested_at: string;
   message_excerpt: string;
+  suggested_solution: string;
 }
 
 interface GroupAnalytics {
@@ -335,6 +423,7 @@ Deno.serve(async (req) => {
             term: bestTerm,
             requested_at: cm.created_at,
             message_excerpt: (cm.mensagem || "").slice(0, 120),
+            suggested_solution: getSuggestedSolution(bestTerm, cm.mensagem || ""),
           });
         }
       }
@@ -366,6 +455,7 @@ Deno.serve(async (req) => {
           term: "sem resposta",
           requested_at: lastClientMsg.created_at,
           message_excerpt: (lastClientMsg.mensagem || "").slice(0, 120),
+          suggested_solution: getSuggestedSolution("sem resposta", lastClientMsg.mensagem || ""),
         });
       }
 

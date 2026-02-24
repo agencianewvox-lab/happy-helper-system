@@ -2,6 +2,7 @@ export interface PendingDemandDetail {
   term: string;
   requested_at: string; // ISO timestamp
   message_excerpt: string;
+  suggested_solution: string;
 }
 
 export interface GroupAnalytics {
