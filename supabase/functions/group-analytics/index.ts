@@ -105,8 +105,75 @@ Deno.serve(async (req) => {
       const clientMsgs = msgs.filter((m: any) => m.direcao === "entrada");
       const teamMsgs = msgs.filter((m: any) => m.direcao === "saida");
 
-      // 1. FRT - Average First Response Time
-      // Find pairs: first client msg followed by first team response
+      // 1. FRT - Average First Response Time (business hours only: 08-18 BRT, UTC-3)
+      // Calculates elapsed business-hours minutes between client msg and team response
+      const BRT_OFFSET = -3; // Brasília UTC offset
+      const BIZ_START = 8; // 08:00
+      const BIZ_END = 18;  // 18:00
+      const BIZ_MINUTES_PER_DAY = (BIZ_END - BIZ_START) * 60; // 600
+
+      function toBrt(d: Date): Date {
+        return new Date(d.getTime() + BRT_OFFSET * 60 * 60 * 1000);
+      }
+
+      function businessMinutesBetween(start: Date, end: Date): number {
+        const s = toBrt(start);
+        const e = toBrt(end);
+        if (e <= s) return 0;
+
+        let total = 0;
+        const cur = new Date(s);
+
+        // Cap start to biz hours
+        const clampToBiz = (d: Date): Date => {
+          const h = d.getHours() + d.getMinutes() / 60;
+          if (h < BIZ_START) { d.setHours(BIZ_START, 0, 0, 0); }
+          else if (h >= BIZ_END) { d.setDate(d.getDate() + 1); d.setHours(BIZ_START, 0, 0, 0); }
+          // Skip weekends
+          while (d.getDay() === 0 || d.getDay() === 6) { d.setDate(d.getDate() + 1); d.setHours(BIZ_START, 0, 0, 0); }
+          return d;
+        };
+
+        const cStart = clampToBiz(new Date(cur));
+        const cEnd = new Date(e);
+
+        if (cStart >= cEnd) return 0;
+
+        // Same day?
+        const sameDay = cStart.toDateString() === cEnd.toDateString();
+        if (sameDay) {
+          const endH = Math.min(cEnd.getHours() + cEnd.getMinutes() / 60, BIZ_END);
+          const startH = cStart.getHours() + cStart.getMinutes() / 60;
+          return Math.max(0, Math.round((endH - startH) * 60));
+        }
+
+        // First partial day
+        total += (BIZ_END - (cStart.getHours() + cStart.getMinutes() / 60)) * 60;
+
+        // Full days in between
+        const nextDay = new Date(cStart);
+        nextDay.setDate(nextDay.getDate() + 1);
+        nextDay.setHours(BIZ_START, 0, 0, 0);
+        while (nextDay.toDateString() !== cEnd.toDateString()) {
+          if (nextDay.getDay() !== 0 && nextDay.getDay() !== 6) {
+            total += BIZ_MINUTES_PER_DAY;
+          }
+          nextDay.setDate(nextDay.getDate() + 1);
+          // Safety: max 30 days
+          if (total > 30 * BIZ_MINUTES_PER_DAY) break;
+        }
+
+        // Last partial day
+        if (cEnd.getDay() !== 0 && cEnd.getDay() !== 6) {
+          const endH = Math.min(cEnd.getHours() + cEnd.getMinutes() / 60, BIZ_END);
+          if (endH > BIZ_START) {
+            total += (endH - BIZ_START) * 60;
+          }
+        }
+
+        return Math.max(0, Math.round(total));
+      }
+
       let totalFrt = 0;
       let frtCount = 0;
       let waitingForResponse = false;
@@ -118,9 +185,9 @@ Deno.serve(async (req) => {
           clientMsgTime = new Date(msg.created_at);
         } else if (msg.direcao === "saida" && waitingForResponse && clientMsgTime) {
           const responseTime = new Date(msg.created_at);
-          const diffMinutes = (responseTime.getTime() - clientMsgTime.getTime()) / (1000 * 60);
-          if (diffMinutes > 0 && diffMinutes < 10080) { // max 7 days
-            totalFrt += diffMinutes;
+          const bizMinutes = businessMinutesBetween(clientMsgTime, responseTime);
+          if (bizMinutes > 0 && bizMinutes < 30 * BIZ_MINUTES_PER_DAY) {
+            totalFrt += bizMinutes;
             frtCount++;
           }
           waitingForResponse = false;
