@@ -6,13 +6,39 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Negative sentiment keywords
+// Client dissatisfaction keywords - signals unhappiness with results/partnership
+const DISSATISFACTION_KEYWORDS = [
+  // Results dissatisfaction
+  "não chegou lead", "nao chegou lead", "sem lead", "zero lead", "nenhum lead",
+  "não estou vendo resultado", "nao estou vendo resultado", "sem resultado",
+  "não tá funcionando", "nao ta funcionando", "não está funcionando", "nao esta funcionando",
+  "não funciona", "nao funciona", "não deu resultado", "nao deu resultado",
+  "resultado ruim", "resultado péssimo", "resultado pessimo", "sem retorno",
+  // Partnership discomfort
+  "isso não pode acontecer", "isso nao pode acontecer", "inaceitável", "inaceitavel",
+  "não pode continuar assim", "nao pode continuar assim",
+  "vou cancelar", "quero cancelar", "cancelar contrato", "rescindir",
+  "trocar de agência", "trocar de agencia", "outra agência", "outra agencia",
+  "insatisfeito", "insatisfeita", "insatisfação", "insatisfacao",
+  "decepcionado", "decepcionada", "decepção", "decepcao",
+  "péssimo", "pessimo", "horrível", "horrivel", "absurdo",
+  "descaso", "falta de compromisso", "falta de comprometimento",
+  "estou pagando", "pago caro", "jogando dinheiro fora",
+  "não recomendo", "nao recomendo", "arrependido", "arrependida",
+  "pior", "piorou", "caiu", "despencou",
+  "não vale a pena", "nao vale a pena", "perda de tempo",
+  "vocês não entregam", "voces nao entregam", "não entrega", "nao entrega",
+  "prometeram", "prometeu", "foi prometido",
+  "cadê os resultados", "cade os resultados",
+  "ninguém resolve", "ninguem resolve", "não resolveu", "nao resolveu",
+  "sempre a mesma coisa", "de novo isso", "de novo",
+  "nunca funciona", "nunca dá certo", "nunca da certo",
+];
+
+// General negative sentiment keywords (lighter weight)
 const COMPLAINT_KEYWORDS = [
-  "de novo", "sempre", "não resolveu", "ninguém responde", "ninguem responde",
-  "insatisfeito", "problema", "reclamação", "reclamacao", "absurdo",
-  "péssimo", "pessimo", "horrível", "horrivel", "demora", "cadê", "cade",
-  "não funciona", "nao funciona", "nunca", "pior", "falta de", "descaso",
-  "cancelar", "cancela", "insatisfação", "decepcionado", "decepcionada",
+  "problema", "reclamação", "reclamacao", "demora",
+  "falta de", "cobrando", "cobra",
 ];
 
 // Positive engagement keywords
@@ -213,13 +239,14 @@ Deno.serve(async (req) => {
 
       // 2 & 3. Sentiment and complaint analysis
       const allClientText = clientMsgs.map((m: any) => m.mensagem || "").join(" ");
-      const { count: complaintCount, matched: complaintTerms } = countKeywordMatches(allClientText, COMPLAINT_KEYWORDS);
+      const { count: dissatisfactionCount, matched: dissatisfactionTerms } = countKeywordMatches(allClientText, DISSATISFACTION_KEYWORDS);
+      const { count: complaintCount } = countKeywordMatches(allClientText, COMPLAINT_KEYWORDS);
       const { count: positiveCount } = countKeywordMatches(allClientText, POSITIVE_KEYWORDS);
       const { count: demandCount } = countKeywordMatches(allClientText, DEMAND_KEYWORDS);
 
-      // Sentiment score: -100 to 100
-      const totalSignals = positiveCount + complaintCount + demandCount || 1;
-      const sentimentScore = Math.round(((positiveCount - complaintCount - demandCount * 0.5) / totalSignals) * 100);
+      // Sentiment score: -100 to 100 (dissatisfaction weighs heavily)
+      const totalSignals = positiveCount + complaintCount + dissatisfactionCount + demandCount || 1;
+      const sentimentScore = Math.round(((positiveCount - dissatisfactionCount * 2 - complaintCount - demandCount * 0.5) / totalSignals) * 100);
       const sentiment: "positivo" | "neutro" | "negativo" =
         sentimentScore > 20 ? "positivo" : sentimentScore < -20 ? "negativo" : "neutro";
 
@@ -235,28 +262,30 @@ Deno.serve(async (req) => {
         engagementType = "misto";
       }
 
-      // 5. Churn risk score (0-100)
-      let churnRisk = 50; // base
-      // Higher complaints = higher risk
-      churnRisk += Math.min(complaintCount * 5, 25);
-      // More demands = higher risk
-      churnRisk += Math.min(demandCount * 3, 15);
+      // 5. Churn risk score (0-100) — driven primarily by client dissatisfaction
+      let churnRisk = 30; // base (lower default)
+      // Dissatisfaction is the PRIMARY driver of high risk
+      churnRisk += Math.min(dissatisfactionCount * 12, 50);
+      // General complaints add moderate risk
+      churnRisk += Math.min(complaintCount * 3, 10);
+      // Demands add slight risk
+      churnRisk += Math.min(demandCount * 2, 8);
       // Positive signals reduce risk
-      churnRisk -= Math.min(positiveCount * 4, 30);
+      churnRisk -= Math.min(positiveCount * 4, 25);
       // Slow FRT increases risk
       if (avgFrt !== null) {
-        if (avgFrt > 480) churnRisk += 15; // >8h
-        else if (avgFrt > 120) churnRisk += 8; // >2h
-        else if (avgFrt < 30) churnRisk -= 10; // <30min
+        if (avgFrt > 480) churnRisk += 10;
+        else if (avgFrt > 120) churnRisk += 5;
+        else if (avgFrt < 30) churnRisk -= 5;
       }
-      // No team responses = high risk
-      if (teamMsgs.length === 0 && clientMsgs.length > 0) churnRisk += 20;
-      // Inactivity (no recent msgs)
+      // No team responses = higher risk
+      if (teamMsgs.length === 0 && clientMsgs.length > 0) churnRisk += 15;
+      // Inactivity
       const lastMsg = msgs[msgs.length - 1];
       if (lastMsg) {
         const daysSince = (Date.now() - new Date(lastMsg.created_at).getTime()) / (1000 * 60 * 60 * 24);
-        if (daysSince > 14) churnRisk += 15;
-        else if (daysSince > 7) churnRisk += 8;
+        if (daysSince > 14) churnRisk += 10;
+        else if (daysSince > 7) churnRisk += 5;
       }
       churnRisk = Math.max(0, Math.min(100, churnRisk));
 
@@ -308,7 +337,7 @@ Deno.serve(async (req) => {
         sentiment,
         sentiment_score: sentimentScore,
         complaint_count: complaintCount,
-        complaint_terms: complaintTerms.slice(0, 5),
+        complaint_terms: dissatisfactionTerms.slice(0, 5),
         positive_count: positiveCount,
         demand_count: demandCount,
         engagement_type: engagementType,
