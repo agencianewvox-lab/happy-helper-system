@@ -35,15 +35,25 @@ export function useClientData() {
 
       if (gruposError) throw gruposError;
 
-      const { data: conversas, error: convsError } = await supabase
-        .from("whatsapp_conversas")
-        .select("group_id, mensagem, created_at")
-        .order("created_at", { ascending: false });
-
-      if (convsError) throw convsError;
+      // Paginate to fetch ALL conversations (Supabase default limit is 1000)
+      let allConversas: { group_id: string | null; mensagem: string | null; created_at: string }[] = [];
+      let offset = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: page, error: convsError } = await supabase
+          .from("whatsapp_conversas")
+          .select("group_id, mensagem, created_at")
+          .order("created_at", { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (convsError) throw convsError;
+        if (!page || page.length === 0) break;
+        allConversas = allConversas.concat(page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
 
       const msgMap = new Map<string, { count: number; last_msg: string | null; last_time: string | null }>();
-      for (const c of conversas || []) {
+      for (const c of allConversas) {
         if (!c.group_id) continue;
         const existing = msgMap.get(c.group_id);
         if (!existing) {
