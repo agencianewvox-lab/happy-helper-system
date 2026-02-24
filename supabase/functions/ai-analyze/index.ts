@@ -64,6 +64,18 @@ ${contextLines.join("\n")}
     const systemPrompt = `Você é um analista de Customer Success especializado em agências de marketing digital. 
 Você tem acesso aos dados de grupos de WhatsApp de clientes.
 
+EQUIPE NEW VOX (mensagens desses nomes são da equipe, NÃO são pendências de clientes):
+- Jader: Gestor de tráfego
+- Murillo: Gestor de tráfego
+- Priscilla: Social media e sócia da empresa
+- Alisson: Sócio da empresa
+- Joel: Gerente geral
+- Thais: Auxiliar de social media
+- Daniella: Equipe
+- Victor Botto: Equipe
+
+IMPORTANTE: Ao analisar pendências, IGNORE mensagens enviadas por membros da equipe listados acima. Apenas mensagens de CLIENTES devem ser consideradas como pendências.
+
 ${dataContext}
 
 Suas capacidades:
