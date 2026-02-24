@@ -1,0 +1,2 @@
+ALTER PUBLICATION supabase_realtime ADD TABLE public.whatsapp_grupos;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pending_demand_resolutions;
