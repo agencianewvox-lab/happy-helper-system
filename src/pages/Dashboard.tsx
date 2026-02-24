@@ -35,7 +35,8 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const total = allGrupos.length;
     const totalMsgs = allGrupos.reduce((sum, g) => sum + g.total_mensagens, 0);
-    const comMsgs = allGrupos.filter((g) => g.total_mensagens > 0).length;
+    const now24 = Date.now() - 24 * 60 * 60 * 1000;
+    const comMsgs = allGrupos.filter((g) => g.ultimo_horario && new Date(g.ultimo_horario).getTime() > now24).length;
     const highRisk = allGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length;
     const avgFrtAll = allGrupos.filter((g) => g.analytics?.avg_frt_minutes != null);
     const avgFrt = avgFrtAll.length > 0
@@ -63,7 +64,7 @@ export default function Dashboard() {
     switch (metricFilter) {
       case "total": return grupos;
       case "totalMsgs": return grupos.filter(g => g.total_mensagens > 0);
-      case "ativos": return grupos.filter(g => g.total_mensagens > 0);
+      case "ativos": return grupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000);
       case "highRisk": return grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60);
       case "pendencias": return grupos.filter(g => g.analytics?.has_pending_demands);
       case "frt": return grupos.filter(g => g.analytics?.avg_frt_minutes != null);
