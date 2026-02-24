@@ -9,7 +9,7 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -49,7 +49,12 @@ export default function Dashboard() {
       if (!g.ultimo_horario) return true;
       return now - new Date(g.ultimo_horario).getTime() > h24;
     }).length;
-    return { total, totalMsgs, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos };
+    const h48 = 48 * 60 * 60 * 1000;
+    const dengue = allGrupos.filter((g) => {
+      if (!g.ultimo_horario) return true;
+      return now - new Date(g.ultimo_horario).getTime() > h48;
+    }).length;
+    return { total, totalMsgs, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue };
   }, [allGrupos]);
 
   // Filter groups by clicked metric
@@ -67,6 +72,10 @@ export default function Dashboard() {
         if (!g.ultimo_horario) return true;
         return Date.now() - new Date(g.ultimo_horario).getTime() > 24 * 60 * 60 * 1000;
       });
+      case "dengue": return grupos.filter(g => {
+        if (!g.ultimo_horario) return true;
+        return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
+      });
       default: return grupos;
     }
   }, [grupos, metricFilter]);
@@ -80,6 +89,7 @@ export default function Dashboard() {
     frt: "Com FRT",
     positive: "Sentimento Positivo",
     inativos: "Grupos Inativos",
+    dengue: "Grupos da Dengue",
   };
 
   return (
@@ -113,7 +123,7 @@ export default function Dashboard() {
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-9 gap-4">
           {[
             { key: "total", label: "Total Grupos", value: stats.total, icon: Users, color: "text-primary" },
             { key: "totalMsgs", label: "Total Mensagens", value: stats.totalMsgs, icon: MessageSquare, color: "text-emerald-500" },
@@ -123,6 +133,7 @@ export default function Dashboard() {
             { key: "frt", label: "FRT Médio", value: stats.avgFrt != null ? `${stats.avgFrt}min` : "—", icon: Timer, color: "text-blue-500" },
             { key: "positive", label: "Sentimento +", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
             { key: "inativos", label: "Grupos Inativos", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
+            { key: "dengue", label: "Grupos da Dengue", value: stats.dengue, icon: Flame, color: "text-red-600" },
           ].map(({ key, label, value, icon: Icon, color }) => (
             <button
               key={key}
