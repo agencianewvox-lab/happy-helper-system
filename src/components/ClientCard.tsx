@@ -2,7 +2,7 @@ import { Grupo } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react";
 
 interface ClientCardProps {
   grupo: Grupo;
@@ -115,6 +115,23 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
             <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", churnBg(a.churn_risk), churnColor(a.churn_risk))}>
               🔥 {a.churn_risk}%
             </span>
+            {/* Pending */}
+            {a.has_pending_demands && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
+                <AlertCircle className="w-3 h-3" />
+                Pendente
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Motivo pendência resumido */}
+        {a?.has_pending_demands && !compact && (
+          <div className="text-[10px] text-orange-400 bg-orange-500/5 rounded px-2 py-1 border border-orange-500/20">
+            <span className="font-semibold">Motivo: </span>
+            {a.pending_demand_terms.length > 0
+              ? a.pending_demand_terms.slice(0, 3).join(", ")
+              : "Sem resposta há +2h"}
           </div>
         )}
 

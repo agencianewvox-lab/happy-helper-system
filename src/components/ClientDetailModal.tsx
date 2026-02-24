@@ -155,6 +155,34 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
               </div>
             )}
 
+            {/* Pending Demands - Motivo Pendência */}
+            {a.has_pending_demands && (
+              <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-orange-500" />
+                  <span className="text-xs font-medium text-orange-500 uppercase tracking-wider">Motivo Pendência</span>
+                </div>
+                {a.pending_demand_terms.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      Cliente aguardando resposta sobre:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {a.pending_demand_terms.map((term) => (
+                        <Badge key={term} variant="outline" className="text-[10px] border-orange-500/30 text-orange-400">
+                          {term}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Cliente enviou mensagem há mais de 2 horas sem resposta da equipe.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Message breakdown */}
             <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
               <span className="text-xs text-muted-foreground font-medium">Mensagens</span>
