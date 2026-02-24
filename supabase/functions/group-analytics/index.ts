@@ -43,11 +43,11 @@ const COMPLAINT_KEYWORDS = [
 
 // Positive engagement keywords
 const POSITIVE_KEYWORDS = [
-  "👍", "obrigado", "obrigada", "perfeito", "excelente", "ótimo", "otimo",
+  "👍", "perfeito", "excelente", "ótimo", "otimo",
   "top", "parabéns", "parabens", "maravilhoso", "maravilhosa", "show",
   "muito bom", "adorei", "incrível", "incrivel", "sensacional", "ficou ótimo",
   "aprovado", "aprovada", "gostei", "amei", "mandou bem", "arrasou",
-  "valeu", "gratidão", "gratidao", "satisfeito", "satisfeita",
+  "satisfeito", "satisfeita",
 ];
 
 // Solicitation/request keywords - actionable demands from clients
