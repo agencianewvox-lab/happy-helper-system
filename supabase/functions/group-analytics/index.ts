@@ -138,6 +138,19 @@ Deno.serve(async (req) => {
       offset += pageSize;
     }
 
+    // Fetch resolved pending demands to filter them out
+    const { data: resolvedDemands, error: resolvedError } = await supabase
+      .from("pending_demand_resolutions")
+      .select("group_id, term, requested_at")
+      .eq("resolved", true);
+    if (resolvedError) throw resolvedError;
+
+    // Build a set of resolved keys for fast lookup: "group_id|term|requested_at"
+    const resolvedSet = new Set<string>();
+    for (const r of (resolvedDemands || [])) {
+      resolvedSet.add(`${r.group_id}|${r.term}|${r.requested_at}`);
+    }
+
     // Group conversations by group_id
     const groupedConvs = new Map<string, any[]>();
     for (const c of allConversas) {
@@ -356,7 +369,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      const uniqueDetails = pendingDetails.slice(0, 5);
+      // Filter out resolved demands
+      const unresolvedDetails = pendingDetails.filter(d => {
+        const key = `${groupId}|${d.term}|${d.requested_at}`;
+        return !resolvedSet.has(key);
+      });
+
+      const uniqueDetails = unresolvedDetails.slice(0, 5);
       const uniquePendingTerms = uniqueDetails.map(d => d.term);
 
       analytics[groupId] = {
