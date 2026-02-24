@@ -24,11 +24,25 @@ const POSITIVE_KEYWORDS = [
   "valeu", "gratidão", "gratidao", "satisfeito", "satisfeita",
 ];
 
-// Neutral/negative demand keywords
+// Solicitation/request keywords - actionable demands from clients
+const SOLICITATION_KEYWORDS = [
+  "criativo", "criativos", "arte", "artes", "banner", "post", "feed",
+  "verba", "orçamento", "orcamento", "campanha", "anúncio", "anuncio",
+  "alterar", "mudar", "trocar", "atualizar", "ajustar", "modificar",
+  "preciso", "precisamos", "solicito", "solicitar", "pedido", "enviar",
+  "fazer", "pode fazer", "consegue", "quando fica pronto", "prazo",
+  "urgente", "urgência", "urgencia", "aprovação", "aprovacao",
+  "relatório", "relatorio", "planilha", "proposta", "briefing",
+  "logo", "logotipo", "vídeo", "video", "stories", "reels",
+  "landing page", "site", "página", "pagina", "link",
+  "subir campanha", "pausar campanha", "ativar", "desativar",
+  "me envia", "me manda", "pode enviar", "pode mandar",
+];
+
+// General demand keywords (waiting/follow-up)
 const DEMAND_KEYWORDS = [
-  "quando fica pronto", "prazo", "urgente", "urgência", "urgencia",
-  "atrasado", "atraso", "cobra", "cobrando", "cadê", "cade",
-  "quanto tempo", "demora", "esperando", "aguardando",
+  "cadê", "cade", "esperando", "aguardando", "cobrando",
+  "quanto tempo", "demora", "atrasado", "atraso",
 ];
 
 interface GroupAnalytics {
@@ -246,25 +260,47 @@ Deno.serve(async (req) => {
       }
       churnRisk = Math.max(0, Math.min(100, churnRisk));
 
-      // 6. Pending demands - client sent demand keywords and last msg is from client (no team response yet)
-      const lastMsgIsClient = msgs.length > 0 && msgs[msgs.length - 1].direcao === "entrada";
-      const { matched: pendingDemandTerms } = countKeywordMatches(
-        lastMsgIsClient ? (msgs[msgs.length - 1].mensagem || "") : "",
-        DEMAND_KEYWORDS
-      );
-      // Also check last 3 client msgs for demand keywords without subsequent team response
-      const lastClientMsgs = msgs.slice(-5).filter((m: any) => m.direcao === "entrada");
+      // 6. Pending demands - detect unanswered client solicitations
+      // A pending demand = client made a specific request/solicitation AND team hasn't resolved it
       const lastTeamMsg = [...msgs].reverse().find((m: any) => m.direcao === "saida");
       const lastTeamTime = lastTeamMsg ? new Date(lastTeamMsg.created_at).getTime() : 0;
-      const unresolvedDemands: string[] = [];
-      for (const cm of lastClientMsgs) {
-        if (new Date(cm.created_at).getTime() > lastTeamTime) {
-          const { matched } = countKeywordMatches(cm.mensagem || "", [...DEMAND_KEYWORDS, ...COMPLAINT_KEYWORDS]);
-          unresolvedDemands.push(...matched);
+
+      // Find client messages AFTER the last team response (unanswered messages)
+      const unansweredClientMsgs = msgs.filter(
+        (m: any) => m.direcao === "entrada" && new Date(m.created_at).getTime() > lastTeamTime
+      );
+
+      // Check if any unanswered message contains a solicitation
+      const unresolvedSolicitations: string[] = [];
+      for (const cm of unansweredClientMsgs) {
+        const { matched: solMatched } = countKeywordMatches(cm.mensagem || "", SOLICITATION_KEYWORDS);
+        const { matched: demMatched } = countKeywordMatches(cm.mensagem || "", DEMAND_KEYWORDS);
+        unresolvedSolicitations.push(...solMatched, ...demMatched);
+      }
+
+      // Also detect "left on read" - client sent messages and team never replied (or replied but didn't address)
+      const lastMsgIsClient = msgs.length > 0 && msgs[msgs.length - 1].direcao === "entrada";
+      const clientLeftWaiting = lastMsgIsClient && unansweredClientMsgs.length >= 1 &&
+        (Date.now() - new Date(msgs[msgs.length - 1].created_at).getTime()) > 2 * 60 * 60 * 1000; // 2h+
+
+      // Check if team responded but client followed up with same request (not resolved)
+      const lastFewMsgs = msgs.slice(-10);
+      for (let i = 0; i < lastFewMsgs.length; i++) {
+        const m = lastFewMsgs[i];
+        if (m.direcao === "entrada") {
+          const { matched } = countKeywordMatches(m.mensagem || "", SOLICITATION_KEYWORDS);
+          if (matched.length > 0) {
+            // Check if team responded AFTER this with a resolution (not just acknowledgment)
+            const subsequentTeamMsgs = lastFewMsgs.slice(i + 1).filter((x: any) => x.direcao === "saida");
+            if (subsequentTeamMsgs.length === 0) {
+              unresolvedSolicitations.push(...matched);
+            }
+          }
         }
       }
-      const uniquePendingTerms = [...new Set([...pendingDemandTerms, ...unresolvedDemands])].slice(0, 5);
-      const hasPendingDemands = uniquePendingTerms.length > 0 || (lastMsgIsClient && demandCount > 0 && clientMsgs.length > teamMsgs.length);
+
+      const uniquePendingTerms = [...new Set(unresolvedSolicitations)].slice(0, 5);
+      const hasPendingDemands = uniquePendingTerms.length > 0 || clientLeftWaiting;
 
       analytics[groupId] = {
         group_id: groupId,
