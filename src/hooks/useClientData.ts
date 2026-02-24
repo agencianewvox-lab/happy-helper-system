@@ -36,13 +36,13 @@ export function useClientData() {
       if (gruposError) throw gruposError;
 
       // Paginate to fetch ALL conversations (Supabase default limit is 1000)
-      let allConversas: { group_id: string | null; mensagem: string | null; created_at: string }[] = [];
+      let allConversas: { group_id: string | null; mensagem: string | null; created_at: string; recebido_em: string }[] = [];
       let offset = 0;
       const pageSize = 1000;
       while (true) {
         const { data: page, error: convsError } = await supabase
           .from("whatsapp_conversas")
-          .select("group_id, mensagem, created_at")
+          .select("group_id, mensagem, created_at, recebido_em")
           .order("created_at", { ascending: false })
           .range(offset, offset + pageSize - 1);
         if (convsError) throw convsError;
@@ -55,11 +55,21 @@ export function useClientData() {
       const msgMap = new Map<string, { count: number; last_msg: string | null; last_time: string | null }>();
       for (const c of allConversas) {
         if (!c.group_id) continue;
+        // Use the most recent timestamp between created_at and recebido_em
+        const msgTime = c.recebido_em && c.recebido_em > c.created_at ? c.recebido_em : c.created_at;
         const existing = msgMap.get(c.group_id);
         if (!existing) {
-          msgMap.set(c.group_id, { count: 1, last_msg: c.mensagem, last_time: c.created_at });
+          msgMap.set(c.group_id, { count: 1, last_msg: c.mensagem, last_time: msgTime });
         } else {
           existing.count++;
+          // Update last_time if this message is more recent
+          if (existing.last_time && msgTime > existing.last_time) {
+            existing.last_time = msgTime;
+            existing.last_msg = c.mensagem;
+          } else if (!existing.last_time) {
+            existing.last_time = msgTime;
+            existing.last_msg = c.mensagem;
+          }
         }
       }
 
