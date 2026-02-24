@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      pending_demand_resolutions: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          requested_at: string
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          term: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          requested_at: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          term: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          requested_at?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          term?: string
+        }
+        Relationships: []
+      }
       whatsapp_conversas: {
         Row: {
           created_at: string

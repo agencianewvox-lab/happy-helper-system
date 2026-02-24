@@ -1,4 +1,6 @@
+import { useState, useEffect, useCallback } from "react";
 import { Grupo } from "@/types/client";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -7,11 +9,13 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   MessageSquare, Clock, Hash, FolderOpen,
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
+  CheckCircle2, XCircle,
 } from "lucide-react";
 
 interface Props {
@@ -54,13 +58,56 @@ function churnLabel(risk: number): string {
 }
 
 export function ClientDetailModal({ grupo, open, onClose }: Props) {
+  // Resolution state - hooks must be before early returns
+  const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const groupId = grupo?.group_id || "";
+  const a = grupo?.analytics;
+
+  const makeKey = useCallback((term: string, requestedAt: string) => `${groupId}|${term}|${requestedAt}`, [groupId]);
+
+  const fetchResolutions = useCallback(async () => {
+    if (!groupId || !a?.pending_demand_details?.length) return;
+    const { data } = await supabase
+      .from("pending_demand_resolutions")
+      .select("term, requested_at, resolved")
+      .eq("group_id", groupId);
+    if (data) {
+      const map: Record<string, boolean> = {};
+      for (const r of data) {
+        map[makeKey(r.term, r.requested_at)] = r.resolved;
+      }
+      setResolutions(map);
+    }
+  }, [groupId, a?.pending_demand_details, makeKey]);
+
+  useEffect(() => {
+    if (open) fetchResolutions();
+  }, [open, fetchResolutions]);
+
+  const handleResolve = useCallback(async (term: string, requestedAt: string, resolved: boolean) => {
+    const key = makeKey(term, requestedAt);
+    setSavingKey(key);
+    const { error } = await supabase
+      .from("pending_demand_resolutions")
+      .upsert(
+        { group_id: groupId, term, requested_at: requestedAt, resolved, resolved_at: new Date().toISOString() },
+        { onConflict: "group_id,term,requested_at" }
+      );
+    if (!error) {
+      setResolutions((prev) => ({ ...prev, [key]: resolved }));
+    }
+    setSavingKey(null);
+  }, [groupId, makeKey]);
+
   if (!grupo) return null;
 
-  const a = grupo.analytics;
   const sent = a ? sentimentConfig[a.sentiment] : null;
   const eng = a ? engagementConfig[a.engagement_type] : null;
   const SentIcon = sent?.icon || Minus;
   const EngIcon = eng?.icon || Minus;
+
 
   const basicItems = [
     { icon: FolderOpen, label: "Categoria", value: grupo.categoria || "Sem categoria" },
@@ -168,17 +215,57 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                       const dt = new Date(d.requested_at);
                       const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
                       const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                      const key = makeKey(d.term, d.requested_at);
+                      const isResolved = resolutions[key] === true;
+                      const isSaving = savingKey === key;
                       return (
-                        <div key={i} className="text-xs text-muted-foreground bg-muted/30 rounded p-2 border border-border/20">
+                        <div key={i} className={cn(
+                          "text-xs text-muted-foreground rounded p-2 border",
+                          isResolved
+                            ? "bg-emerald-500/5 border-emerald-500/20"
+                            : "bg-muted/30 border-border/20"
+                        )}>
                           <p>
+                            {isResolved && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 inline mr-1" />}
                             Cliente solicitou <strong className="text-orange-400">{d.term}</strong> em{" "}
-                            <strong>{dateStr}</strong> às <strong>{timeStr}</strong> e ainda não foi atendido.
+                            <strong>{dateStr}</strong> às <strong>{timeStr}</strong>
+                            {isResolved
+                              ? <span className="text-emerald-500 font-medium"> — Resolvido ✓</span>
+                              : " e ainda não foi atendido."}
                           </p>
                           {d.message_excerpt && (
                             <p className="mt-1 italic text-[10px] text-muted-foreground/70 truncate">
                               "{d.message_excerpt}"
                             </p>
                           )}
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              variant={isResolved ? "default" : "outline"}
+                              className={cn(
+                                "h-6 text-[10px] px-2 gap-1",
+                                isResolved && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                              )}
+                              disabled={isSaving}
+                              onClick={() => handleResolve(d.term, d.requested_at, true)}
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              Resolvido
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={resolutions[key] === false ? "default" : "outline"}
+                              className={cn(
+                                "h-6 text-[10px] px-2 gap-1",
+                                resolutions[key] === false && "bg-red-600 hover:bg-red-700 text-white"
+                              )}
+                              disabled={isSaving}
+                              onClick={() => handleResolve(d.term, d.requested_at, false)}
+                            >
+                              <XCircle className="w-3 h-3" />
+                              Não resolvido
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
