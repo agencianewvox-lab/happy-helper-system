@@ -125,19 +125,27 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
           </div>
         )}
 
-        {/* Motivo pendência resumido */}
+        {/* Motivo pendência resumido + solução */}
         {a?.has_pending_demands && !compact && (
-          <div className="text-[10px] text-orange-400 bg-orange-500/5 rounded px-2 py-1 border border-orange-500/20">
-            <span className="font-semibold">Pendência: </span>
-            {a.pending_demand_details && a.pending_demand_details.length > 0
-              ? (() => {
-                  const d = a.pending_demand_details[0];
-                  const dt = new Date(d.requested_at);
-                  const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-                  const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                  return `Pediu "${d.term}" em ${dateStr} às ${timeStr}`;
-                })()
-              : "Sem resposta há +2h"}
+          <div className="text-[10px] text-orange-400 bg-orange-500/5 rounded px-2 py-1 border border-orange-500/20 space-y-0.5">
+            <div>
+              <span className="font-semibold">Pendência: </span>
+              {a.pending_demand_details && a.pending_demand_details.length > 0
+                ? (() => {
+                    const d = a.pending_demand_details[0];
+                    const dt = new Date(d.requested_at);
+                    const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+                    const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                    return `Pediu "${d.term}" em ${dateStr} às ${timeStr}`;
+                  })()
+                : "Sem resposta há +2h"}
+            </div>
+            {a.pending_demand_details && a.pending_demand_details.length > 0 && a.pending_demand_details[0].suggested_solution && (
+              <div className="text-emerald-400">
+                <span className="font-semibold">Solução: </span>
+                {a.pending_demand_details[0].suggested_solution}
+              </div>
+            )}
           </div>
         )}
 
