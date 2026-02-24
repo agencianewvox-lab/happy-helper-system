@@ -26,12 +26,34 @@ Deno.serve(async (req) => {
     const clean = (val: any) =>
       typeof val === "string" && val.startsWith("=") ? val.slice(1) : val;
 
+    // Nomes do time New Vox — mensagens desses contatos são "saida"
+    const TEAM_MEMBERS = [
+      "alisson", "alisson lima",
+      "murilo", "murillo", "murilo araújo",
+      "priscila", "priscilla", "priscila borges", "priscilla borges",
+      "joel", "joel reis",
+      "thais", "thaís", "~thais",
+      "daniella",
+      "victor", "victor botto",
+    ];
+
+    function detectDirection(msg: any): string {
+      const explicit = clean(msg.direcao || msg.direction);
+      if (explicit && explicit !== "entrada" && explicit !== "") return explicit;
+      
+      const name = (clean(msg.nome_contato || msg.name || msg.pushName) || "").toLowerCase().trim();
+      if (name && TEAM_MEMBERS.some((tm) => name.includes(tm))) {
+        return "saida";
+      }
+      return "entrada";
+    }
+
     const registros = mensagens.map((msg: any) => ({
       telefone: clean(msg.telefone || msg.phone || msg.from) || null,
       nome_contato: clean(msg.nome_contato || msg.name || msg.pushName) || null,
       mensagem: clean(msg.mensagem || msg.message || msg.text || msg.body) || null,
       group_id: clean(msg.group_id) || null,
-      direcao: clean(msg.direcao || msg.direction) || "entrada",
+      direcao: detectDirection(msg),
       status: clean(msg.status) || "recebida",
       dados_extras: msg,
     }));
