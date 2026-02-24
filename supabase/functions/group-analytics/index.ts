@@ -372,7 +372,7 @@ Deno.serve(async (req) => {
         churn_risk: Math.round(churnRisk),
         total_client_msgs: clientMsgs.length,
         total_team_msgs: teamMsgs.length,
-        has_pending_demands: hasPendingDemands,
+        has_pending_demands: uniqueDetails.length > 0,
         pending_demand_terms: uniquePendingTerms,
         pending_demand_details: uniqueDetails,
       };
