@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { usePendingAlert } from "@/hooks/usePendingAlert";
+import { usePendingAlert, useHighRiskAlert } from "@/hooks/usePendingAlert";
 import { cn } from "@/lib/utils";
 import { useClientData } from "@/hooks/useClientData";
 import { AIChatPanel } from "@/components/AIChatPanel";
@@ -23,7 +23,12 @@ export default function Dashboard() {
     () => allGrupos.filter((g) => g.analytics?.has_pending_demands).length,
     [allGrupos]
   );
+  const highRiskCount = useMemo(
+    () => allGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length,
+    [allGrupos]
+  );
   usePendingAlert(pendingCount);
+  useHighRiskAlert(highRiskCount);
 
   const stats = useMemo(() => {
     const total = allGrupos.length;
