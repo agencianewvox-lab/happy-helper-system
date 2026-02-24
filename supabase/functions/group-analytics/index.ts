@@ -297,38 +297,56 @@ Deno.serve(async (req) => {
       churnRisk = Math.max(0, Math.min(100, churnRisk));
 
       // 6. Pending demands - detect unanswered client solicitations
-      // A pending demand = client made a specific request/solicitation AND team hasn't resolved it
+      // Group by MESSAGE (not by keyword) to avoid duplicates from same message
       const lastTeamMsg = [...msgs].reverse().find((m: any) => m.direcao === "saida");
       const lastTeamTime = lastTeamMsg ? new Date(lastTeamMsg.created_at).getTime() : 0;
 
-      // Find client messages AFTER the last team response (unanswered messages)
       const unansweredClientMsgs = msgs.filter(
         (m: any) => m.direcao === "entrada" && new Date(m.created_at).getTime() > lastTeamTime
       );
 
-      // Check if any unanswered message contains a solicitation
-      const unresolvedSolicitations: string[] = [];
       const pendingDetails: PendingDemandDetail[] = [];
-      for (const cm of unansweredClientMsgs) {
+      const seenMsgTimes = new Set<string>();
+
+      // Helper: process a client message, pick the BEST matching keyword (not all)
+      function addPendingFromMsg(cm: any) {
+        const timeKey = cm.created_at;
+        if (seenMsgTimes.has(timeKey)) return;
         const { matched: solMatched } = countKeywordMatches(cm.mensagem || "", SOLICITATION_KEYWORDS);
         const { matched: demMatched } = countKeywordMatches(cm.mensagem || "", DEMAND_KEYWORDS);
-        const allMatched = [...solMatched, ...demMatched];
-        unresolvedSolicitations.push(...allMatched);
-        for (const term of allMatched) {
+        // Pick only the first/best match to represent this message
+        const bestTerm = solMatched[0] || demMatched[0];
+        if (bestTerm) {
+          seenMsgTimes.add(timeKey);
           pendingDetails.push({
-            term,
+            term: bestTerm,
             requested_at: cm.created_at,
             message_excerpt: (cm.mensagem || "").slice(0, 120),
           });
         }
       }
 
-      // Also detect "left on read" - client sent messages and team never replied (or replied but didn't address)
+      for (const cm of unansweredClientMsgs) {
+        addPendingFromMsg(cm);
+      }
+
+      // Also check last 10 messages for unanswered solicitations
+      const lastFewMsgs = msgs.slice(-10);
+      for (let i = 0; i < lastFewMsgs.length; i++) {
+        const m = lastFewMsgs[i];
+        if (m.direcao === "entrada") {
+          const subsequentTeamMsgs = lastFewMsgs.slice(i + 1).filter((x: any) => x.direcao === "saida");
+          if (subsequentTeamMsgs.length === 0) {
+            addPendingFromMsg(m);
+          }
+        }
+      }
+
+      // "Left on read" - client waiting 2h+ with no specific terms
       const lastMsgIsClient = msgs.length > 0 && msgs[msgs.length - 1].direcao === "entrada";
       const clientLeftWaiting = lastMsgIsClient && unansweredClientMsgs.length >= 1 &&
-        (Date.now() - new Date(msgs[msgs.length - 1].created_at).getTime()) > 2 * 60 * 60 * 1000; // 2h+
+        (Date.now() - new Date(msgs[msgs.length - 1].created_at).getTime()) > 2 * 60 * 60 * 1000;
 
-      // If left waiting with no specific terms, add a generic detail
       if (clientLeftWaiting && pendingDetails.length === 0) {
         const lastClientMsg = unansweredClientMsgs[unansweredClientMsgs.length - 1];
         pendingDetails.push({
@@ -338,39 +356,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Check if team responded but client followed up with same request (not resolved)
-      const lastFewMsgs = msgs.slice(-10);
-      for (let i = 0; i < lastFewMsgs.length; i++) {
-        const m = lastFewMsgs[i];
-        if (m.direcao === "entrada") {
-          const { matched } = countKeywordMatches(m.mensagem || "", SOLICITATION_KEYWORDS);
-          if (matched.length > 0) {
-            const subsequentTeamMsgs = lastFewMsgs.slice(i + 1).filter((x: any) => x.direcao === "saida");
-            if (subsequentTeamMsgs.length === 0) {
-              unresolvedSolicitations.push(...matched);
-              for (const term of matched) {
-                if (!pendingDetails.find(d => d.term === term && d.requested_at === m.created_at)) {
-                  pendingDetails.push({
-                    term,
-                    requested_at: m.created_at,
-                    message_excerpt: (m.mensagem || "").slice(0, 120),
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-
-      const uniquePendingTerms = [...new Set(unresolvedSolicitations)].slice(0, 5);
-      const hasPendingDemands = uniquePendingTerms.length > 0 || clientLeftWaiting;
-      // Deduplicate details by term, keep earliest
-      const seenTerms = new Set<string>();
-      const uniqueDetails = pendingDetails.filter(d => {
-        if (seenTerms.has(d.term)) return false;
-        seenTerms.add(d.term);
-        return true;
-      }).slice(0, 5);
+      const uniqueDetails = pendingDetails.slice(0, 5);
+      const uniquePendingTerms = uniqueDetails.map(d => d.term);
 
       analytics[groupId] = {
         group_id: groupId,
