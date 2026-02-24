@@ -71,21 +71,28 @@ const DEMAND_KEYWORDS = [
   "quanto tempo", "demora", "atrasado", "atraso",
 ];
 
+interface PendingDemandDetail {
+  term: string;
+  requested_at: string;
+  message_excerpt: string;
+}
+
 interface GroupAnalytics {
   group_id: string;
   avg_frt_minutes: number | null;
   sentiment: "positivo" | "neutro" | "negativo";
-  sentiment_score: number; // -100 to 100
+  sentiment_score: number;
   complaint_count: number;
   complaint_terms: string[];
   positive_count: number;
   demand_count: number;
   engagement_type: "saudável" | "cobrança" | "misto" | "inativo";
-  churn_risk: number; // 0-100
+  churn_risk: number;
   total_client_msgs: number;
   total_team_msgs: number;
   has_pending_demands: boolean;
   pending_demand_terms: string[];
+  pending_demand_details: PendingDemandDetail[];
 }
 
 function countKeywordMatches(text: string, keywords: string[]): { count: number; matched: string[] } {
@@ -301,16 +308,35 @@ Deno.serve(async (req) => {
 
       // Check if any unanswered message contains a solicitation
       const unresolvedSolicitations: string[] = [];
+      const pendingDetails: PendingDemandDetail[] = [];
       for (const cm of unansweredClientMsgs) {
         const { matched: solMatched } = countKeywordMatches(cm.mensagem || "", SOLICITATION_KEYWORDS);
         const { matched: demMatched } = countKeywordMatches(cm.mensagem || "", DEMAND_KEYWORDS);
-        unresolvedSolicitations.push(...solMatched, ...demMatched);
+        const allMatched = [...solMatched, ...demMatched];
+        unresolvedSolicitations.push(...allMatched);
+        for (const term of allMatched) {
+          pendingDetails.push({
+            term,
+            requested_at: cm.created_at,
+            message_excerpt: (cm.mensagem || "").slice(0, 120),
+          });
+        }
       }
 
       // Also detect "left on read" - client sent messages and team never replied (or replied but didn't address)
       const lastMsgIsClient = msgs.length > 0 && msgs[msgs.length - 1].direcao === "entrada";
       const clientLeftWaiting = lastMsgIsClient && unansweredClientMsgs.length >= 1 &&
         (Date.now() - new Date(msgs[msgs.length - 1].created_at).getTime()) > 2 * 60 * 60 * 1000; // 2h+
+
+      // If left waiting with no specific terms, add a generic detail
+      if (clientLeftWaiting && pendingDetails.length === 0) {
+        const lastClientMsg = unansweredClientMsgs[unansweredClientMsgs.length - 1];
+        pendingDetails.push({
+          term: "sem resposta",
+          requested_at: lastClientMsg.created_at,
+          message_excerpt: (lastClientMsg.mensagem || "").slice(0, 120),
+        });
+      }
 
       // Check if team responded but client followed up with same request (not resolved)
       const lastFewMsgs = msgs.slice(-10);
@@ -319,10 +345,18 @@ Deno.serve(async (req) => {
         if (m.direcao === "entrada") {
           const { matched } = countKeywordMatches(m.mensagem || "", SOLICITATION_KEYWORDS);
           if (matched.length > 0) {
-            // Check if team responded AFTER this with a resolution (not just acknowledgment)
             const subsequentTeamMsgs = lastFewMsgs.slice(i + 1).filter((x: any) => x.direcao === "saida");
             if (subsequentTeamMsgs.length === 0) {
               unresolvedSolicitations.push(...matched);
+              for (const term of matched) {
+                if (!pendingDetails.find(d => d.term === term && d.requested_at === m.created_at)) {
+                  pendingDetails.push({
+                    term,
+                    requested_at: m.created_at,
+                    message_excerpt: (m.mensagem || "").slice(0, 120),
+                  });
+                }
+              }
             }
           }
         }
@@ -330,6 +364,13 @@ Deno.serve(async (req) => {
 
       const uniquePendingTerms = [...new Set(unresolvedSolicitations)].slice(0, 5);
       const hasPendingDemands = uniquePendingTerms.length > 0 || clientLeftWaiting;
+      // Deduplicate details by term, keep earliest
+      const seenTerms = new Set<string>();
+      const uniqueDetails = pendingDetails.filter(d => {
+        if (seenTerms.has(d.term)) return false;
+        seenTerms.add(d.term);
+        return true;
+      }).slice(0, 5);
 
       analytics[groupId] = {
         group_id: groupId,
@@ -346,6 +387,7 @@ Deno.serve(async (req) => {
         total_team_msgs: teamMsgs.length,
         has_pending_demands: hasPendingDemands,
         pending_demand_terms: uniquePendingTerms,
+        pending_demand_details: uniqueDetails,
       };
     }
 

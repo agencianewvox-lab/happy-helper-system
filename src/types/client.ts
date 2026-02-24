@@ -1,3 +1,9 @@
+export interface PendingDemandDetail {
+  term: string;
+  requested_at: string; // ISO timestamp
+  message_excerpt: string;
+}
+
 export interface GroupAnalytics {
   group_id: string;
   avg_frt_minutes: number | null;
@@ -13,6 +19,7 @@ export interface GroupAnalytics {
   total_team_msgs: number;
   has_pending_demands: boolean;
   pending_demand_terms: string[];
+  pending_demand_details?: PendingDemandDetail[];
 }
 
 export interface Grupo {
