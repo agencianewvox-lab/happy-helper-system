@@ -9,11 +9,13 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Dashboard() {
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
+  const { signOut } = useAuth();
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
@@ -90,6 +92,9 @@ export default function Dashboard() {
                 AO VIVO
               </div>
               <TVModeButton onClick={() => setTvMode(true)} />
+              <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
