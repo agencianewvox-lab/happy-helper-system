@@ -170,7 +170,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
               </div>
 
               {/* Churn Risk */}
-              <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+              <div className="p-3 rounded-lg bg-muted/30 border border-border/30 col-span-2">
                 <div className="flex items-center gap-2 mb-1">
                   <ShieldAlert className={cn("w-4 h-4", churnColor(a.churn_risk))} />
                   <span className="text-xs text-muted-foreground font-medium">Risco de Churn</span>
@@ -182,6 +182,39 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                   </Badge>
                 </div>
                 <Progress value={a.churn_risk} className="h-1.5 mt-2" />
+
+                {/* Breakdown */}
+                {a.churn_breakdown && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Composição do Score</p>
+                    {[
+                      { label: "Base", value: a.churn_breakdown.base, icon: "🔹" },
+                      { label: "Insatisfação", value: a.churn_breakdown.dissatisfaction, icon: "😡" },
+                      { label: "Reclamações", value: a.churn_breakdown.complaints, icon: "⚠️" },
+                      { label: "Cobranças", value: a.churn_breakdown.demands, icon: "📢" },
+                      { label: "Positivos", value: a.churn_breakdown.positive, icon: "👍" },
+                      { label: "Tempo de resposta", value: a.churn_breakdown.frt, icon: "⏱" },
+                      { label: "Sem resposta", value: a.churn_breakdown.no_response, icon: "🔇" },
+                      { label: "Inatividade", value: a.churn_breakdown.inactivity, icon: "💤" },
+                    ].filter(item => item.value !== 0).map(({ label, value, icon }) => (
+                      <div key={label} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <span>{icon}</span> {label}
+                        </span>
+                        <span className={cn(
+                          "font-semibold tabular-nums",
+                          value > 0 ? "text-red-400" : "text-emerald-400"
+                        )}>
+                          {value > 0 ? `+${value}` : value}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between text-xs border-t border-border/30 pt-1.5 mt-1">
+                      <span className="font-semibold">Total</span>
+                      <span className={cn("font-bold", churnColor(a.churn_risk))}>{a.churn_risk}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

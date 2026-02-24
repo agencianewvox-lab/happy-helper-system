@@ -5,6 +5,17 @@ export interface PendingDemandDetail {
   suggested_solution: string;
 }
 
+export interface ChurnBreakdown {
+  base: number;
+  dissatisfaction: number;
+  complaints: number;
+  demands: number;
+  positive: number;
+  frt: number;
+  no_response: number;
+  inactivity: number;
+}
+
 export interface GroupAnalytics {
   group_id: string;
   avg_frt_minutes: number | null;
@@ -16,6 +27,7 @@ export interface GroupAnalytics {
   demand_count: number;
   engagement_type: "saudável" | "cobrança" | "misto" | "inativo";
   churn_risk: number;
+  churn_breakdown?: ChurnBreakdown;
   total_client_msgs: number;
   total_team_msgs: number;
   has_pending_demands: boolean;

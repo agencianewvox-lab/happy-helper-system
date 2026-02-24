@@ -165,6 +165,17 @@ interface PendingDemandDetail {
   suggested_solution: string;
 }
 
+interface ChurnBreakdown {
+  base: number;
+  dissatisfaction: number;
+  complaints: number;
+  demands: number;
+  positive: number;
+  frt: number;
+  no_response: number;
+  inactivity: number;
+}
+
 interface GroupAnalytics {
   group_id: string;
   avg_frt_minutes: number | null;
@@ -176,6 +187,7 @@ interface GroupAnalytics {
   demand_count: number;
   engagement_type: "saudável" | "cobrança" | "misto" | "inativo";
   churn_risk: number;
+  churn_breakdown: ChurnBreakdown;
   total_client_msgs: number;
   total_team_msgs: number;
   has_pending_demands: boolean;
@@ -371,30 +383,34 @@ Deno.serve(async (req) => {
       }
 
       // 5. Churn risk score (0-100) — driven primarily by client dissatisfaction
-      let churnRisk = 30; // base (lower default)
-      // Dissatisfaction is the PRIMARY driver of high risk
-      churnRisk += Math.min(dissatisfactionCount * 12, 50);
-      // General complaints add moderate risk
-      churnRisk += Math.min(complaintCount * 3, 10);
-      // Demands add slight risk
-      churnRisk += Math.min(demandCount * 2, 8);
-      // Positive signals reduce risk
-      churnRisk -= Math.min(positiveCount * 4, 25);
-      // Slow FRT increases risk
+      const breakdown: ChurnBreakdown = {
+        base: 30,
+        dissatisfaction: Math.min(dissatisfactionCount * 12, 50),
+        complaints: Math.min(complaintCount * 3, 10),
+        demands: Math.min(demandCount * 2, 8),
+        positive: -Math.min(positiveCount * 4, 25),
+        frt: 0,
+        no_response: 0,
+        inactivity: 0,
+      };
+
+      // Slow FRT
       if (avgFrt !== null) {
-        if (avgFrt > 480) churnRisk += 10;
-        else if (avgFrt > 120) churnRisk += 5;
-        else if (avgFrt < 30) churnRisk -= 5;
+        if (avgFrt > 480) breakdown.frt = 10;
+        else if (avgFrt > 120) breakdown.frt = 5;
+        else if (avgFrt < 30) breakdown.frt = -5;
       }
-      // No team responses = higher risk
-      if (teamMsgs.length === 0 && clientMsgs.length > 0) churnRisk += 15;
+      // No team responses
+      if (teamMsgs.length === 0 && clientMsgs.length > 0) breakdown.no_response = 15;
       // Inactivity
       const lastMsg = msgs[msgs.length - 1];
       if (lastMsg) {
         const daysSince = (Date.now() - new Date(lastMsg.created_at).getTime()) / (1000 * 60 * 60 * 24);
-        if (daysSince > 14) churnRisk += 10;
-        else if (daysSince > 7) churnRisk += 5;
+        if (daysSince > 14) breakdown.inactivity = 10;
+        else if (daysSince > 7) breakdown.inactivity = 5;
       }
+
+      let churnRisk = breakdown.base + breakdown.dissatisfaction + breakdown.complaints + breakdown.demands + breakdown.positive + breakdown.frt + breakdown.no_response + breakdown.inactivity;
       churnRisk = Math.max(0, Math.min(100, churnRisk));
 
       // 6. Pending demands - detect unanswered client solicitations
@@ -479,6 +495,7 @@ Deno.serve(async (req) => {
         demand_count: demandCount,
         engagement_type: engagementType,
         churn_risk: Math.round(churnRisk),
+        churn_breakdown: breakdown,
         total_client_msgs: clientMsgs.length,
         total_team_msgs: teamMsgs.length,
         has_pending_demands: uniqueDetails.length > 0,
