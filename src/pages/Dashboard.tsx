@@ -126,16 +126,16 @@ export default function Dashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-9 gap-4">
           {[
-            { key: "total", label: "Total Grupos", value: stats.total, icon: Users, color: "text-primary" },
-            { key: "totalMsgs", label: "Total Mensagens", value: stats.totalMsgs, icon: MessageSquare, color: "text-emerald-500" },
-            { key: "ativos", label: "Grupos Ativos", value: stats.comMsgs, icon: Activity, color: "text-amber-500" },
-            { key: "highRisk", label: "Risco Alto", value: stats.highRisk, icon: AlertTriangle, color: "text-red-500" },
-            { key: "pendencias", label: "Pendências", value: stats.pendencias, icon: AlertCircle, color: "text-orange-500" },
-            { key: "frt", label: "FRT Médio", value: stats.avgFrt != null ? `${stats.avgFrt}min` : "—", icon: Timer, color: "text-blue-500" },
-            { key: "positive", label: "Sentimento +", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
-            { key: "inativos", label: "Grupos Inativos", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
-            { key: "dengue", label: "Grupos da Dengue", value: stats.dengue, icon: Flame, color: "text-red-600" },
-          ].map(({ key, label, value, icon: Icon, color }) => (
+            { key: "total", label: "Total Grupos", desc: "Todos os grupos cadastrados", value: stats.total, icon: Users, color: "text-primary" },
+            { key: "totalMsgs", label: "Total Mensagens", desc: "Soma de todas as mensagens", value: stats.totalMsgs, icon: MessageSquare, color: "text-emerald-500" },
+            { key: "ativos", label: "Grupos Ativos", desc: "Com atividade nas últimas 24h", value: stats.comMsgs, icon: Activity, color: "text-amber-500" },
+            { key: "highRisk", label: "Risco Alto", desc: "Risco de churn ≥ 60%", value: stats.highRisk, icon: AlertTriangle, color: "text-red-500" },
+            { key: "pendencias", label: "Pendências", desc: "Demandas ainda não resolvidas", value: stats.pendencias, icon: AlertCircle, color: "text-orange-500" },
+            { key: "frt", label: "FRT Médio", desc: "Tempo médio de 1ª resposta", value: stats.avgFrt != null ? `${stats.avgFrt}min` : "—", icon: Timer, color: "text-blue-500" },
+            { key: "positive", label: "Sentimento +", desc: "Grupos com sentimento positivo", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
+            { key: "inativos", label: "Grupos Inativos", desc: "Sem atividade há mais de 24h", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
+            { key: "dengue", label: "Grupos da Dengue", desc: "Sem atividade há mais de 48h", value: stats.dengue, icon: Flame, color: "text-red-600" },
+          ].map(({ key, label, desc, value, icon: Icon, color }) => (
             <button
               key={key}
               onClick={() => setMetricFilter(metricFilter === key ? null : key)}
@@ -146,11 +146,13 @@ export default function Dashboard() {
                   ? "border-primary ring-1 ring-primary/30 bg-card"
                   : "border-border/30"
               )}
+              title={desc}
             >
               <Icon className={`w-7 h-7 ${color}`} />
               <div>
                 <p className="text-xl font-black">{value}</p>
                 <p className="text-[10px] text-muted-foreground">{label}</p>
+                <p className="text-[9px] text-muted-foreground/60">{desc}</p>
               </div>
             </button>
           ))}
