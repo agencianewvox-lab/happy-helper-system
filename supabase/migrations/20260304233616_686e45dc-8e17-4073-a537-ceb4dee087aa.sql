@@ -1,0 +1,1 @@
+UPDATE whatsapp_grupos SET nome = 'NV-MKT OralMed' WHERE id = '678d679c-bb20-49fc-a4c6-da52b606fc59';
