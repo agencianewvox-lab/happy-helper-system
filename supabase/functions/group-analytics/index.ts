@@ -162,19 +162,7 @@ O QUE NÃO É PENDÊNCIA (NUNCA marcar como pendência):
 REGRA DE PRECISÃO:
 A análise deve conter APENAS problemas reais que precisam de ação da equipe. Evite falsos alertas.
 
-FORMATO DE RESPOSTA:
-Responda APENAS com um JSON array. Sem texto adicional, sem markdown, sem explicações.
-Se não houver pendências, retorne [].
-
-Cada item deve ter:
-{
-  "group_id": "ID do grupo",
-  "client_name": "Nome do cliente",
-  "message": "Texto original da mensagem (até 120 caracteres)",
-  "type": "Demanda" ou "Pergunta sem resposta",
-  "timestamp": "ISO timestamp da mensagem",
-  "suggested_action": "Ação sugerida para a equipe resolver"
-}`;
+Use a função report_pending_demands para retornar as pendências encontradas. Se não houver pendências, chame com array vazio.`;
 
 function buildConversationContext(groupId: string, msgs: any[]): string {
   // Take last 30 messages for context
@@ -229,6 +217,39 @@ async function detectPendingWithAI(
             },
           ],
           temperature: 0.1,
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "report_pending_demands",
+                description: "Report all pending demands found in the conversations. Call with empty array if no pending demands found.",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    pendencias: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          group_id: { type: "string", description: "The group ID from the conversation header" },
+                          client_name: { type: "string", description: "Name of the client who sent the message" },
+                          message: { type: "string", description: "Original message text (max 120 chars)" },
+                          type: { type: "string", enum: ["Demanda", "Pergunta sem resposta"] },
+                          timestamp: { type: "string", description: "ISO timestamp of the message" },
+                          suggested_action: { type: "string", description: "Suggested action for the team" },
+                        },
+                        required: ["group_id", "client_name", "message", "type", "timestamp", "suggested_action"],
+                        additionalProperties: false,
+                      },
+                    },
+                  },
+                  required: ["pendencias"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          ],
+          tool_choice: { type: "function", function: { name: "report_pending_demands" } },
         }),
       });
 
@@ -238,18 +259,26 @@ async function detectPendingWithAI(
       }
 
       const data = await response.json();
-      let content = data.choices?.[0]?.message?.content || "[]";
       
-      // Clean markdown code blocks if present
-      content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-      
-      try {
-        const items = JSON.parse(content);
-        if (Array.isArray(items)) {
-          allItems.push(...items);
+      // Extract from tool call response
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (toolCall?.function?.arguments) {
+        try {
+          const parsed = JSON.parse(toolCall.function.arguments);
+          if (Array.isArray(parsed.pendencias)) {
+            allItems.push(...parsed.pendencias);
+          }
+        } catch (parseErr) {
+          console.error("Failed to parse tool call args:", toolCall.function.arguments.slice(0, 200));
         }
-      } catch (parseErr) {
-        console.error("Failed to parse AI pending response:", content.slice(0, 200));
+      } else {
+        // Fallback: try content as JSON
+        let content = data.choices?.[0]?.message?.content || "[]";
+        content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+        try {
+          const items = JSON.parse(content);
+          if (Array.isArray(items)) allItems.push(...items);
+        } catch { /* ignore */ }
       }
     } catch (fetchErr) {
       console.error("AI fetch error:", fetchErr);
