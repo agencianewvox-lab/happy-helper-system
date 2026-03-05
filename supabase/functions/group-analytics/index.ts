@@ -8,13 +8,11 @@ const corsHeaders = {
 
 // Client dissatisfaction keywords - signals unhappiness with results/partnership
 const DISSATISFACTION_KEYWORDS = [
-  // Results dissatisfaction
   "não chegou lead", "nao chegou lead", "sem lead", "zero lead", "nenhum lead",
   "não estou vendo resultado", "nao estou vendo resultado", "sem resultado",
   "não tá funcionando", "nao ta funcionando", "não está funcionando", "nao esta funcionando",
   "não funciona", "nao funciona", "não deu resultado", "nao deu resultado",
   "resultado ruim", "resultado péssimo", "resultado pessimo", "sem retorno",
-  // Partnership discomfort
   "isso não pode acontecer", "isso nao pode acontecer", "inaceitável", "inaceitavel",
   "não pode continuar assim", "nao pode continuar assim",
   "vou cancelar", "quero cancelar", "cancelar contrato", "rescindir",
@@ -50,113 +48,16 @@ const POSITIVE_KEYWORDS = [
   "satisfeito", "satisfeita",
 ];
 
-// Solicitation/request keywords - actionable demands from clients
-const SOLICITATION_KEYWORDS = [
-  "criativo", "criativos", "arte", "artes", "banner", "post", "feed",
-  "verba", "orçamento", "orcamento", "campanha", "anúncio", "anuncio",
-  "alterar", "mudar", "trocar", "atualizar", "ajustar", "modificar",
-  "preciso", "precisamos", "solicito", "solicitar", "pedido", "enviar",
-  "fazer", "pode fazer", "consegue", "quando fica pronto", "prazo",
-  "urgente", "urgência", "urgencia", "aprovação", "aprovacao",
-  "relatório", "relatorio", "planilha", "proposta", "briefing",
-  "logo", "logotipo", "vídeo", "video", "stories", "reels",
-  "landing page", "site", "página", "pagina", "link",
-  "subir campanha", "pausar campanha", "ativar", "desativar",
-  "me envia", "me manda", "pode enviar", "pode mandar",
-];
-
-// General demand keywords (waiting/follow-up)
+// Demand keywords for churn scoring only
 const DEMAND_KEYWORDS = [
   "cadê", "cade", "esperando", "aguardando", "cobrando",
   "quanto tempo", "demora", "atrasado", "atraso",
 ];
 
-// Solution suggestions based on detected pending demand terms
-const SOLUTION_MAP: Record<string, string> = {
-  // Criativo / Arte
-  "criativo": "Equipe criar e enviar o criativo para o cliente",
-  "criativos": "Equipe criar e enviar os criativos para o cliente",
-  "arte": "Equipe produzir e enviar a arte solicitada",
-  "artes": "Equipe produzir e enviar as artes solicitadas",
-  "banner": "Equipe criar e enviar o banner para o cliente",
-  "post": "Equipe criar e enviar o post para aprovação",
-  "feed": "Equipe preparar o conteúdo do feed e enviar",
-  "stories": "Equipe criar os stories e enviar para aprovação",
-  "reels": "Equipe produzir o reels e enviar para o cliente",
-  // Verba / Orçamento
-  "verba": "Equipe enviar a recarga/verba para o cliente",
-  "orçamento": "Equipe enviar o orçamento solicitado",
-  "orcamento": "Equipe enviar o orçamento solicitado",
-  // Campanha
-  "campanha": "Equipe configurar/ajustar a campanha conforme solicitado",
-  "anúncio": "Equipe criar/ajustar o anúncio solicitado",
-  "anuncio": "Equipe criar/ajustar o anúncio solicitado",
-  "subir campanha": "Equipe subir a campanha no gerenciador",
-  "pausar campanha": "Equipe pausar a campanha conforme pedido",
-  "ativar": "Equipe ativar o item conforme solicitado",
-  "desativar": "Equipe desativar conforme pedido do cliente",
-  // Alterações
-  "alterar": "Equipe realizar a alteração solicitada pelo cliente",
-  "mudar": "Equipe realizar a mudança pedida",
-  "trocar": "Equipe fazer a troca solicitada",
-  "atualizar": "Equipe atualizar conforme pedido do cliente",
-  "ajustar": "Equipe ajustar conforme solicitação",
-  "modificar": "Equipe modificar conforme pedido",
-  // Envios / Solicitações
-  "preciso": "Equipe atender à necessidade do cliente",
-  "precisamos": "Equipe atender à necessidade do cliente",
-  "solicito": "Equipe atender à solicitação do cliente",
-  "solicitar": "Equipe processar a solicitação",
-  "pedido": "Equipe atender ao pedido do cliente",
-  "enviar": "Equipe enviar o material solicitado",
-  "me envia": "Equipe enviar o que foi pedido ao cliente",
-  "me manda": "Equipe enviar o material para o cliente",
-  "pode enviar": "Equipe enviar o que foi solicitado",
-  "pode mandar": "Equipe enviar o que foi solicitado",
-  // Urgência / Prazo
-  "urgente": "Equipe priorizar e resolver com urgência",
-  "urgência": "Equipe priorizar e resolver com urgência",
-  "urgencia": "Equipe priorizar e resolver com urgência",
-  "quando fica pronto": "Equipe informar prazo de entrega ao cliente",
-  "prazo": "Equipe informar/cumprir o prazo solicitado",
-  // Documentos / Relatórios
-  "relatório": "Equipe preparar e enviar o relatório",
-  "relatorio": "Equipe preparar e enviar o relatório",
-  "planilha": "Equipe preparar e enviar a planilha",
-  "proposta": "Equipe elaborar e enviar a proposta",
-  "briefing": "Equipe preencher/enviar o briefing",
-  // Digital
-  "logo": "Equipe criar/enviar o logo solicitado",
-  "logotipo": "Equipe criar/enviar o logotipo",
-  "vídeo": "Equipe produzir e enviar o vídeo",
-  "video": "Equipe produzir e enviar o vídeo",
-  "landing page": "Equipe criar/ajustar a landing page",
-  "site": "Equipe atualizar/criar o site conforme pedido",
-  "página": "Equipe atualizar a página solicitada",
-  "pagina": "Equipe atualizar a página solicitada",
-  "link": "Equipe enviar/corrigir o link solicitado",
-  "aprovação": "Equipe enviar material para aprovação do cliente",
-  "aprovacao": "Equipe enviar material para aprovação do cliente",
-  // Cobranças / Espera
-  "cadê": "Equipe responder e dar retorno ao cliente",
-  "cade": "Equipe responder e dar retorno ao cliente",
-  "esperando": "Equipe dar retorno ao cliente que está aguardando",
-  "aguardando": "Equipe dar retorno ao cliente que está aguardando",
-  "cobrando": "Equipe resolver a pendência cobrada pelo cliente",
-  "demora": "Equipe agilizar e dar retorno ao cliente",
-  "atrasado": "Equipe resolver o atraso e informar o cliente",
-  "atraso": "Equipe resolver o atraso e informar o cliente",
-  // Genérico
-  "sem resposta": "Equipe responder a mensagem do cliente",
-  "fazer": "Equipe executar o que foi solicitado",
-  "pode fazer": "Equipe atender ao pedido do cliente",
-  "consegue": "Equipe avaliar e responder a viabilidade",
-};
-
-function getSuggestedSolution(term: string, excerpt: string): string {
-  const lower = term.toLowerCase();
-  return SOLUTION_MAP[lower] || `Equipe dar retorno sobre "${term}" ao cliente`;
-}
+// Team member names - messages from these people are NOT client messages
+const TEAM_MEMBERS = [
+  "jader", "murillo", "priscilla", "alisson", "joel", "thais", "daniella", "victor botto",
+];
 
 interface PendingDemandDetail {
   term: string;
@@ -195,6 +96,15 @@ interface GroupAnalytics {
   pending_demand_details: PendingDemandDetail[];
 }
 
+interface AIPendingItem {
+  group_id: string;
+  client_name: string;
+  message: string;
+  type: "Demanda" | "Pergunta sem resposta";
+  timestamp: string;
+  suggested_action: string;
+}
+
 function countKeywordMatches(text: string, keywords: string[]): { count: number; matched: string[] } {
   const lower = text.toLowerCase();
   let count = 0;
@@ -210,12 +120,154 @@ function countKeywordMatches(text: string, keywords: string[]): { count: number;
   return { count, matched };
 }
 
+const PENDING_DETECTION_PROMPT = `Você é uma IA responsável por analisar conversas em grupos de atendimento de clientes.
+
+Seu objetivo é identificar pendências reais que precisam de ação da equipe.
+
+Uma pendência ocorre quando um cliente solicita algo ou faz uma pergunta e a equipe não respondeu ou não assumiu a execução da tarefa.
+
+Você deve analisar a sequência da conversa, não apenas mensagens isoladas.
+
+EQUIPE NEW VOX (mensagens desses nomes são da equipe, NÃO são pendências de clientes):
+- Jader: Gestor de tráfego
+- Murillo: Gestor de tráfego
+- Priscilla: Social media e sócia da empresa
+- Alisson: Sócio da empresa
+- Joel: Gerente geral
+- Thais: Auxiliar de social media
+- Daniella: Equipe
+- Victor Botto: Equipe
+
+DEFINIÇÃO DE PENDÊNCIA:
+Uma mensagem deve ser marcada como PENDÊNCIA quando:
+1. A mensagem foi enviada pelo CLIENTE (não pela equipe)
+2. O cliente fez uma pergunta ou solicitou algo
+3. Nenhum membro da equipe respondeu a essa mensagem
+4. Nenhum membro da equipe confirmou que vai executar a solicitação
+Se qualquer membro da equipe respondeu ou assumiu a tarefa, NÃO existe mais pendência.
+
+TIPOS DE PENDÊNCIA:
+1. "Demanda" — Quando o cliente pede algo para ser executado (arte, campanha, alteração, vídeo, etc.)
+2. "Pergunta sem resposta" — Quando o cliente faz uma pergunta e ninguém respondeu
+
+REGRAS DE CANCELAMENTO DE PENDÊNCIA:
+Se qualquer membro da equipe responder algo como "Já vou fazer", "Pode deixar", "Já estou cuidando", "Vou verificar", "Vou subir agora", "Já solicitamos isso" — então a pendência DEIXA de existir.
+
+O QUE NÃO É PENDÊNCIA (NUNCA marcar como pendência):
+- Agradecimentos: "Obrigado", "Valeu", "Perfeito", "Show", "Beleza", "Top"
+- Emojis: 👍 🔥 👏 🙏 ❤️
+- Confirmações simples: "Ok", "Certo", "Combinado", "Pode deixar"
+- Conversa informal: "Bom dia", "Boa tarde", "Boa noite", "Tudo bem?"
+
+REGRA DE PRECISÃO:
+A análise deve conter APENAS problemas reais que precisam de ação da equipe. Evite falsos alertas.
+
+FORMATO DE RESPOSTA:
+Responda APENAS com um JSON array. Sem texto adicional, sem markdown, sem explicações.
+Se não houver pendências, retorne [].
+
+Cada item deve ter:
+{
+  "group_id": "ID do grupo",
+  "client_name": "Nome do cliente",
+  "message": "Texto original da mensagem (até 120 caracteres)",
+  "type": "Demanda" ou "Pergunta sem resposta",
+  "timestamp": "ISO timestamp da mensagem",
+  "suggested_action": "Ação sugerida para a equipe resolver"
+}`;
+
+function buildConversationContext(groupId: string, msgs: any[]): string {
+  // Take last 30 messages for context
+  const recentMsgs = msgs.slice(-30);
+  const lines = recentMsgs.map((m: any) => {
+    const dir = m.direcao === "entrada" ? "CLIENTE" : "EQUIPE";
+    const name = m.nome_contato || "Desconhecido";
+    const time = m.created_at;
+    const text = (m.mensagem || "").slice(0, 200);
+    return `[${time}] ${dir} (${name}): ${text}`;
+  });
+  return `\n--- GRUPO: ${groupId} ---\n${lines.join("\n")}`;
+}
+
+async function detectPendingWithAI(
+  groupConversations: Map<string, any[]>,
+  apiKey: string
+): Promise<AIPendingItem[]> {
+  if (groupConversations.size === 0) return [];
+
+  // Build conversation context for all groups
+  const contextParts: string[] = [];
+  for (const [groupId, msgs] of groupConversations) {
+    if (msgs.length === 0) continue;
+    contextParts.push(buildConversationContext(groupId, msgs));
+  }
+
+  if (contextParts.length === 0) return [];
+
+  // Batch groups to avoid token limits (~10 groups per call)
+  const BATCH_SIZE = 10;
+  const allItems: AIPendingItem[] = [];
+  
+  for (let i = 0; i < contextParts.length; i += BATCH_SIZE) {
+    const batch = contextParts.slice(i, i + BATCH_SIZE);
+    const conversationText = batch.join("\n\n");
+
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: PENDING_DETECTION_PROMPT },
+            {
+              role: "user",
+              content: `Analise as conversas abaixo e identifique TODAS as pendências reais:\n\n${conversationText}`,
+            },
+          ],
+          temperature: 0.1,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("AI pending detection error:", response.status, await response.text());
+        continue;
+      }
+
+      const data = await response.json();
+      let content = data.choices?.[0]?.message?.content || "[]";
+      
+      // Clean markdown code blocks if present
+      content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      
+      try {
+        const items = JSON.parse(content);
+        if (Array.isArray(items)) {
+          allItems.push(...items);
+        }
+      } catch (parseErr) {
+        console.error("Failed to parse AI pending response:", content.slice(0, 200));
+      }
+    } catch (fetchErr) {
+      console.error("AI fetch error:", fetchErr);
+    }
+  }
+
+  return allItems;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -245,7 +297,6 @@ Deno.serve(async (req) => {
       .eq("resolved", true);
     if (resolvedError) throw resolvedError;
 
-    // Build a set of resolved keys for fast lookup: "group_id|term|requested_at"
     const resolvedSet = new Set<string>();
     for (const r of (resolvedDemands || [])) {
       resolvedSet.add(`${r.group_id}|${r.term}|${r.requested_at}`);
@@ -259,18 +310,18 @@ Deno.serve(async (req) => {
       groupedConvs.get(c.group_id)!.push(c);
     }
 
-    const analytics: Record<string, GroupAnalytics> = {};
+    // Step 1: Compute FRT, sentiment, churn for all groups
+    const analyticsPartial: Map<string, Omit<GroupAnalytics, "has_pending_demands" | "pending_demand_terms" | "pending_demand_details">> = new Map();
 
     for (const [groupId, msgs] of groupedConvs) {
       const clientMsgs = msgs.filter((m: any) => m.direcao === "entrada");
       const teamMsgs = msgs.filter((m: any) => m.direcao === "saida");
 
-      // 1. FRT - Average First Response Time (business hours only: 08-18 BRT, UTC-3)
-      // Calculates elapsed business-hours minutes between client msg and team response
-      const BRT_OFFSET = -3; // Brasília UTC offset
-      const BIZ_START = 8; // 08:00
-      const BIZ_END = 18;  // 18:00
-      const BIZ_MINUTES_PER_DAY = (BIZ_END - BIZ_START) * 60; // 600
+      // FRT calculation (business hours)
+      const BRT_OFFSET = -3;
+      const BIZ_START = 8;
+      const BIZ_END = 18;
+      const BIZ_MINUTES_PER_DAY = (BIZ_END - BIZ_START) * 60;
 
       function toBrt(d: Date): Date {
         return new Date(d.getTime() + BRT_OFFSET * 60 * 60 * 1000);
@@ -282,24 +333,20 @@ Deno.serve(async (req) => {
         if (e <= s) return 0;
 
         let total = 0;
-        const cur = new Date(s);
 
-        // Cap start to biz hours
         const clampToBiz = (d: Date): Date => {
           const h = d.getHours() + d.getMinutes() / 60;
           if (h < BIZ_START) { d.setHours(BIZ_START, 0, 0, 0); }
           else if (h >= BIZ_END) { d.setDate(d.getDate() + 1); d.setHours(BIZ_START, 0, 0, 0); }
-          // Skip weekends
           while (d.getDay() === 0 || d.getDay() === 6) { d.setDate(d.getDate() + 1); d.setHours(BIZ_START, 0, 0, 0); }
           return d;
         };
 
-        const cStart = clampToBiz(new Date(cur));
+        const cStart = clampToBiz(new Date(s));
         const cEnd = new Date(e);
 
         if (cStart >= cEnd) return 0;
 
-        // Same day?
         const sameDay = cStart.toDateString() === cEnd.toDateString();
         if (sameDay) {
           const endH = Math.min(cEnd.getHours() + cEnd.getMinutes() / 60, BIZ_END);
@@ -307,10 +354,8 @@ Deno.serve(async (req) => {
           return Math.max(0, Math.round((endH - startH) * 60));
         }
 
-        // First partial day
         total += (BIZ_END - (cStart.getHours() + cStart.getMinutes() / 60)) * 60;
 
-        // Full days in between
         const nextDay = new Date(cStart);
         nextDay.setDate(nextDay.getDate() + 1);
         nextDay.setHours(BIZ_START, 0, 0, 0);
@@ -319,11 +364,9 @@ Deno.serve(async (req) => {
             total += BIZ_MINUTES_PER_DAY;
           }
           nextDay.setDate(nextDay.getDate() + 1);
-          // Safety: max 30 days
           if (total > 30 * BIZ_MINUTES_PER_DAY) break;
         }
 
-        // Last partial day
         if (cEnd.getDay() !== 0 && cEnd.getDay() !== 6) {
           const endH = Math.min(cEnd.getHours() + cEnd.getMinutes() / 60, BIZ_END);
           if (endH > BIZ_START) {
@@ -357,20 +400,18 @@ Deno.serve(async (req) => {
 
       const avgFrt = frtCount > 0 ? Math.round(totalFrt / frtCount) : null;
 
-      // 2 & 3. Sentiment and complaint analysis
+      // Sentiment and complaint analysis
       const allClientText = clientMsgs.map((m: any) => m.mensagem || "").join(" ");
       const { count: dissatisfactionCount, matched: dissatisfactionTerms } = countKeywordMatches(allClientText, DISSATISFACTION_KEYWORDS);
       const { count: complaintCount } = countKeywordMatches(allClientText, COMPLAINT_KEYWORDS);
       const { count: positiveCount } = countKeywordMatches(allClientText, POSITIVE_KEYWORDS);
       const { count: demandCount } = countKeywordMatches(allClientText, DEMAND_KEYWORDS);
 
-      // Sentiment score: -100 to 100 (dissatisfaction weighs heavily)
       const totalSignals = positiveCount + complaintCount + dissatisfactionCount + demandCount || 1;
       const sentimentScore = Math.round(((positiveCount - dissatisfactionCount * 2 - complaintCount - demandCount * 0.5) / totalSignals) * 100);
       const sentiment: "positivo" | "neutro" | "negativo" =
         sentimentScore > 20 ? "positivo" : sentimentScore < -20 ? "negativo" : "neutro";
 
-      // 4. Engagement type
       let engagementType: "saudável" | "cobrança" | "misto" | "inativo";
       if (clientMsgs.length === 0) {
         engagementType = "inativo";
@@ -382,7 +423,6 @@ Deno.serve(async (req) => {
         engagementType = "misto";
       }
 
-      // 5. Churn risk score (0-100) — driven primarily by client dissatisfaction
       const breakdown: ChurnBreakdown = {
         base: 30,
         dissatisfaction: Math.min(dissatisfactionCount * 12, 50),
@@ -394,15 +434,12 @@ Deno.serve(async (req) => {
         inactivity: 0,
       };
 
-      // Slow FRT
       if (avgFrt !== null) {
         if (avgFrt > 480) breakdown.frt = 10;
         else if (avgFrt > 120) breakdown.frt = 5;
         else if (avgFrt < 30) breakdown.frt = -5;
       }
-      // No team responses
       if (teamMsgs.length === 0 && clientMsgs.length > 0) breakdown.no_response = 15;
-      // Inactivity
       const lastMsg = msgs[msgs.length - 1];
       if (lastMsg) {
         const daysSince = (Date.now() - new Date(lastMsg.created_at).getTime()) / (1000 * 60 * 60 * 24);
@@ -413,78 +450,7 @@ Deno.serve(async (req) => {
       let churnRisk = breakdown.base + breakdown.dissatisfaction + breakdown.complaints + breakdown.demands + breakdown.positive + breakdown.frt + breakdown.no_response + breakdown.inactivity;
       churnRisk = Math.max(0, Math.min(100, churnRisk));
 
-      // 6. Pending demands - detect unanswered client solicitations
-      // Group by MESSAGE (not by keyword) to avoid duplicates from same message
-      const lastTeamMsg = [...msgs].reverse().find((m: any) => m.direcao === "saida");
-      const lastTeamTime = lastTeamMsg ? new Date(lastTeamMsg.created_at).getTime() : 0;
-
-      const unansweredClientMsgs = msgs.filter(
-        (m: any) => m.direcao === "entrada" && new Date(m.created_at).getTime() > lastTeamTime
-      );
-
-      const pendingDetails: PendingDemandDetail[] = [];
-      const seenMsgTimes = new Set<string>();
-
-      // Helper: process a client message, pick the BEST matching keyword (not all)
-      function addPendingFromMsg(cm: any) {
-        const timeKey = cm.created_at;
-        if (seenMsgTimes.has(timeKey)) return;
-        const { matched: solMatched } = countKeywordMatches(cm.mensagem || "", SOLICITATION_KEYWORDS);
-        const { matched: demMatched } = countKeywordMatches(cm.mensagem || "", DEMAND_KEYWORDS);
-        // Pick only the first/best match to represent this message
-        const bestTerm = solMatched[0] || demMatched[0];
-        if (bestTerm) {
-          seenMsgTimes.add(timeKey);
-          pendingDetails.push({
-            term: bestTerm,
-            requested_at: cm.created_at,
-            message_excerpt: (cm.mensagem || "").slice(0, 120),
-            suggested_solution: getSuggestedSolution(bestTerm, cm.mensagem || ""),
-          });
-        }
-      }
-
-      for (const cm of unansweredClientMsgs) {
-        addPendingFromMsg(cm);
-      }
-
-      // Also check last 10 messages for unanswered solicitations
-      const lastFewMsgs = msgs.slice(-10);
-      for (let i = 0; i < lastFewMsgs.length; i++) {
-        const m = lastFewMsgs[i];
-        if (m.direcao === "entrada") {
-          const subsequentTeamMsgs = lastFewMsgs.slice(i + 1).filter((x: any) => x.direcao === "saida");
-          if (subsequentTeamMsgs.length === 0) {
-            addPendingFromMsg(m);
-          }
-        }
-      }
-
-      // "Left on read" - client waiting 2h+ with no specific terms
-      const lastMsgIsClient = msgs.length > 0 && msgs[msgs.length - 1].direcao === "entrada";
-      const clientLeftWaiting = lastMsgIsClient && unansweredClientMsgs.length >= 1 &&
-        (Date.now() - new Date(msgs[msgs.length - 1].created_at).getTime()) > 2 * 60 * 60 * 1000;
-
-      if (clientLeftWaiting && pendingDetails.length === 0) {
-        const lastClientMsg = unansweredClientMsgs[unansweredClientMsgs.length - 1];
-        pendingDetails.push({
-          term: "sem resposta",
-          requested_at: lastClientMsg.created_at,
-          message_excerpt: (lastClientMsg.mensagem || "").slice(0, 120),
-          suggested_solution: getSuggestedSolution("sem resposta", lastClientMsg.mensagem || ""),
-        });
-      }
-
-      // Filter out resolved demands
-      const unresolvedDetails = pendingDetails.filter(d => {
-        const key = `${groupId}|${d.term}|${d.requested_at}`;
-        return !resolvedSet.has(key);
-      });
-
-      const uniqueDetails = unresolvedDetails.slice(0, 5);
-      const uniquePendingTerms = uniqueDetails.map(d => d.term);
-
-      analytics[groupId] = {
+      analyticsPartial.set(groupId, {
         group_id: groupId,
         avg_frt_minutes: avgFrt,
         sentiment,
@@ -498,9 +464,47 @@ Deno.serve(async (req) => {
         churn_breakdown: breakdown,
         total_client_msgs: clientMsgs.length,
         total_team_msgs: teamMsgs.length,
-        has_pending_demands: uniqueDetails.length > 0,
-        pending_demand_terms: uniquePendingTerms,
-        pending_demand_details: uniqueDetails,
+      });
+    }
+
+    // Step 2: AI-powered pending demand detection
+    let aiPendingItems: AIPendingItem[] = [];
+    try {
+      aiPendingItems = await detectPendingWithAI(groupedConvs, LOVABLE_API_KEY);
+    } catch (aiErr) {
+      console.error("AI pending detection failed, continuing without:", aiErr);
+    }
+
+    // Step 3: Map AI results to groups and build final analytics
+    const pendingByGroup = new Map<string, PendingDemandDetail[]>();
+    for (const item of aiPendingItems) {
+      if (!pendingByGroup.has(item.group_id)) pendingByGroup.set(item.group_id, []);
+      
+      const detail: PendingDemandDetail = {
+        term: item.type === "Demanda" ? "demanda" : "pergunta sem resposta",
+        requested_at: item.timestamp,
+        message_excerpt: (item.message || "").slice(0, 120),
+        suggested_solution: item.suggested_action || "Equipe dar retorno ao cliente",
+      };
+
+      // Filter out resolved
+      const key = `${item.group_id}|${detail.term}|${detail.requested_at}`;
+      if (!resolvedSet.has(key)) {
+        pendingByGroup.get(item.group_id)!.push(detail);
+      }
+    }
+
+    // Merge into final analytics
+    const analytics: Record<string, GroupAnalytics> = {};
+    for (const [groupId, partial] of analyticsPartial) {
+      const pendingDetails = (pendingByGroup.get(groupId) || []).slice(0, 5);
+      const pendingTerms = pendingDetails.map(d => d.term);
+
+      analytics[groupId] = {
+        ...partial,
+        has_pending_demands: pendingDetails.length > 0,
+        pending_demand_terms: pendingTerms,
+        pending_demand_details: pendingDetails,
       };
     }
 
