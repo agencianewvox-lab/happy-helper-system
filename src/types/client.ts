@@ -42,6 +42,7 @@ export interface Grupo {
   categoria: string | null;
   created_at: string;
   total_mensagens: number;
+  mensagens_hoje: number;
   ultima_mensagem: string | null;
   ultimo_horario: string | null;
   analytics?: GroupAnalytics;

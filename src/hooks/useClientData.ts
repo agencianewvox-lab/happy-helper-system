@@ -52,17 +52,23 @@ export function useClientData() {
         offset += pageSize;
       }
 
-      const msgMap = new Map<string, { count: number; last_msg: string | null; last_time: string | null }>();
+      const msgMap = new Map<string, { count: number; todayCount: number; last_msg: string | null; last_time: string | null }>();
+      
+      // Calculate start of today in local timezone
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStartISO = todayStart.toISOString();
+
       for (const c of allConversas) {
         if (!c.group_id) continue;
-        // Use the most recent timestamp between created_at and recebido_em
         const msgTime = c.recebido_em && c.recebido_em > c.created_at ? c.recebido_em : c.created_at;
+        const isToday = msgTime >= todayStartISO;
         const existing = msgMap.get(c.group_id);
         if (!existing) {
-          msgMap.set(c.group_id, { count: 1, last_msg: c.mensagem, last_time: msgTime });
+          msgMap.set(c.group_id, { count: 1, todayCount: isToday ? 1 : 0, last_msg: c.mensagem, last_time: msgTime });
         } else {
           existing.count++;
-          // Update last_time if this message is more recent
+          if (isToday) existing.todayCount++;
           if (existing.last_time && msgTime > existing.last_time) {
             existing.last_time = msgTime;
             existing.last_msg = c.mensagem;
@@ -82,6 +88,7 @@ export function useClientData() {
           categoria: g.categoria,
           created_at: g.created_at,
           total_mensagens: stats?.count || 0,
+          mensagens_hoje: stats?.todayCount || 0,
           ultima_mensagem: stats?.last_msg || null,
           ultimo_horario: stats?.last_time || null,
         };

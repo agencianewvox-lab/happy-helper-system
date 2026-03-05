@@ -34,7 +34,7 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const total = allGrupos.length;
-    const totalMsgs = allGrupos.reduce((sum, g) => sum + g.total_mensagens, 0);
+    const totalMsgsHoje = allGrupos.reduce((sum, g) => sum + (g.mensagens_hoje || 0), 0);
     const now24 = Date.now() - 24 * 60 * 60 * 1000;
     const comMsgs = allGrupos.filter((g) => g.ultimo_horario && new Date(g.ultimo_horario).getTime() > now24).length;
     const highRisk = allGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length;
@@ -55,7 +55,7 @@ export default function Dashboard() {
       if (!g.ultimo_horario) return true;
       return now - new Date(g.ultimo_horario).getTime() > h48;
     }).length;
-    return { total, totalMsgs, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue };
+    return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue };
   }, [allGrupos]);
 
   // Filter groups by clicked metric
@@ -127,7 +127,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-9 gap-4">
           {[
             { key: "total", label: "Total Grupos", desc: "Todos os grupos cadastrados", value: stats.total, icon: Users, color: "text-primary" },
-            { key: "totalMsgs", label: "Total Mensagens", desc: "Soma de todas as mensagens", value: stats.totalMsgs, icon: MessageSquare, color: "text-emerald-500" },
+            { key: "totalMsgs", label: "Mensagens Hoje", desc: "Total de mensagens do dia", value: stats.totalMsgsHoje, icon: MessageSquare, color: "text-emerald-500" },
             { key: "ativos", label: "Grupos Ativos", desc: "Com atividade nas últimas 24h", value: stats.comMsgs, icon: Activity, color: "text-amber-500" },
             { key: "highRisk", label: "Risco Alto", desc: "Risco de churn ≥ 60%", value: stats.highRisk, icon: AlertTriangle, color: "text-red-500" },
             { key: "pendencias", label: "Pendências", desc: "Demandas ainda não resolvidas", value: stats.pendencias, icon: AlertCircle, color: "text-orange-500" },
