@@ -6,6 +6,7 @@ import { Brain, Send, Loader2, X, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -13,15 +14,51 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 
 export function AIChatPanel() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>(() => {
-    try {
-      const saved = localStorage.getItem("ai-chat-history");
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load history from database on mount
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("ai_chat_messages")
+          .select("role, content, created_at")
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          console.error("Error loading chat history:", error);
+          // Fallback to localStorage
+          const saved = localStorage.getItem("ai-chat-history");
+          if (saved) setMessages(JSON.parse(saved));
+        } else if (data && data.length > 0) {
+          setMessages(data.map((d) => ({ role: d.role as "user" | "assistant", content: d.content })));
+        } else {
+          // Try migrating from localStorage
+          const saved = localStorage.getItem("ai-chat-history");
+          if (saved) {
+            const parsed: Msg[] = JSON.parse(saved);
+            if (parsed.length > 0) {
+              // Migrate to DB
+              const rows = parsed.map((m) => ({ role: m.role, content: m.content }));
+              await supabase.from("ai_chat_messages").insert(rows);
+              setMessages(parsed);
+              localStorage.removeItem("ai-chat-history");
+            }
+          }
+        }
+      } catch {
+        const saved = localStorage.getItem("ai-chat-history");
+        if (saved) setMessages(JSON.parse(saved));
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+    loadHistory();
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -29,15 +66,16 @@ export function AIChatPanel() {
     }
   }, [messages]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem("ai-chat-history", JSON.stringify(messages));
-    }
-  }, [messages]);
+  const saveMessageToDB = async (msg: Msg) => {
+    const { error } = await supabase.from("ai_chat_messages").insert({ role: msg.role, content: msg.content });
+    if (error) console.error("Error saving message:", error);
+  };
 
-  const clearChat = () => {
+  const clearChat = async () => {
     setMessages([]);
     localStorage.removeItem("ai-chat-history");
+    const { error } = await supabase.from("ai_chat_messages").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    if (error) console.error("Error clearing chat:", error);
   };
 
   const sendMessage = async (text?: string) => {
@@ -49,6 +87,9 @@ export function AIChatPanel() {
     setMessages(allMessages);
     setInput("");
     setIsLoading(true);
+
+    // Save user message to DB
+    await saveMessageToDB(userMsg);
 
     let assistantSoFar = "";
 
@@ -110,6 +151,11 @@ export function AIChatPanel() {
           }
         }
       }
+
+      // Save complete assistant message to DB
+      if (assistantSoFar) {
+        await saveMessageToDB({ role: "assistant", content: assistantSoFar });
+      }
     } catch (e) {
       console.error(e);
       toast.error("Erro ao conectar com a IA");
@@ -144,6 +190,7 @@ export function AIChatPanel() {
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
           <span className="font-bold text-sm">IA Analista CS</span>
+          <span className="text-xs text-muted-foreground">({messages.filter(m => m.role === "user").length} perguntas)</span>
         </div>
         <div className="flex items-center gap-1">
           {messages.length > 0 && (
@@ -159,7 +206,12 @@ export function AIChatPanel() {
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        {messages.length === 0 && (
+        {isLoadingHistory ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Carregando histórico...</span>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground text-center mb-4">
               Pergunte qualquer coisa sobre seus grupos de WhatsApp
@@ -174,7 +226,7 @@ export function AIChatPanel() {
               </button>
             ))}
           </div>
-        )}
+        ) : null}
 
         <div className="space-y-4">
           {messages.map((m, i) => (
