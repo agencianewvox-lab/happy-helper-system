@@ -104,6 +104,8 @@ export default function Dashboard() {
     positive: "Sentimento Positivo",
     inativos: "Grupos Inativos",
     dengue: "Grupos da Dengue",
+    sla: "SLA Violado",
+    priority: "Prioridade Máxima",
   };
 
   return (
