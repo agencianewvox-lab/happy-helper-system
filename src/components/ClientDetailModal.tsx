@@ -395,6 +395,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                           const time = new Date(c.recebido_em).toLocaleTimeString("pt-BR", {
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: "America/Sao_Paulo",
                           });
                           const isOutgoing = c.direcao === "saida";
                           return (
