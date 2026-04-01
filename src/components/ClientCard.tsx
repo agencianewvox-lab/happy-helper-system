@@ -71,9 +71,11 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
       className={cn(
         "cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2",
         "bg-card/80 backdrop-blur-sm",
-        temMensagens
-          ? "border-border/50 hover:border-primary/30"
-          : "border-border/20 opacity-70 hover:opacity-100",
+        grupo.sla_violated
+          ? "border-red-500/60 ring-1 ring-red-500/20 shadow-red-500/10 shadow-lg"
+          : temMensagens
+            ? "border-border/50 hover:border-primary/30"
+            : "border-border/20 opacity-70 hover:opacity-100",
         compact && "text-sm"
       )}
     >
