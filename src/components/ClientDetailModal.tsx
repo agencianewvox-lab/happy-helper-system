@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Grupo } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -11,12 +11,23 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   MessageSquare, Clock, Hash, FolderOpen,
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
-  CheckCircle2, XCircle,
+  CheckCircle2, XCircle, ArrowDown, ArrowUp,
 } from "lucide-react";
+
+interface Conversa {
+  id: string;
+  mensagem: string | null;
+  nome_contato: string | null;
+  direcao: string | null;
+  recebido_em: string;
+  created_at: string;
+}
 
 interface Props {
   grupo: Grupo | null;
