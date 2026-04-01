@@ -129,6 +129,15 @@ export default function Dashboard() {
                 AO VIVO
               </div>
               <TVModeButton onClick={() => setTvMode(true)} />
+              <a
+                href="/performance"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title="Central de Performance"
+              >
+                <BarChart3 className="w-4 h-4" />
+              </a>
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
               </button>
