@@ -9,7 +9,7 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3 } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 
