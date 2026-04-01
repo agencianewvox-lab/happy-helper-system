@@ -314,8 +314,8 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                       <div className="space-y-2">
                         {unresolvedDetails.map((d, i) => {
                           const dt = new Date(d.requested_at);
-                          const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-                          const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                          const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+                          const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
                           const key = makeKey(d.term, d.requested_at);
                           const isSaving = savingKey === key;
                           return (
