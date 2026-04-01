@@ -139,12 +139,55 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     }
   }, [groupId, a?.pending_demand_details, makeKey]);
 
+  // Fetch client info fields
+  const fetchClientInfo = useCallback(async () => {
+    if (!grupo?.id) return;
+    const { data } = await supabase
+      .from("whatsapp_grupos")
+      .select("plano, investimento_ads, data_entrada, aniversario_cliente, aniversario_empresa, acessos_cliente")
+      .eq("id", grupo.id)
+      .single();
+    if (data) {
+      setClientInfo({
+        plano: (data as any).plano || "",
+        investimento_ads: (data as any).investimento_ads != null ? String((data as any).investimento_ads) : "",
+        data_entrada: (data as any).data_entrada || "",
+        aniversario_cliente: (data as any).aniversario_cliente || "",
+        aniversario_empresa: (data as any).aniversario_empresa || "",
+        acessos_cliente: (data as any).acessos_cliente || "",
+      });
+    }
+  }, [grupo?.id]);
+
+  const saveClientInfo = useCallback(async () => {
+    if (!grupo?.id) return;
+    setSavingInfo(true);
+    setInfoSaved(false);
+    const { error } = await supabase
+      .from("whatsapp_grupos")
+      .update({
+        plano: clientInfo.plano || null,
+        investimento_ads: clientInfo.investimento_ads ? Number(clientInfo.investimento_ads) : null,
+        data_entrada: clientInfo.data_entrada || null,
+        aniversario_cliente: clientInfo.aniversario_cliente || null,
+        aniversario_empresa: clientInfo.aniversario_empresa || null,
+        acessos_cliente: clientInfo.acessos_cliente || null,
+      } as any)
+      .eq("id", grupo.id);
+    setSavingInfo(false);
+    if (!error) {
+      setInfoSaved(true);
+      setTimeout(() => setInfoSaved(false), 2000);
+    }
+  }, [grupo?.id, clientInfo]);
+
   useEffect(() => {
     if (open) {
       fetchResolutions();
       fetchConversas();
+      fetchClientInfo();
     }
-  }, [open, fetchResolutions, fetchConversas]);
+  }, [open, fetchResolutions, fetchConversas, fetchClientInfo]);
 
   // Group conversations by date
   const conversasByDate = useMemo(() => {
