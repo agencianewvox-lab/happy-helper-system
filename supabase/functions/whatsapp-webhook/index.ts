@@ -123,18 +123,27 @@ Deno.serve(async (req) => {
       const data = body.data;
       const key = data.key || {};
       const remoteJid = key.remoteJid || "";
+
+      // Ignorar mensagens que NÃO são de grupos permitidos
+      const isGroup = isGroupJid(remoteJid);
+      if (!isGroup || !isAllowedGroup(remoteJid)) {
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, reason: "group_not_allowed" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const fromMe = key.fromMe || false;
       const pushName = data.pushName || "";
       const messageTimestamp = data.messageTimestamp;
 
       // Extract message text
       let messageText = extractMessageText(data.message);
-      // Fallback to messageBody if available (some Evolution API versions)
       if (!messageText && data.messageBody) {
         messageText = data.messageBody;
       }
 
-      // Skip if no meaningful content (reactions, protocol messages, etc.)
+      // Skip if no meaningful content
       if (messageText === null) {
         return new Response(
           JSON.stringify({ success: true, skipped: true, reason: "no_text_content" }),
@@ -142,8 +151,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const isGroup = isGroupJid(remoteJid);
-      const groupId = isGroup ? remoteJid : null;
+      const groupId = remoteJid;
       const phone = isGroup
         ? (key.participant ? extractPhoneFromJid(key.participant) : null)
         : extractPhoneFromJid(remoteJid);
