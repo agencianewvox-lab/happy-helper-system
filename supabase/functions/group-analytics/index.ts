@@ -77,6 +77,8 @@ interface ChurnBreakdown {
   inactivity: number;
 }
 
+type IntentCategory = "Aprovação" | "Suporte Técnico" | "Financeiro" | "Urgência" | "Informativo" | null;
+
 interface GroupAnalytics {
   group_id: string;
   avg_frt_minutes: number | null;
@@ -94,6 +96,7 @@ interface GroupAnalytics {
   has_pending_demands: boolean;
   pending_demand_terms: string[];
   pending_demand_details: PendingDemandDetail[];
+  intent: IntentCategory;
 }
 
 interface AIPendingItem {
@@ -287,6 +290,112 @@ async function detectPendingWithAI(
 
   return allItems;
 }
+
+const INTENT_DETECTION_PROMPT = `Você é uma IA que classifica a intenção principal das últimas mensagens de clientes em grupos de WhatsApp de uma agência de marketing digital.
+
+Classifique cada grupo em UMA das categorias:
+- "Aprovação" — Cliente aguardando ou enviando aprovação de arte, campanha, post, vídeo
+- "Suporte Técnico" — Problemas técnicos, bugs, site fora do ar, erro em anúncio
+- "Financeiro" — Assuntos sobre pagamento, boleto, contrato, investimento, valores
+- "Urgência" — Situação urgente que precisa de ação imediata (reclamação grave, prazo apertado)
+- "Informativo" — Conversa geral, alinhamento, bom dia, atualizações sem ação pendente
+
+Analise apenas as ÚLTIMAS 5-10 mensagens do CLIENTE (não da equipe) para determinar a intenção.
+Use a função classify_intents para retornar os resultados.`;
+
+async function detectIntentWithAI(
+  groupConversations: Map<string, any[]>,
+  apiKey: string
+): Promise<Map<string, IntentCategory>> {
+  const result = new Map<string, IntentCategory>();
+  if (groupConversations.size === 0) return result;
+
+  const contextParts: { groupId: string; text: string }[] = [];
+  for (const [groupId, msgs] of groupConversations) {
+    // Get last 10 client messages
+    const clientMsgs = msgs.filter((m: any) => m.direcao === "entrada").slice(-10);
+    if (clientMsgs.length === 0) continue;
+    const text = clientMsgs.map((m: any) => (m.mensagem || "").slice(0, 150)).join("\n");
+    contextParts.push({ groupId, text: `[GRUPO: ${groupId}]\n${text}` });
+  }
+
+  const BATCH_SIZE = 15;
+  for (let i = 0; i < contextParts.length; i += BATCH_SIZE) {
+    const batch = contextParts.slice(i, i + BATCH_SIZE);
+    const conversationText = batch.map(b => b.text).join("\n\n");
+
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: INTENT_DETECTION_PROMPT },
+            { role: "user", content: `Classifique a intenção de cada grupo:\n\n${conversationText}` },
+          ],
+          temperature: 0.1,
+          tools: [{
+            type: "function",
+            function: {
+              name: "classify_intents",
+              description: "Classify the intent of each group's recent messages",
+              parameters: {
+                type: "object",
+                properties: {
+                  intents: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        group_id: { type: "string" },
+                        intent: { type: "string", enum: ["Aprovação", "Suporte Técnico", "Financeiro", "Urgência", "Informativo"] },
+                      },
+                      required: ["group_id", "intent"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["intents"],
+                additionalProperties: false,
+              },
+            },
+          }],
+          tool_choice: { type: "function", function: { name: "classify_intents" } },
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("AI intent error:", response.status, await response.text());
+        continue;
+      }
+
+      const data = await response.json();
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (toolCall?.function?.arguments) {
+        try {
+          const parsed = JSON.parse(toolCall.function.arguments);
+          if (Array.isArray(parsed.intents)) {
+            for (const item of parsed.intents) {
+              const validIntents = ["Aprovação", "Suporte Técnico", "Financeiro", "Urgência", "Informativo"];
+              if (validIntents.includes(item.intent)) {
+                result.set(item.group_id, item.intent as IntentCategory);
+              }
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+    } catch (err) {
+      console.error("AI intent fetch error:", err);
+    }
+  }
+
+  return result;
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -496,12 +605,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Step 2: AI-powered pending demand detection
+    // Step 2: AI-powered pending demand detection + intent detection (parallel)
     let aiPendingItems: AIPendingItem[] = [];
-    try {
-      aiPendingItems = await detectPendingWithAI(groupedConvs, LOVABLE_API_KEY);
-    } catch (aiErr) {
-      console.error("AI pending detection failed, continuing without:", aiErr);
+    let intentMap = new Map<string, IntentCategory>();
+    
+    const [pendingResult, intentResult] = await Promise.allSettled([
+      detectPendingWithAI(groupedConvs, LOVABLE_API_KEY),
+      detectIntentWithAI(groupedConvs, LOVABLE_API_KEY),
+    ]);
+    
+    if (pendingResult.status === "fulfilled") {
+      aiPendingItems = pendingResult.value;
+    } else {
+      console.error("AI pending detection failed:", pendingResult.reason);
+    }
+    
+    if (intentResult.status === "fulfilled") {
+      intentMap = intentResult.value;
+    } else {
+      console.error("AI intent detection failed:", intentResult.reason);
     }
 
     // Step 3: Map AI results to groups and build final analytics
@@ -534,6 +656,7 @@ Deno.serve(async (req) => {
         has_pending_demands: pendingDetails.length > 0,
         pending_demand_terms: pendingTerms,
         pending_demand_details: pendingDetails,
+        intent: intentMap.get(groupId) || null,
       };
     }
 
