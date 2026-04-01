@@ -13,11 +13,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   MessageSquare, Clock, Hash, FolderOpen,
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2,
 } from "lucide-react";
 
 interface Conversa {
