@@ -64,11 +64,6 @@ export default function Performance() {
     async function fetchData() {
       setLoading(true);
       try {
-        const { data: result, error } = await supabase.functions.invoke("team-performance", {
-          body: null,
-          headers: {},
-        });
-        // Use query params via URL workaround
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/team-performance?period=${period}`;
         const resp = await fetch(url, {
           headers: {
