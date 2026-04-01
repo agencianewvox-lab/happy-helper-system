@@ -604,12 +604,25 @@ async function detectIntentWithAI(
       });
     }
 
-    // Step 2: AI-powered pending demand detection
+    // Step 2: AI-powered pending demand detection + intent detection (parallel)
     let aiPendingItems: AIPendingItem[] = [];
-    try {
-      aiPendingItems = await detectPendingWithAI(groupedConvs, LOVABLE_API_KEY);
-    } catch (aiErr) {
-      console.error("AI pending detection failed, continuing without:", aiErr);
+    let intentMap = new Map<string, IntentCategory>();
+    
+    const [pendingResult, intentResult] = await Promise.allSettled([
+      detectPendingWithAI(groupedConvs, LOVABLE_API_KEY),
+      detectIntentWithAI(groupedConvs, LOVABLE_API_KEY),
+    ]);
+    
+    if (pendingResult.status === "fulfilled") {
+      aiPendingItems = pendingResult.value;
+    } else {
+      console.error("AI pending detection failed:", pendingResult.reason);
+    }
+    
+    if (intentResult.status === "fulfilled") {
+      intentMap = intentResult.value;
+    } else {
+      console.error("AI intent detection failed:", intentResult.reason);
     }
 
     // Step 3: Map AI results to groups and build final analytics
@@ -642,6 +655,7 @@ async function detectIntentWithAI(
         has_pending_demands: pendingDetails.length > 0,
         pending_demand_terms: pendingTerms,
         pending_demand_details: pendingDetails,
+        intent: intentMap.get(groupId) || null,
       };
     }
 
