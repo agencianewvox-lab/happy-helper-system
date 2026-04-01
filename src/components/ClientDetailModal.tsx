@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Grupo } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -90,6 +90,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   });
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
+  const conversasEndRef = useRef<HTMLDivElement>(null);
 
   const groupId = grupo?.group_id || "";
   const a = grupo?.analytics;
@@ -251,7 +252,13 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="indicadores" className="mt-2">
+        <Tabs defaultValue="indicadores" className="mt-2" onValueChange={(val) => {
+          if (val === "conversas") {
+            setTimeout(() => {
+              conversasEndRef.current?.scrollIntoView({ behavior: "auto" });
+            }, 100);
+          }
+        }}>
           <TabsList className="w-full">
             <TabsTrigger value="indicadores" className="flex-1">Indicadores</TabsTrigger>
             <TabsTrigger value="conversas" className="flex-1">
@@ -493,6 +500,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                       </div>
                     </div>
                   ))}
+                  <div ref={conversasEndRef} />
                 </div>
               </ScrollArea>
             )}
