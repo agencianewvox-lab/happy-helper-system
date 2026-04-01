@@ -79,6 +79,18 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [loadingConversas, setLoadingConversas] = useState(false);
 
+  // Client info fields state
+  const [clientInfo, setClientInfo] = useState({
+    plano: "",
+    investimento_ads: "",
+    data_entrada: "",
+    aniversario_cliente: "",
+    aniversario_empresa: "",
+    acessos_cliente: "",
+  });
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [infoSaved, setInfoSaved] = useState(false);
+
   const groupId = grupo?.group_id || "";
   const a = grupo?.analytics;
 
