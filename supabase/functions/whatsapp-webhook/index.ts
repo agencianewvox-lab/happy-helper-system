@@ -63,8 +63,44 @@ function extractPhoneFromJid(jid: string): string | null {
   return match ? match[1] : null;
 }
 
+// Grupos permitidos — apenas esses serão processados
+const ALLOWED_GROUPS: Record<string, string> = {
+  "120363406574401569@g.us": "NV-MKT IMPLANTAR JATAÍ",
+  "120363427941134678@g.us": "NV - MICROLINS",
+  "120363406346934597@g.us": "NV MKT - EXCLUSIVE",
+  "120363387212424738@g.us": "MK-NV Itulub Lançamentos",
+  "120363425401904195@g.us": "NV-MKT Instituto Reabilis",
+  "120363145568211726@g.us": "MKT NV - ORAL CENTER ARAGUARI",
+  "120363419961757740@g.us": "NV - SORRIA BEM",
+  "120363422452848401@g.us": "NV-MKT Patos Eixos",
+  "120363400497423496@g.us": "MKT-NV Luiz Curti",
+  "120363423267143034@g.us": "NV-MKT Beatriz Chaves Confeitaria",
+  "120363422455970759@g.us": "NV - SOLUÇÃO T3LED",
+  "120363316048469386@g.us": "MKT NV - ORAL CENTER CATALAO",
+  "120363419351414313@g.us": "NV-MKT Guardião Proteção",
+  "120363405241521628@g.us": "NV - DRA. TACIANE",
+  "120363301303362582@g.us": "NV-MKT CIRO AUTO PEÇAS",
+  "120363406937225964@g.us": "NV-MKT ORALMED",
+  "120363418339795433@g.us": "NV - VEMSER",
+  "120363422282387892@g.us": "NV-MKT Trevo Legaliza",
+  "120363420218079110@g.us": "NV-MKT MIX IMPORTS",
+  "120363404775153601@g.us": "NV - REDEPOP",
+  "120363422095140523@g.us": "NV-MKT Chevromix",
+  "12036311637739178@g.us": "NV-MKT Veneza",
+  "120363164575490995@g.us": "NV-MKT VENEZA SEMI NOVOS",
+  "12036342134908487@g.us": "NV - MKT PRIMAVERA M. CONSTRUÇÃO",
+  "120363423095337077@g.us": "NV - T3 LED",
+  "120363426488293045@g.us": "NV - MKT IMPLANTAR RIO VERDE",
+  "120363404804672868@g.us": "NV - MKT ODONTONEO",
+  "120363405316956579@g.us": "NV - Guardião e agilidade de tráfego",
+};
+
 function isGroupJid(jid: string): boolean {
   return jid?.endsWith("@g.us") || false;
+}
+
+function isAllowedGroup(jid: string): boolean {
+  return jid in ALLOWED_GROUPS;
 }
 
 Deno.serve(async (req) => {
@@ -87,18 +123,27 @@ Deno.serve(async (req) => {
       const data = body.data;
       const key = data.key || {};
       const remoteJid = key.remoteJid || "";
+
+      // Ignorar mensagens que NÃO são de grupos permitidos
+      const isGroup = isGroupJid(remoteJid);
+      if (!isGroup || !isAllowedGroup(remoteJid)) {
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, reason: "group_not_allowed" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const fromMe = key.fromMe || false;
       const pushName = data.pushName || "";
       const messageTimestamp = data.messageTimestamp;
 
       // Extract message text
       let messageText = extractMessageText(data.message);
-      // Fallback to messageBody if available (some Evolution API versions)
       if (!messageText && data.messageBody) {
         messageText = data.messageBody;
       }
 
-      // Skip if no meaningful content (reactions, protocol messages, etc.)
+      // Skip if no meaningful content
       if (messageText === null) {
         return new Response(
           JSON.stringify({ success: true, skipped: true, reason: "no_text_content" }),
@@ -106,8 +151,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const isGroup = isGroupJid(remoteJid);
-      const groupId = isGroup ? remoteJid : null;
+      const groupId = remoteJid;
       const phone = isGroup
         ? (key.participant ? extractPhoneFromJid(key.participant) : null)
         : extractPhoneFromJid(remoteJid);
@@ -126,10 +170,9 @@ Deno.serve(async (req) => {
         receivedAt = new Date().toISOString();
       }
 
-      // Auto-create group if it's a group message
-      if (isGroup && groupId) {
-        // Extract group name from data if available, otherwise use groupId
-        const groupName = data.groupName || data.instanceData?.groupName || remoteJid;
+      // Auto-create group if not yet registered
+      if (groupId) {
+        const groupName = ALLOWED_GROUPS[groupId] || data.groupName || remoteJid;
 
         const { data: existingGroup } = await supabase
           .from("whatsapp_grupos")
