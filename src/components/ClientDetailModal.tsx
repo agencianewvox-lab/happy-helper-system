@@ -13,11 +13,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   MessageSquare, Clock, Hash, FolderOpen,
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2,
 } from "lucide-react";
 
 interface Conversa {
@@ -75,6 +79,18 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [loadingConversas, setLoadingConversas] = useState(false);
 
+  // Client info fields state
+  const [clientInfo, setClientInfo] = useState({
+    plano: "",
+    investimento_ads: "",
+    data_entrada: "",
+    aniversario_cliente: "",
+    aniversario_empresa: "",
+    acessos_cliente: "",
+  });
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [infoSaved, setInfoSaved] = useState(false);
+
   const groupId = grupo?.group_id || "";
   const a = grupo?.analytics;
 
@@ -123,12 +139,55 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     }
   }, [groupId, a?.pending_demand_details, makeKey]);
 
+  // Fetch client info fields
+  const fetchClientInfo = useCallback(async () => {
+    if (!grupo?.id) return;
+    const { data } = await supabase
+      .from("whatsapp_grupos")
+      .select("plano, investimento_ads, data_entrada, aniversario_cliente, aniversario_empresa, acessos_cliente")
+      .eq("id", grupo.id)
+      .single();
+    if (data) {
+      setClientInfo({
+        plano: (data as any).plano || "",
+        investimento_ads: (data as any).investimento_ads != null ? String((data as any).investimento_ads) : "",
+        data_entrada: (data as any).data_entrada || "",
+        aniversario_cliente: (data as any).aniversario_cliente || "",
+        aniversario_empresa: (data as any).aniversario_empresa || "",
+        acessos_cliente: (data as any).acessos_cliente || "",
+      });
+    }
+  }, [grupo?.id]);
+
+  const saveClientInfo = useCallback(async () => {
+    if (!grupo?.id) return;
+    setSavingInfo(true);
+    setInfoSaved(false);
+    const { error } = await supabase
+      .from("whatsapp_grupos")
+      .update({
+        plano: clientInfo.plano || null,
+        investimento_ads: clientInfo.investimento_ads ? Number(clientInfo.investimento_ads) : null,
+        data_entrada: clientInfo.data_entrada || null,
+        aniversario_cliente: clientInfo.aniversario_cliente || null,
+        aniversario_empresa: clientInfo.aniversario_empresa || null,
+        acessos_cliente: clientInfo.acessos_cliente || null,
+      } as any)
+      .eq("id", grupo.id);
+    setSavingInfo(false);
+    if (!error) {
+      setInfoSaved(true);
+      setTimeout(() => setInfoSaved(false), 2000);
+    }
+  }, [grupo?.id, clientInfo]);
+
   useEffect(() => {
     if (open) {
       fetchResolutions();
       fetchConversas();
+      fetchClientInfo();
     }
-  }, [open, fetchResolutions, fetchConversas]);
+  }, [open, fetchResolutions, fetchConversas, fetchClientInfo]);
 
   // Group conversations by date
   const conversasByDate = useMemo(() => {
@@ -440,7 +499,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
           </TabsContent>
 
           {/* Tab: Informações */}
-          <TabsContent value="info" className="space-y-3 mt-4">
+          <TabsContent value="info" className="space-y-4 mt-4">
             {basicItems.map(({ icon: Icon, label, value }) => (
               <div
                 key={label}
@@ -463,6 +522,117 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                 </div>
               </div>
             )}
+
+            {/* Separator */}
+            <div className="border-t border-border/40 pt-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3">📌 Dados do Cliente</p>
+
+              <div className="space-y-3">
+                {/* Plano */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <Briefcase className="w-4 h-4 mt-2 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Plano</Label>
+                    <Input
+                      value={clientInfo.plano}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, plano: e.target.value }))}
+                      placeholder="Ex: SM + Tráfego Pago"
+                      className="mt-1 h-8 text-sm bg-background/50"
+                    />
+                  </div>
+                </div>
+
+                {/* Investimento em Ads */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                  <DollarSign className="w-4 h-4 mt-2 text-emerald-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Investimento em Ads</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                      <Input
+                        type="number"
+                        value={clientInfo.investimento_ads}
+                        onChange={(e) => setClientInfo(prev => ({ ...prev, investimento_ads: e.target.value }))}
+                        placeholder="0,00"
+                        className="h-8 text-sm pl-9 bg-background/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Data de Entrada */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <CalendarDays className="w-4 h-4 mt-2 text-blue-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Data de Entrada</Label>
+                    <Input
+                      type="date"
+                      value={clientInfo.data_entrada}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, data_entrada: e.target.value }))}
+                      className="mt-1 h-8 text-sm bg-background/50"
+                    />
+                  </div>
+                </div>
+
+                {/* Aniversários */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <Cake className="w-4 h-4 mt-2 text-pink-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Aniv. Cliente</Label>
+                      <Input
+                        type="date"
+                        value={clientInfo.aniversario_cliente}
+                        onChange={(e) => setClientInfo(prev => ({ ...prev, aniversario_cliente: e.target.value }))}
+                        className="mt-1 h-8 text-sm bg-background/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <Cake className="w-4 h-4 mt-2 text-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Aniv. Empresa</Label>
+                      <Input
+                        type="date"
+                        value={clientInfo.aniversario_empresa}
+                        onChange={(e) => setClientInfo(prev => ({ ...prev, aniversario_empresa: e.target.value }))}
+                        className="mt-1 h-8 text-sm bg-background/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acessos do Cliente */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <KeyRound className="w-4 h-4 mt-2 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Acessos do Cliente</Label>
+                    <Textarea
+                      value={clientInfo.acessos_cliente}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, acessos_cliente: e.target.value }))}
+                      placeholder="Logins, senhas, links de acesso..."
+                      className="mt-1 text-sm bg-background/50 min-h-[60px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Save button */}
+                <Button
+                  onClick={saveClientInfo}
+                  disabled={savingInfo}
+                  className="w-full gap-2"
+                  variant={infoSaved ? "outline" : "default"}
+                >
+                  {savingInfo ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
+                  ) : infoSaved ? (
+                    <><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Salvo!</>
+                  ) : (
+                    <><Save className="w-4 h-4" /> Salvar Informações</>
+                  )}
+                </Button>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
