@@ -156,6 +156,12 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
                 Pendente
               </span>
             )}
+            {/* Intent */}
+            {a.intent && intentConfig[a.intent] && (
+              <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", intentConfig[a.intent].bg, intentConfig[a.intent].color)}>
+                {intentConfig[a.intent].emoji} {a.intent}
+              </span>
+            )}
           </div>
         )}
 
