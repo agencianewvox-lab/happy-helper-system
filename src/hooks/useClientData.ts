@@ -36,7 +36,7 @@ export function useClientData() {
       if (gruposError) throw gruposError;
 
       // Paginate to fetch ALL conversations (Supabase default limit is 1000)
-      let allConversas: { group_id: string | null; mensagem: string | null; created_at: string; recebido_em: string }[] = [];
+      let allConversas: { group_id: string | null; mensagem: string | null; created_at: string; recebido_em: string; direcao: string | null }[] = [];
       let offset = 0;
       const pageSize = 1000;
       while (true) {

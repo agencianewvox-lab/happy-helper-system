@@ -46,4 +46,8 @@ export interface Grupo {
   ultima_mensagem: string | null;
   ultimo_horario: string | null;
   analytics?: GroupAnalytics;
+  /** True when last message is from client and team hasn't responded in 30+ biz minutes */
+  sla_violated: boolean;
+  /** Minutes of delay beyond the 30-min SLA threshold */
+  sla_delay_minutes: number;
 }
