@@ -499,7 +499,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
           </TabsContent>
 
           {/* Tab: Informações */}
-          <TabsContent value="info" className="space-y-3 mt-4">
+          <TabsContent value="info" className="space-y-4 mt-4">
             {basicItems.map(({ icon: Icon, label, value }) => (
               <div
                 key={label}
@@ -522,6 +522,117 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                 </div>
               </div>
             )}
+
+            {/* Separator */}
+            <div className="border-t border-border/40 pt-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3">📌 Dados do Cliente</p>
+
+              <div className="space-y-3">
+                {/* Plano */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <Briefcase className="w-4 h-4 mt-2 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Plano</Label>
+                    <Input
+                      value={clientInfo.plano}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, plano: e.target.value }))}
+                      placeholder="Ex: SM + Tráfego Pago"
+                      className="mt-1 h-8 text-sm bg-background/50"
+                    />
+                  </div>
+                </div>
+
+                {/* Investimento em Ads */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                  <DollarSign className="w-4 h-4 mt-2 text-emerald-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Investimento em Ads</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                      <Input
+                        type="number"
+                        value={clientInfo.investimento_ads}
+                        onChange={(e) => setClientInfo(prev => ({ ...prev, investimento_ads: e.target.value }))}
+                        placeholder="0,00"
+                        className="h-8 text-sm pl-9 bg-background/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Data de Entrada */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <CalendarDays className="w-4 h-4 mt-2 text-blue-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Data de Entrada</Label>
+                    <Input
+                      type="date"
+                      value={clientInfo.data_entrada}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, data_entrada: e.target.value }))}
+                      className="mt-1 h-8 text-sm bg-background/50"
+                    />
+                  </div>
+                </div>
+
+                {/* Aniversários */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <Cake className="w-4 h-4 mt-2 text-pink-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Aniv. Cliente</Label>
+                      <Input
+                        type="date"
+                        value={clientInfo.aniversario_cliente}
+                        onChange={(e) => setClientInfo(prev => ({ ...prev, aniversario_cliente: e.target.value }))}
+                        className="mt-1 h-8 text-sm bg-background/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <Cake className="w-4 h-4 mt-2 text-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Aniv. Empresa</Label>
+                      <Input
+                        type="date"
+                        value={clientInfo.aniversario_empresa}
+                        onChange={(e) => setClientInfo(prev => ({ ...prev, aniversario_empresa: e.target.value }))}
+                        className="mt-1 h-8 text-sm bg-background/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acessos do Cliente */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <KeyRound className="w-4 h-4 mt-2 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Acessos do Cliente</Label>
+                    <Textarea
+                      value={clientInfo.acessos_cliente}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, acessos_cliente: e.target.value }))}
+                      placeholder="Logins, senhas, links de acesso..."
+                      className="mt-1 text-sm bg-background/50 min-h-[60px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Save button */}
+                <Button
+                  onClick={saveClientInfo}
+                  disabled={savingInfo}
+                  className="w-full gap-2"
+                  variant={infoSaved ? "outline" : "default"}
+                >
+                  {savingInfo ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
+                  ) : infoSaved ? (
+                    <><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Salvo!</>
+                  ) : (
+                    <><Save className="w-4 h-4" /> Salvar Informações</>
+                  )}
+                </Button>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
