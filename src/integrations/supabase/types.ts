@@ -109,25 +109,43 @@ export type Database = {
       }
       whatsapp_grupos: {
         Row: {
+          acessos_cliente: string | null
+          aniversario_cliente: string | null
+          aniversario_empresa: string | null
           categoria: string | null
           created_at: string
+          data_entrada: string | null
           group_id: string
           id: string
+          investimento_ads: number | null
           nome: string
+          plano: string | null
         }
         Insert: {
+          acessos_cliente?: string | null
+          aniversario_cliente?: string | null
+          aniversario_empresa?: string | null
           categoria?: string | null
           created_at?: string
+          data_entrada?: string | null
           group_id: string
           id?: string
+          investimento_ads?: number | null
           nome: string
+          plano?: string | null
         }
         Update: {
+          acessos_cliente?: string | null
+          aniversario_cliente?: string | null
+          aniversario_empresa?: string | null
           categoria?: string | null
           created_at?: string
+          data_entrada?: string | null
           group_id?: string
           id?: string
+          investimento_ads?: number | null
           nome?: string
+          plano?: string | null
         }
         Relationships: []
       }
