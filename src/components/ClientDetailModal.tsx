@@ -133,12 +133,14 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   // Group conversations by date
   const conversasByDate = useMemo(() => {
     const groups: Record<string, Conversa[]> = {};
+    const tz = "America/Sao_Paulo";
     for (const c of conversas) {
       const dateKey = new Date(c.recebido_em).toLocaleDateString("pt-BR", {
         weekday: "long",
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
+        timeZone: tz,
       });
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(c);
