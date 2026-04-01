@@ -90,6 +90,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   });
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
+  const conversasEndRef = useRef<HTMLDivElement>(null);
 
   const groupId = grupo?.group_id || "";
   const a = grupo?.analytics;
