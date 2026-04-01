@@ -34,36 +34,13 @@ function detectDirection(fromMe: boolean, contactName: string): string {
   return "entrada";
 }
 
-function extractMessageText(message: any): string | null {
-  if (!message) return null;
-  // Text messages
-  if (message.conversation) return message.conversation;
-  if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
-  // Media with caption
-  if (message.imageMessage?.caption) return `[Imagem] ${message.imageMessage.caption}`;
-  if (message.imageMessage) return "[Imagem]";
-  if (message.videoMessage?.caption) return `[Vídeo] ${message.videoMessage.caption}`;
-  if (message.videoMessage) return "[Vídeo]";
-  if (message.audioMessage) return "[Áudio]";
-  if (message.documentMessage?.fileName) return `[Documento] ${message.documentMessage.fileName}`;
-  if (message.documentMessage) return "[Documento]";
-  if (message.stickerMessage) return "[Figurinha]";
-  if (message.contactMessage) return "[Contato]";
-  if (message.locationMessage) return "[Localização]";
-  if (message.reactionMessage) return null; // Ignore reactions
-  if (message.protocolMessage) return null; // Ignore protocol messages
-  // Fallback: try messageBody if present at data level
-  return null;
-}
-
 function extractPhoneFromJid(jid: string): string | null {
   if (!jid) return null;
-  // Format: 5511999999999@s.whatsapp.net or 120363xxx@g.us
   const match = jid.match(/^(\d+)@/);
   return match ? match[1] : null;
 }
 
-// Grupos permitidos — apenas esses serão processados
+// Grupos permitidos
 const ALLOWED_GROUPS: Record<string, string> = {
   "120363406574401569@g.us": "NV-MKT IMPLANTAR JATAÍ",
   "120363427941134678@g.us": "NV - MICROLINS",
@@ -103,6 +80,105 @@ function isAllowedGroup(jid: string): boolean {
   return jid in ALLOWED_GROUPS;
 }
 
+/**
+ * Transcribe audio using OpenAI Whisper API.
+ * Accepts base64-encoded audio data.
+ */
+async function transcribeAudio(base64Audio: string, mimetype?: string): Promise<string | null> {
+  const openaiKey = Deno.env.get("openai");
+  if (!openaiKey) {
+    console.error("OpenAI API key not configured (secret name: 'openai')");
+    return null;
+  }
+
+  try {
+    // Decode base64 to binary
+    const binaryStr = atob(base64Audio);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    // Determine file extension from mimetype
+    const ext = mimetype?.includes("ogg") ? "ogg" : mimetype?.includes("mp4") ? "m4a" : "ogg";
+    const blob = new Blob([bytes], { type: mimetype || "audio/ogg" });
+
+    const formData = new FormData();
+    formData.append("file", blob, `audio.${ext}`);
+    formData.append("model", "whisper-1");
+    formData.append("language", "pt");
+
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Whisper API error:", response.status, errText);
+      return null;
+    }
+
+    const result = await response.json();
+    return result.text || null;
+  } catch (err) {
+    console.error("Audio transcription error:", err);
+    return null;
+  }
+}
+
+/**
+ * Extract message text from Evolution API message object.
+ * For audio messages with base64 data, attempts transcription.
+ */
+async function extractMessageText(message: any, data: any): Promise<string | null> {
+  if (!message) return null;
+
+  // Text messages
+  if (message.conversation) return message.conversation;
+  if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+
+  // Image with caption
+  if (message.imageMessage?.caption) return `[Imagem] ${message.imageMessage.caption}`;
+  if (message.imageMessage) return "[Imagem]";
+
+  // Video
+  if (message.videoMessage?.caption) return `[Vídeo] ${message.videoMessage.caption}`;
+  if (message.videoMessage) return "[Vídeo]";
+
+  // Audio — attempt transcription if base64 is available
+  if (message.audioMessage) {
+    const base64 = message.base64 || data?.message?.base64 || message.audioMessage?.base64;
+    if (base64) {
+      const mimetype = message.audioMessage?.mimetype || "audio/ogg; codecs=opus";
+      console.log("Attempting audio transcription...");
+      const transcription = await transcribeAudio(base64, mimetype);
+      if (transcription) {
+        console.log("Transcription successful:", transcription.substring(0, 50) + "...");
+        return `[Áudio Transcrito] ${transcription}`;
+      }
+      console.log("Transcription failed, falling back to [Áudio]");
+    } else {
+      console.log("No base64 data for audio message, storing as [Áudio]");
+    }
+    return "[Áudio]";
+  }
+
+  // Other media types
+  if (message.documentMessage?.fileName) return `[Documento] ${message.documentMessage.fileName}`;
+  if (message.documentMessage) return "[Documento]";
+  if (message.stickerMessage) return "[Figurinha]";
+  if (message.contactMessage) return "[Contato]";
+  if (message.locationMessage) return "[Localização]";
+  if (message.reactionMessage) return null;
+  if (message.protocolMessage) return null;
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -118,7 +194,6 @@ Deno.serve(async (req) => {
     console.log("Webhook received, event:", body.event);
 
     // ===== EVOLUTION API FORMAT =====
-    // Payload: { event: "messages.upsert", data: { key: {...}, message: {...}, pushName: "..." }, ... }
     if (body.event === "messages.upsert" && body.data) {
       const data = body.data;
       const key = data.key || {};
@@ -137,8 +212,8 @@ Deno.serve(async (req) => {
       const pushName = data.pushName || "";
       const messageTimestamp = data.messageTimestamp;
 
-      // Extract message text
-      let messageText = extractMessageText(data.message);
+      // Extract message text (now async for audio transcription)
+      let messageText = await extractMessageText(data.message, data);
       if (!messageText && data.messageBody) {
         messageText = data.messageBody;
       }
@@ -173,7 +248,6 @@ Deno.serve(async (req) => {
       // Auto-create group if not yet registered
       if (groupId) {
         const groupName = ALLOWED_GROUPS[groupId] || data.groupName || remoteJid;
-
         const { data: existingGroup } = await supabase
           .from("whatsapp_grupos")
           .select("id")
@@ -220,7 +294,6 @@ Deno.serve(async (req) => {
 
     // ===== LEGACY N8N FORMAT (backward compatible) =====
     const mensagens = Array.isArray(body) ? body : [body];
-
     const clean = (val: any) =>
       typeof val === "string" && val.startsWith("=") ? val.slice(1) : val;
 
