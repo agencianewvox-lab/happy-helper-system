@@ -170,10 +170,9 @@ Deno.serve(async (req) => {
         receivedAt = new Date().toISOString();
       }
 
-      // Auto-create group if it's a group message
-      if (isGroup && groupId) {
-        // Extract group name from data if available, otherwise use groupId
-        const groupName = data.groupName || data.instanceData?.groupName || remoteJid;
+      // Auto-create group if not yet registered
+      if (groupId) {
+        const groupName = ALLOWED_GROUPS[groupId] || data.groupName || remoteJid;
 
         const { data: existingGroup } = await supabase
           .from("whatsapp_grupos")
