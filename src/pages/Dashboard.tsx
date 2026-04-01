@@ -139,7 +139,7 @@ export default function Dashboard() {
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-9 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-11 gap-4">
           {[
             { key: "total", label: "Total Grupos", desc: "Todos os grupos cadastrados", value: stats.total, icon: Users, color: "text-primary" },
             { key: "totalMsgs", label: "Mensagens Hoje", desc: "Total de mensagens do dia", value: stats.totalMsgsHoje, icon: MessageSquare, color: "text-emerald-500" },
