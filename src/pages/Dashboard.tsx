@@ -181,6 +181,8 @@ export default function Dashboard() {
             categorias={categorias}
             activeFilter={categoriaFilter}
             onFilterChange={(f) => { setCategoriaFilter(f); setMetricFilter(null); }}
+            onPriorityFilter={() => setMetricFilter(metricFilter === "priority" ? null : "priority")}
+            isPriorityActive={metricFilter === "priority"}
           />
           <div className="flex items-center gap-2">
             {metricFilter && (
