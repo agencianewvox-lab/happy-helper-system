@@ -251,7 +251,13 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="indicadores" className="mt-2">
+        <Tabs defaultValue="indicadores" className="mt-2" onValueChange={(val) => {
+          if (val === "conversas") {
+            setTimeout(() => {
+              conversasEndRef.current?.scrollIntoView({ behavior: "auto" });
+            }, 100);
+          }
+        }}>
           <TabsList className="w-full">
             <TabsTrigger value="indicadores" className="flex-1">Indicadores</TabsTrigger>
             <TabsTrigger value="conversas" className="flex-1">
