@@ -44,6 +44,8 @@ export default function Dashboard() {
       : null;
     const positiveSent = allGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
     const pendencias = allGrupos.filter((g) => g.analytics?.has_pending_demands).length;
+    const slaViolations = allGrupos.filter((g) => g.sla_violated).length;
+    const priorityCount = allGrupos.filter((g) => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)).length;
     const now = Date.now();
     const h24 = 24 * 60 * 60 * 1000;
     const inativos = allGrupos.filter((g) => {
@@ -55,7 +57,7 @@ export default function Dashboard() {
       if (!g.ultimo_horario) return true;
       return now - new Date(g.ultimo_horario).getTime() > h48;
     }).length;
-    return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue };
+    return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue, slaViolations, priorityCount };
   }, [allGrupos]);
 
   // Filter groups by clicked metric
