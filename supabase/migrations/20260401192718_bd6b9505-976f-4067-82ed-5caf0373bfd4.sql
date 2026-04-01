@@ -1,0 +1,2 @@
+CREATE POLICY "Service role insert grupos" ON public.whatsapp_grupos FOR INSERT TO public WITH CHECK (true);
+CREATE POLICY "Service role update grupos" ON public.whatsapp_grupos FOR UPDATE TO public USING (true) WITH CHECK (true);
