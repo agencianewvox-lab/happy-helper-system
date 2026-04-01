@@ -77,6 +77,8 @@ interface ChurnBreakdown {
   inactivity: number;
 }
 
+type IntentCategory = "Aprovação" | "Suporte Técnico" | "Financeiro" | "Urgência" | "Informativo" | null;
+
 interface GroupAnalytics {
   group_id: string;
   avg_frt_minutes: number | null;
@@ -94,6 +96,7 @@ interface GroupAnalytics {
   has_pending_demands: boolean;
   pending_demand_terms: string[];
   pending_demand_details: PendingDemandDetail[];
+  intent: IntentCategory;
 }
 
 interface AIPendingItem {
