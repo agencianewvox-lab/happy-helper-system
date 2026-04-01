@@ -12,8 +12,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const OPENAI_API_KEY = Deno.env.get("openai");
+    if (!OPENAI_API_KEY) throw new Error("OpenAI API key not configured");
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -90,14 +90,14 @@ Quando detectar alertas, classifique como 🔴 Crítico, 🟡 Atenção, 🟢 OK
 
     // If type is "analyze", do a one-shot analysis with tool calling for structured output
     if (type === "analyze") {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: systemPrompt },
             {
@@ -139,14 +139,14 @@ Quando detectar alertas, classifique como 🔴 Crítico, 🟡 Atenção, 🟢 OK
     }
 
     // Chat mode: stream response
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gpt-4o-mini",
         messages: [{ role: "system", content: systemPrompt }, ...messages],
         stream: true,
       }),
