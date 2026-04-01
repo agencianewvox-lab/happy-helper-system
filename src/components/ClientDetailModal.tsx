@@ -500,6 +500,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                       </div>
                     </div>
                   ))}
+                  <div ref={conversasEndRef} />
                 </div>
               </ScrollArea>
             )}
