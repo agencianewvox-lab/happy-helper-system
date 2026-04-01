@@ -94,6 +94,14 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
         </div>
       </CardHeader>
       <CardContent className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}>
+        {/* SLA Violation Banner */}
+        {grupo.sla_violated && (
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-500 bg-red-500/10 rounded px-2 py-1 border border-red-500/20 animate-pulse">
+            <PhoneOff className="w-3.5 h-3.5 shrink-0" />
+            <span>Silêncio da Equipe — {formatDelay(grupo.sla_delay_minutes + 30)} sem resposta</span>
+          </div>
+        )}
+
         {grupo.categoria && (
           <Badge variant="secondary" className="text-[10px]">
             {grupo.categoria}
