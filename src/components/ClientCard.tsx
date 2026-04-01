@@ -1,8 +1,9 @@
+import { useState, useEffect } from "react";
 import { Grupo } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react";
+import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff } from "lucide-react";
 
 interface ClientCardProps {
   grupo: Grupo;
@@ -42,6 +43,13 @@ function churnBg(risk: number): string {
   return "bg-emerald-500/10";
 }
 
+function formatDelay(minutes: number): string {
+  if (minutes < 60) return `${minutes}min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h${m}m` : `${h}h`;
+}
+
 export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
@@ -49,15 +57,25 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
   const sent = a ? sentimentConfig[a.sentiment] : null;
   const SentIcon = sent?.icon || Minus;
 
+  // Live tick for SLA timer
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!grupo.sla_violated) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, [grupo.sla_violated]);
+
   return (
     <Card
       onClick={() => onClick(grupo)}
       className={cn(
         "cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2",
         "bg-card/80 backdrop-blur-sm",
-        temMensagens
-          ? "border-border/50 hover:border-primary/30"
-          : "border-border/20 opacity-70 hover:opacity-100",
+        grupo.sla_violated
+          ? "border-red-500/60 ring-1 ring-red-500/20 shadow-red-500/10 shadow-lg"
+          : temMensagens
+            ? "border-border/50 hover:border-primary/30"
+            : "border-border/20 opacity-70 hover:opacity-100",
         compact && "text-sm"
       )}
     >
@@ -76,6 +94,14 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
         </div>
       </CardHeader>
       <CardContent className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}>
+        {/* SLA Violation Banner */}
+        {grupo.sla_violated && (
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-500 bg-red-500/10 rounded px-2 py-1 border border-red-500/20 animate-pulse">
+            <PhoneOff className="w-3.5 h-3.5 shrink-0" />
+            <span>Silêncio da Equipe — {formatDelay(grupo.sla_delay_minutes + 30)} sem resposta</span>
+          </div>
+        )}
+
         {grupo.categoria && (
           <Badge variant="secondary" className="text-[10px]">
             {grupo.categoria}

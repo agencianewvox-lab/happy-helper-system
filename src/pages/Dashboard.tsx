@@ -9,7 +9,7 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -44,6 +44,8 @@ export default function Dashboard() {
       : null;
     const positiveSent = allGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
     const pendencias = allGrupos.filter((g) => g.analytics?.has_pending_demands).length;
+    const slaViolations = allGrupos.filter((g) => g.sla_violated).length;
+    const priorityCount = allGrupos.filter((g) => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)).length;
     const now = Date.now();
     const h24 = 24 * 60 * 60 * 1000;
     const inativos = allGrupos.filter((g) => {
@@ -55,30 +57,41 @@ export default function Dashboard() {
       if (!g.ultimo_horario) return true;
       return now - new Date(g.ultimo_horario).getTime() > h48;
     }).length;
-    return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue };
+    return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue, slaViolations, priorityCount };
   }, [allGrupos]);
 
   // Filter groups by clicked metric
   const metricFilteredGrupos = useMemo(() => {
-    if (!metricFilter) return grupos;
-    switch (metricFilter) {
-      case "total": return grupos;
-      case "totalMsgs": return grupos.filter(g => g.total_mensagens > 0);
-      case "ativos": return grupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000);
-      case "highRisk": return grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60);
-      case "pendencias": return grupos.filter(g => g.analytics?.has_pending_demands);
-      case "frt": return grupos.filter(g => g.analytics?.avg_frt_minutes != null);
-      case "positive": return grupos.filter(g => g.analytics?.sentiment === "positivo");
-      case "inativos": return grupos.filter(g => {
-        if (!g.ultimo_horario) return true;
-        return Date.now() - new Date(g.ultimo_horario).getTime() > 24 * 60 * 60 * 1000;
-      });
-      case "dengue": return grupos.filter(g => {
-        if (!g.ultimo_horario) return true;
-        return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
-      });
-      default: return grupos;
+    let result = grupos;
+    if (metricFilter) {
+      switch (metricFilter) {
+        case "total": result = grupos; break;
+        case "totalMsgs": result = grupos.filter(g => g.total_mensagens > 0); break;
+        case "ativos": result = grupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000); break;
+        case "highRisk": result = grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60); break;
+        case "pendencias": result = grupos.filter(g => g.analytics?.has_pending_demands); break;
+        case "frt": result = grupos.filter(g => g.analytics?.avg_frt_minutes != null); break;
+        case "positive": result = grupos.filter(g => g.analytics?.sentiment === "positivo"); break;
+        case "inativos": result = grupos.filter(g => {
+          if (!g.ultimo_horario) return true;
+          return Date.now() - new Date(g.ultimo_horario).getTime() > 24 * 60 * 60 * 1000;
+        }); break;
+        case "dengue": result = grupos.filter(g => {
+          if (!g.ultimo_horario) return true;
+          return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
+        }); break;
+        case "sla": result = grupos.filter(g => g.sla_violated); break;
+        case "priority": result = grupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
+        default: break;
+      }
     }
+    // Sort: SLA violated groups always on top
+    return [...result].sort((a, b) => {
+      if (a.sla_violated && !b.sla_violated) return -1;
+      if (!a.sla_violated && b.sla_violated) return 1;
+      if (a.sla_violated && b.sla_violated) return b.sla_delay_minutes - a.sla_delay_minutes;
+      return 0;
+    });
   }, [grupos, metricFilter]);
 
   const metricLabels: Record<string, string> = {
@@ -91,6 +104,8 @@ export default function Dashboard() {
     positive: "Sentimento Positivo",
     inativos: "Grupos Inativos",
     dengue: "Grupos da Dengue",
+    sla: "SLA Violado",
+    priority: "Prioridade Máxima",
   };
 
   return (
@@ -124,7 +139,7 @@ export default function Dashboard() {
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-9 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-11 gap-4">
           {[
             { key: "total", label: "Total Grupos", desc: "Todos os grupos cadastrados", value: stats.total, icon: Users, color: "text-primary" },
             { key: "totalMsgs", label: "Mensagens Hoje", desc: "Total de mensagens do dia", value: stats.totalMsgsHoje, icon: MessageSquare, color: "text-emerald-500" },
@@ -135,6 +150,8 @@ export default function Dashboard() {
             { key: "positive", label: "Sentimento +", desc: "Grupos com sentimento positivo", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
             { key: "inativos", label: "Grupos Inativos", desc: "Sem atividade há mais de 24h", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
             { key: "dengue", label: "Grupos da Dengue", desc: "Sem atividade há mais de 48h", value: stats.dengue, icon: Flame, color: "text-red-600" },
+            { key: "sla", label: "SLA Violado", desc: "Equipe sem responder há +30min", value: stats.slaViolations, icon: AlertCircle, color: "text-red-500" },
+            { key: "priority", label: "Prioridade Máxima", desc: "Churn alto OU SLA violado", value: stats.priorityCount, icon: ShieldAlert, color: "text-red-600" },
           ].map(({ key, label, desc, value, icon: Icon, color }) => (
             <button
               key={key}
@@ -164,6 +181,8 @@ export default function Dashboard() {
             categorias={categorias}
             activeFilter={categoriaFilter}
             onFilterChange={(f) => { setCategoriaFilter(f); setMetricFilter(null); }}
+            onPriorityFilter={() => setMetricFilter(metricFilter === "priority" ? null : "priority")}
+            isPriorityActive={metricFilter === "priority"}
           />
           <div className="flex items-center gap-2">
             {metricFilter && (

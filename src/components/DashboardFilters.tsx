@@ -1,10 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ShieldAlert } from "lucide-react";
 
 interface Props {
   categorias: string[];
   activeFilter: string | null;
   onFilterChange: (cat: string | null) => void;
+  onPriorityFilter?: () => void;
+  isPriorityActive?: boolean;
 }
 
 const categoriaIcons: Record<string, string> = {
@@ -13,17 +16,28 @@ const categoriaIcons: Record<string, string> = {
   "Internos / Gestão": "🧠",
 };
 
-export function DashboardFilters({ categorias, activeFilter, onFilterChange }: Props) {
+export function DashboardFilters({ categorias, activeFilter, onFilterChange, onPriorityFilter, isPriorityActive }: Props) {
   return (
     <div className="flex flex-wrap gap-2">
       <Button
-        variant={activeFilter === null ? "default" : "outline"}
+        variant={activeFilter === null && !isPriorityActive ? "default" : "outline"}
         size="sm"
         onClick={() => onFilterChange(null)}
         className="text-xs gap-1.5"
       >
         Todos
       </Button>
+      {onPriorityFilter && (
+        <Button
+          variant={isPriorityActive ? "default" : "outline"}
+          size="sm"
+          onClick={onPriorityFilter}
+          className={cn("text-xs gap-1.5", isPriorityActive && "bg-red-600 hover:bg-red-700 text-white")}
+        >
+          <ShieldAlert className="w-3.5 h-3.5" />
+          Prioridade Máxima
+        </Button>
+      )}
       {categorias.map((cat) => (
         <Button
           key={cat}
