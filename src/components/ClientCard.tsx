@@ -17,6 +17,14 @@ const categoriaConfig: Record<string, { color: string; icon: string }> = {
   "Internos / Gestão": { color: "bg-purple-500", icon: "🧠" },
 };
 
+const intentConfig: Record<string, { emoji: string; color: string; bg: string }> = {
+  "Aprovação": { emoji: "🎨", color: "text-violet-500", bg: "bg-violet-500/10" },
+  "Suporte Técnico": { emoji: "🔧", color: "text-blue-500", bg: "bg-blue-500/10" },
+  "Financeiro": { emoji: "💰", color: "text-amber-500", bg: "bg-amber-500/10" },
+  "Urgência": { emoji: "🚨", color: "text-red-500", bg: "bg-red-500/10" },
+  "Informativo": { emoji: "💬", color: "text-muted-foreground", bg: "bg-muted" },
+};
+
 const sentimentConfig = {
   positivo: { icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Positivo" },
   neutro: { icon: Minus, color: "text-amber-500", bg: "bg-amber-500/10", label: "Neutro" },
