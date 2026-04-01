@@ -8,13 +8,13 @@ const corsHeaders = {
 
 // Nomes do time New Vox — mensagens desses contatos são "saida"
 const TEAM_MEMBERS = [
-  "jader",
+  "jader", "jader costa",
   "alisson", "alisson lima",
-  "murilo", "murillo", "murilo araújo",
+  "murilo", "murillo", "murilo araújo", "murilo araujo",
   "priscila", "priscilla", "priscila borges", "priscilla borges",
-  "joel", "joel reis",
   "thais", "thaís", "~thais",
-  "daniella",
+  "netto", "netto monge",
+  "jiza", "jiza reis",
   "victor", "victor botto",
 ];
 
