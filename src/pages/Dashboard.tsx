@@ -62,25 +62,36 @@ export default function Dashboard() {
 
   // Filter groups by clicked metric
   const metricFilteredGrupos = useMemo(() => {
-    if (!metricFilter) return grupos;
-    switch (metricFilter) {
-      case "total": return grupos;
-      case "totalMsgs": return grupos.filter(g => g.total_mensagens > 0);
-      case "ativos": return grupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000);
-      case "highRisk": return grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60);
-      case "pendencias": return grupos.filter(g => g.analytics?.has_pending_demands);
-      case "frt": return grupos.filter(g => g.analytics?.avg_frt_minutes != null);
-      case "positive": return grupos.filter(g => g.analytics?.sentiment === "positivo");
-      case "inativos": return grupos.filter(g => {
-        if (!g.ultimo_horario) return true;
-        return Date.now() - new Date(g.ultimo_horario).getTime() > 24 * 60 * 60 * 1000;
-      });
-      case "dengue": return grupos.filter(g => {
-        if (!g.ultimo_horario) return true;
-        return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
-      });
-      default: return grupos;
+    let result = grupos;
+    if (metricFilter) {
+      switch (metricFilter) {
+        case "total": result = grupos; break;
+        case "totalMsgs": result = grupos.filter(g => g.total_mensagens > 0); break;
+        case "ativos": result = grupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000); break;
+        case "highRisk": result = grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60); break;
+        case "pendencias": result = grupos.filter(g => g.analytics?.has_pending_demands); break;
+        case "frt": result = grupos.filter(g => g.analytics?.avg_frt_minutes != null); break;
+        case "positive": result = grupos.filter(g => g.analytics?.sentiment === "positivo"); break;
+        case "inativos": result = grupos.filter(g => {
+          if (!g.ultimo_horario) return true;
+          return Date.now() - new Date(g.ultimo_horario).getTime() > 24 * 60 * 60 * 1000;
+        }); break;
+        case "dengue": result = grupos.filter(g => {
+          if (!g.ultimo_horario) return true;
+          return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
+        }); break;
+        case "sla": result = grupos.filter(g => g.sla_violated); break;
+        case "priority": result = grupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
+        default: break;
+      }
     }
+    // Sort: SLA violated groups always on top
+    return [...result].sort((a, b) => {
+      if (a.sla_violated && !b.sla_violated) return -1;
+      if (!a.sla_violated && b.sla_violated) return 1;
+      if (a.sla_violated && b.sla_violated) return b.sla_delay_minutes - a.sla_delay_minutes;
+      return 0;
+    });
   }, [grupos, metricFilter]);
 
   const metricLabels: Record<string, string> = {
