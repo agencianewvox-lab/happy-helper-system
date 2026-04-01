@@ -72,11 +72,41 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   // Resolution state - hooks must be before early returns
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [loadingConversas, setLoadingConversas] = useState(false);
 
   const groupId = grupo?.group_id || "";
   const a = grupo?.analytics;
 
   const makeKey = useCallback((term: string, requestedAt: string) => `${groupId}|${term}|${requestedAt}`, [groupId]);
+
+  const fetchConversas = useCallback(async () => {
+    if (!groupId) return;
+    setLoadingConversas(true);
+    try {
+      let all: Conversa[] = [];
+      let offset = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("whatsapp_conversas")
+          .select("id, mensagem, nome_contato, direcao, recebido_em, created_at")
+          .eq("group_id", groupId)
+          .order("recebido_em", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all = all.concat(data);
+        if (data.length < pageSize) break;
+        offset += pageSize;
+      }
+      setConversas(all);
+    } catch (err) {
+      console.error("Error fetching conversas:", err);
+    } finally {
+      setLoadingConversas(false);
+    }
+  }, [groupId]);
 
   const fetchResolutions = useCallback(async () => {
     if (!groupId || !a?.pending_demand_details?.length) return;
@@ -94,8 +124,27 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   }, [groupId, a?.pending_demand_details, makeKey]);
 
   useEffect(() => {
-    if (open) fetchResolutions();
-  }, [open, fetchResolutions]);
+    if (open) {
+      fetchResolutions();
+      fetchConversas();
+    }
+  }, [open, fetchResolutions, fetchConversas]);
+
+  // Group conversations by date
+  const conversasByDate = useMemo(() => {
+    const groups: Record<string, Conversa[]> = {};
+    for (const c of conversas) {
+      const dateKey = new Date(c.recebido_em).toLocaleDateString("pt-BR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(c);
+    }
+    return groups;
+  }, [conversas]);
 
   const handleResolve = useCallback(async (term: string, requestedAt: string, resolved: boolean) => {
     const key = makeKey(term, requestedAt);
