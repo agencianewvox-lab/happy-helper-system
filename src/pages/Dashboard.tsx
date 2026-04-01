@@ -150,6 +150,8 @@ export default function Dashboard() {
             { key: "positive", label: "Sentimento +", desc: "Grupos com sentimento positivo", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
             { key: "inativos", label: "Grupos Inativos", desc: "Sem atividade há mais de 24h", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
             { key: "dengue", label: "Grupos da Dengue", desc: "Sem atividade há mais de 48h", value: stats.dengue, icon: Flame, color: "text-red-600" },
+            { key: "sla", label: "SLA Violado", desc: "Equipe sem responder há +30min", value: stats.slaViolations, icon: AlertCircle, color: "text-red-500" },
+            { key: "priority", label: "Prioridade Máxima", desc: "Churn alto OU SLA violado", value: stats.priorityCount, icon: ShieldAlert, color: "text-red-600" },
           ].map(({ key, label, desc, value, icon: Icon, color }) => (
             <button
               key={key}
