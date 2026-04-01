@@ -43,12 +43,27 @@ function churnBg(risk: number): string {
   return "bg-emerald-500/10";
 }
 
+function formatDelay(minutes: number): string {
+  if (minutes < 60) return `${minutes}min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h${m}m` : `${h}h`;
+}
+
 export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
   const sent = a ? sentimentConfig[a.sentiment] : null;
   const SentIcon = sent?.icon || Minus;
+
+  // Live tick for SLA timer
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!grupo.sla_violated) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, [grupo.sla_violated]);
 
   return (
     <Card
