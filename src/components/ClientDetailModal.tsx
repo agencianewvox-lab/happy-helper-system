@@ -680,6 +680,20 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                   </div>
                 </div>
 
+                {/* Briefing */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <Briefcase className="w-4 h-4 mt-2 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Briefing</Label>
+                    <Textarea
+                      value={clientInfo.briefing}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, briefing: e.target.value }))}
+                      placeholder="Descreva o briefing do cliente..."
+                      className="mt-1 text-sm bg-background/50 min-h-[80px]"
+                    />
+                  </div>
+                </div>
+
                 {/* Save button */}
                 <Button
                   onClick={saveClientInfo}
