@@ -165,6 +165,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         aniversario_empresa: (data as any).aniversario_empresa || "",
         acessos_cliente: (data as any).acessos_cliente || "",
         gestor_responsavel: (data as any).gestor_responsavel || "",
+        briefing: (data as any).briefing || "",
       });
     }
   }, [grupo?.id]);
