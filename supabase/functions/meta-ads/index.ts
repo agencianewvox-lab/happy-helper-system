@@ -1,10 +1,13 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js/cors";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
 Deno.serve(async (req) => {
+  console.log("meta-ads function invoked", req.method);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -25,9 +28,11 @@ Deno.serve(async (req) => {
     if (action === "list_accounts") {
       let allAccounts: any[] = [];
       let url: string | null = `${META_BASE}/me/adaccounts?fields=account_id,name,account_status,currency,business_name&limit=100&access_token=${token}`;
+      console.log("Fetching accounts, token length:", token.length, "token prefix:", token.substring(0, 10));
       while (url) {
         const res = await fetch(url);
         const data = await res.json();
+        console.log("Meta API response status:", res.status, "data:", JSON.stringify(data).substring(0, 500));
         if (data.error) {
           return new Response(JSON.stringify({ error: data.error.message }), {
             status: 400,
