@@ -28,9 +28,11 @@ Deno.serve(async (req) => {
     if (action === "list_accounts") {
       let allAccounts: any[] = [];
       let url: string | null = `${META_BASE}/me/adaccounts?fields=account_id,name,account_status,currency,business_name&limit=100&access_token=${token}`;
+      console.log("Fetching accounts, token length:", token.length, "token prefix:", token.substring(0, 10));
       while (url) {
         const res = await fetch(url);
         const data = await res.json();
+        console.log("Meta API response status:", res.status, "data:", JSON.stringify(data).substring(0, 500));
         if (data.error) {
           return new Response(JSON.stringify({ error: data.error.message }), {
             status: 400,
