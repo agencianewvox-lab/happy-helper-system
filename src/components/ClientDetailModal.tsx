@@ -589,6 +589,25 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                   </div>
                 </div>
 
+                {/* Data de Ciclo de Ads */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                  <CalendarDays className="w-4 h-4 mt-2 text-emerald-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Data de Ciclo de Ads</Label>
+                    <Input
+                      type="date"
+                      value={clientInfo.data_ciclo_ads}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, data_ciclo_ads: e.target.value }))}
+                      className="mt-1 h-8 text-sm bg-background/50"
+                    />
+                    {clientInfo.data_ciclo_ads && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Próximo ciclo: {new Date(new Date(clientInfo.data_ciclo_ads).getTime() + 30 * 86400000).toLocaleDateString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Aniversários */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
