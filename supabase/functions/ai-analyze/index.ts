@@ -110,8 +110,11 @@ Deno.serve(async (req) => {
       
       // Add Meta Ads data if available
       const ads = adsDataMap.get(gid);
+      const linkedAccount = adsLinkedGroups.get(gid);
       if (ads) {
-        line += ` | META ADS (últimos 30 dias): Investimento R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, CPM R$${ads.cpm.toFixed(2)}, Alcance ${ads.reach}, Frequência ${ads.frequency.toFixed(2)}, Leads ${ads.leads}, Compras ${ads.purchases}`;
+        line += ` | 📊 META ADS (últimos 30 dias): Investimento R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, CPM R$${ads.cpm.toFixed(2)}, Alcance ${ads.reach}, Frequência ${ads.frequency.toFixed(2)}, Leads ${ads.leads}, Compras ${ads.purchases}`;
+      } else if (linkedAccount) {
+        line += ` | 📊 META ADS: Conta vinculada (ID: ${linkedAccount}) mas sem dados de gastos nos últimos 30 dias`;
       }
       contextLines.push(line);
     }
