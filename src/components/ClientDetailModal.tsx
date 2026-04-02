@@ -173,6 +173,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         plano: clientInfo.plano || null,
         investimento_ads: clientInfo.investimento_ads ? Number(clientInfo.investimento_ads) : null,
         data_entrada: clientInfo.data_entrada || null,
+        data_ciclo_ads: clientInfo.data_ciclo_ads || null,
         aniversario_cliente: clientInfo.aniversario_cliente || null,
         aniversario_empresa: clientInfo.aniversario_empresa || null,
         acessos_cliente: clientInfo.acessos_cliente || null,
