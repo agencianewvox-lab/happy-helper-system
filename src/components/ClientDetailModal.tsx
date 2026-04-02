@@ -21,8 +21,9 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp,
-  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone,
 } from "lucide-react";
+import { MetaAdsTab } from "@/components/MetaAdsTab";
 
 interface Conversa {
   id: string;
