@@ -93,6 +93,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     aniversario_empresa: "",
     acessos_cliente: "",
     gestor_responsavel: "",
+    briefing: "",
   });
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
