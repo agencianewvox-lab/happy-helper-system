@@ -1,16 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
-  Save, Loader2, CheckCircle2, DollarSign, Eye, MousePointerClick,
-  TrendingUp, Target, BarChart3, RefreshCw
+  Loader2, DollarSign, Eye, MousePointerClick,
+  TrendingUp, Target, BarChart3, RefreshCw, Search, X
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart,
+  Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart,
 } from "recharts";
 
 interface MetaAdsTabProps {
@@ -50,11 +51,30 @@ interface DailyData {
   leads: number;
 }
 
+interface AdAccount {
+  account_id: string;
+  name: string;
+  account_status: number;
+  currency: string;
+  business_name?: string;
+}
+
+const STATUS_MAP: Record<number, { label: string; color: string }> = {
+  1: { label: "Ativa", color: "text-emerald-500" },
+  2: { label: "Desativada", color: "text-muted-foreground" },
+  3: { label: "Não segura", color: "text-red-500" },
+};
+
 export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
-  const [adAccountId, setAdAccountId] = useState("");
   const [savedAccountId, setSavedAccountId] = useState("");
+  const [savedAccountName, setSavedAccountName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+
+  const [accounts, setAccounts] = useState<AdAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [summary, setSummary] = useState<AdsSummary | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -72,25 +92,65 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
         .eq("id", grupoDbId)
         .single();
       if (data && (data as any).ad_account_id) {
-        const id = (data as any).ad_account_id;
-        setAdAccountId(id);
-        setSavedAccountId(id);
+        setSavedAccountId((data as any).ad_account_id);
       }
     })();
   }, [grupoDbId]);
 
-  const saveAccount = useCallback(async () => {
+  const loadAccounts = useCallback(async () => {
+    setAccountsLoading(true);
+    setAccountsError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("meta-ads", {
+        body: { action: "list_accounts" },
+      });
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+      setAccounts(data.accounts || []);
+      setAccountsLoaded(true);
+    } catch (err: any) {
+      setAccountsError(err.message || "Erro ao listar contas");
+    } finally {
+      setAccountsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!accountsLoaded) loadAccounts();
+  }, [accountsLoaded, loadAccounts]);
+
+  useEffect(() => {
+    if (savedAccountId && accounts.length > 0) {
+      const found = accounts.find((a) => a.account_id === savedAccountId || `act_${a.account_id}` === savedAccountId);
+      if (found) setSavedAccountName(found.name || found.account_id);
+    }
+  }, [savedAccountId, accounts]);
+
+  const selectAccount = useCallback(async (account: AdAccount) => {
     setSaving(true);
-    setSaved(false);
+    const id = account.account_id;
     await supabase
       .from("whatsapp_grupos")
-      .update({ ad_account_id: adAccountId || null } as any)
+      .update({ ad_account_id: id } as any)
       .eq("id", grupoDbId);
-    setSavedAccountId(adAccountId);
+    setSavedAccountId(id);
+    setSavedAccountName(account.name || id);
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }, [adAccountId, grupoDbId]);
+  }, [grupoDbId]);
+
+  const disconnectAccount = useCallback(async () => {
+    setSaving(true);
+    await supabase
+      .from("whatsapp_grupos")
+      .update({ ad_account_id: null } as any)
+      .eq("id", grupoDbId);
+    setSavedAccountId("");
+    setSavedAccountName("");
+    setSummary(null);
+    setCampaigns([]);
+    setDaily([]);
+    setSaving(false);
+  }, [grupoDbId]);
 
   const fetchAds = useCallback(async () => {
     if (!savedAccountId) return;
@@ -116,38 +176,108 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
     if (savedAccountId) fetchAds();
   }, [savedAccountId, fetchAds]);
 
+  const filteredAccounts = useMemo(() => {
+    if (!searchQuery) return accounts;
+    const q = searchQuery.toLowerCase();
+    return accounts.filter((a) =>
+      (a.name || "").toLowerCase().includes(q) ||
+      a.account_id.includes(q) ||
+      (a.business_name || "").toLowerCase().includes(q)
+    );
+  }, [accounts, searchQuery]);
+
   const fmt = (n: number) => n.toLocaleString("pt-BR");
   const fmtMoney = (n: number) => `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-4">
-      {/* Account ID Config */}
-      <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
-        <Label className="text-xs text-muted-foreground font-medium">ID da Conta de Anúncios (Meta)</Label>
-        <div className="flex gap-2 mt-1">
-          <Input
-            value={adAccountId}
-            onChange={(e) => setAdAccountId(e.target.value)}
-            placeholder="Ex: 123456789 ou act_123456789"
-            className="h-8 text-sm bg-background/50 flex-1"
-          />
-          <Button size="sm" className="h-8 gap-1" onClick={saveAccount} disabled={saving}>
-            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Save className="w-3 h-3" />}
-            {saved ? "Salvo" : "Salvar"}
+      {/* Account Selector */}
+      {!savedAccountId ? (
+        <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-3">
+          <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+            Selecione a Conta de Anúncios
+          </Label>
+
+          {accountsLoading && (
+            <div className="flex items-center justify-center py-6 gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Buscando contas disponíveis...
+            </div>
+          )}
+
+          {accountsError && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-center justify-between">
+              <span>{accountsError}</span>
+              <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={loadAccounts}>Tentar novamente</Button>
+            </div>
+          )}
+
+          {accountsLoaded && accounts.length > 0 && (
+            <>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por nome ou ID..."
+                  className="h-8 text-sm bg-background/50 pl-8"
+                />
+              </div>
+              <ScrollArea className="max-h-[250px]">
+                <div className="space-y-1.5">
+                  {filteredAccounts.map((acc) => {
+                    const status = STATUS_MAP[acc.account_status] || { label: `Status ${acc.account_status}`, color: "text-muted-foreground" };
+                    return (
+                      <button
+                        key={acc.account_id}
+                        onClick={() => selectAccount(acc)}
+                        disabled={saving}
+                        className="w-full text-left p-2.5 rounded-lg border border-border/20 bg-background/50 hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{acc.name || acc.account_id}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                            <span>ID: {acc.account_id}</span>
+                            {acc.business_name && <span>• {acc.business_name}</span>}
+                            <span>• {acc.currency}</span>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={cn("text-[9px] shrink-0", status.color)}>
+                          {status.label}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                  {filteredAccounts.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">Nenhuma conta encontrada.</p>
+                  )}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+
+          {accountsLoaded && accounts.length === 0 && !accountsError && (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              Nenhuma conta de anúncios encontrada para este token.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+          <BarChart3 className="w-4 h-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{savedAccountName || savedAccountId}</p>
+            <p className="text-[10px] text-muted-foreground">ID: {savedAccountId}</p>
+          </div>
+          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground hover:text-destructive" onClick={disconnectAccount} disabled={saving}>
+            <X className="w-3 h-3" /> Desconectar
           </Button>
         </div>
-      </div>
-
-      {!savedAccountId && (
-        <p className="text-sm text-muted-foreground text-center py-6">
-          Configure o ID da conta de anúncios acima para ver os dados do Meta Ads.
-        </p>
       )}
 
       {savedAccountId && (
         <>
           {/* Period selector + refresh */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {["last_7d", "last_14d", "last_30d", "this_month", "last_month"].map((p) => (
               <Badge
                 key={p}

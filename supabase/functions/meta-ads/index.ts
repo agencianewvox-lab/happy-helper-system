@@ -18,7 +18,30 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { ad_account_id, date_preset } = await req.json();
+    const body = await req.json();
+    const { action, ad_account_id, date_preset } = body;
+
+    // Action: list all ad accounts available to this token
+    if (action === "list_accounts") {
+      let allAccounts: any[] = [];
+      let url: string | null = `${META_BASE}/me/adaccounts?fields=account_id,name,account_status,currency,business_name&limit=100&access_token=${token}`;
+      while (url) {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.error) {
+          return new Response(JSON.stringify({ error: data.error.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        allAccounts = allAccounts.concat(data.data || []);
+        url = data.paging?.next || null;
+      }
+      return new Response(JSON.stringify({ accounts: allAccounts }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!ad_account_id) {
       return new Response(JSON.stringify({ error: "ad_account_id is required" }), {
         status: 400,
