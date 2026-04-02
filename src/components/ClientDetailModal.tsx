@@ -642,6 +642,27 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                   </div>
                 </div>
 
+                {/* Gestor Responsável */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Gestor Responsável</Label>
+                    <Select
+                      value={clientInfo.gestor_responsavel}
+                      onValueChange={(val) => setClientInfo(prev => ({ ...prev, gestor_responsavel: val }))}
+                    >
+                      <SelectTrigger className="mt-1 h-8 text-sm bg-background/50">
+                        <SelectValue placeholder="Selecione o gestor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Netto Monge">Netto Monge</SelectItem>
+                        <SelectItem value="Murilo Araújo">Murilo Araújo</SelectItem>
+                        <SelectItem value="Jader Costa">Jader Costa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 {/* Acessos do Cliente */}
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
                   <KeyRound className="w-4 h-4 mt-2 text-muted-foreground shrink-0" />
