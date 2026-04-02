@@ -185,6 +185,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         aniversario_empresa: clientInfo.aniversario_empresa || null,
         acessos_cliente: clientInfo.acessos_cliente || null,
         gestor_responsavel: clientInfo.gestor_responsavel || null,
+        briefing: clientInfo.briefing || null,
       } as any)
       .eq("id", grupo.id);
     setSavingInfo(false);
