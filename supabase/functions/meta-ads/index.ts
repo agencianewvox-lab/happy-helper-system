@@ -7,7 +7,6 @@ const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
 Deno.serve(async (req) => {
-  console.log("meta-ads function invoked", req.method);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
