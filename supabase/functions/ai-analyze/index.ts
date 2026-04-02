@@ -6,6 +6,39 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const META_API_VERSION = "v21.0";
+const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
+
+async function fetchMetaAdsForAccount(accountId: string, token: string): Promise<any | null> {
+  try {
+    const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
+    const fields = "spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,reach,frequency";
+    const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error || !data.data?.length) return null;
+    const row = data.data[0];
+    const actions = row.actions || [];
+    const leads = actions.find((a: any) => a.action_type === "lead")?.value || 0;
+    const purchases = actions.find((a: any) => a.action_type === "purchase" || a.action_type === "omni_purchase")?.value || 0;
+    return {
+      spend: parseFloat(row.spend || "0"),
+      impressions: parseInt(row.impressions || "0"),
+      clicks: parseInt(row.clicks || "0"),
+      ctr: parseFloat(row.ctr || "0"),
+      cpc: parseFloat(row.cpc || "0"),
+      cpm: parseFloat(row.cpm || "0"),
+      reach: parseInt(row.reach || "0"),
+      frequency: parseFloat(row.frequency || "0"),
+      leads: parseInt(leads),
+      purchases: parseInt(purchases),
+    };
+  } catch (e) {
+    console.error("Meta Ads fetch error for", accountId, e);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -14,6 +47,8 @@ Deno.serve(async (req) => {
   try {
     const OPENAI_API_KEY = Deno.env.get("openai");
     if (!OPENAI_API_KEY) throw new Error("OpenAI API key not configured");
+
+    const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -35,6 +70,17 @@ Deno.serve(async (req) => {
     const grupos = gruposRes.data || [];
     const conversas = conversasRes.data || [];
 
+    // Fetch Meta Ads data for groups with linked ad accounts
+    const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
+    const adsDataMap = new Map<string, any>();
+    if (META_TOKEN && groupsWithAds.length > 0) {
+      const adsPromises = groupsWithAds.map(async (g: any) => {
+        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
+        if (adsData) adsDataMap.set(g.group_id, adsData);
+      });
+      await Promise.all(adsPromises);
+    }
+
     // Build context summary
     const groupMap = new Map<string, { nome: string; categoria: string; msgs: any[] }>();
     for (const g of grupos) {
@@ -49,14 +95,19 @@ Deno.serve(async (req) => {
     const contextLines: string[] = [];
     for (const [gid, info] of groupMap) {
       const lastMsg = info.msgs[0];
-      contextLines.push(
-        `- ${info.nome} [${info.categoria}]: ${info.msgs.length} mensagens` +
-          (lastMsg ? `, última: "${lastMsg.mensagem}" por ${lastMsg.nome_contato} em ${lastMsg.created_at}` : ", sem mensagens")
-      );
+      let line = `- ${info.nome} [${info.categoria}]: ${info.msgs.length} mensagens` +
+        (lastMsg ? `, última: "${lastMsg.mensagem}" por ${lastMsg.nome_contato} em ${lastMsg.created_at}` : ", sem mensagens");
+      
+      // Add Meta Ads data if available
+      const ads = adsDataMap.get(gid);
+      if (ads) {
+        line += ` | META ADS (últimos 30 dias): Investimento R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, CPM R$${ads.cpm.toFixed(2)}, Alcance ${ads.reach}, Frequência ${ads.frequency.toFixed(2)}, Leads ${ads.leads}, Compras ${ads.purchases}`;
+      }
+      contextLines.push(line);
     }
 
     const dataContext = `
-DADOS DOS GRUPOS DE WHATSAPP (${grupos.length} grupos, ${conversas.length} mensagens recentes):
+DADOS DOS GRUPOS DE WHATSAPP (${grupos.length} grupos, ${conversas.length} mensagens recentes, ${adsDataMap.size} contas de anúncios vinculadas):
 
 ${contextLines.join("\n")}
 `;
@@ -83,10 +134,18 @@ Suas capacidades:
 2. SCORE DE ENGAJAMENTO: Calcule um score de 0-100 para cada grupo baseado em volume de mensagens, frequência e participação.
 3. ALERTAS INTELIGENTES: Detecte grupos inativos, possíveis reclamações, riscos de churn.
 4. ANÁLISE GERAL: Responda perguntas sobre os dados.
+5. ANÁLISE DE META ADS: Para clientes com conta de anúncios vinculada, analise métricas como investimento, CTR, CPC, CPM, alcance, leads e compras. Identifique campanhas com bom/mau desempenho, sugira otimizações de orçamento, detecte anomalias de custo e compare resultados entre clientes.
+
+Quando perguntarem sobre resultados, métricas, performance ou anúncios de um cliente, use os dados de Meta Ads disponíveis para dar uma análise completa incluindo:
+- Eficiência do investimento (CPC, CPM, CPA)
+- Volume de resultados (leads, compras, conversões)
+- Engajamento (CTR, alcance, frequência)
+- Recomendações práticas de otimização
 
 Responda sempre em português brasileiro, de forma objetiva e acionável. Use emojis para facilitar a leitura.
 Quando listar scores, use o formato: "Nome do Grupo: XX/100 - observação".
-Quando detectar alertas, classifique como 🔴 Crítico, 🟡 Atenção, 🟢 OK.`;
+Quando detectar alertas, classifique como 🔴 Crítico, 🟡 Atenção, 🟢 OK.
+Quando analisar ads, use indicadores visuais: 📈 Bom desempenho, 📉 Precisa atenção, 💰 Custo alto, 🎯 Boa conversão.`;
 
     // If type is "analyze", do a one-shot analysis with tool calling for structured output
     if (type === "analyze") {
