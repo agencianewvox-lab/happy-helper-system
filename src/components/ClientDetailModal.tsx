@@ -93,6 +93,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     aniversario_empresa: "",
     acessos_cliente: "",
     gestor_responsavel: "",
+    briefing: "",
   });
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
@@ -151,7 +152,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     if (!grupo?.id) return;
     const { data } = await supabase
       .from("whatsapp_grupos")
-      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel")
+      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing")
       .eq("id", grupo.id)
       .single();
     if (data) {
@@ -164,6 +165,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         aniversario_empresa: (data as any).aniversario_empresa || "",
         acessos_cliente: (data as any).acessos_cliente || "",
         gestor_responsavel: (data as any).gestor_responsavel || "",
+        briefing: (data as any).briefing || "",
       });
     }
   }, [grupo?.id]);
@@ -183,6 +185,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         aniversario_empresa: clientInfo.aniversario_empresa || null,
         acessos_cliente: clientInfo.acessos_cliente || null,
         gestor_responsavel: clientInfo.gestor_responsavel || null,
+        briefing: clientInfo.briefing || null,
       } as any)
       .eq("id", grupo.id);
     setSavingInfo(false);
@@ -673,6 +676,20 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                       onChange={(e) => setClientInfo(prev => ({ ...prev, acessos_cliente: e.target.value }))}
                       placeholder="Logins, senhas, links de acesso..."
                       className="mt-1 text-sm bg-background/50 min-h-[60px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Briefing */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <Briefcase className="w-4 h-4 mt-2 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Briefing</Label>
+                    <Textarea
+                      value={clientInfo.briefing}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, briefing: e.target.value }))}
+                      placeholder="Descreva o briefing do cliente..."
+                      className="mt-1 text-sm bg-background/50 min-h-[80px]"
                     />
                   </div>
                 </div>

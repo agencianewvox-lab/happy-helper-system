@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_grupos ADD COLUMN briefing text DEFAULT NULL;
