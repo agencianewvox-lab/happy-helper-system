@@ -645,6 +645,11 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
               </div>
             </div>
           </TabsContent>
+
+          {/* Tab: Meta Ads */}
+          <TabsContent value="meta-ads" className="mt-4">
+            <MetaAdsTab grupoId={grupo.group_id} grupoDbId={grupo.id} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
