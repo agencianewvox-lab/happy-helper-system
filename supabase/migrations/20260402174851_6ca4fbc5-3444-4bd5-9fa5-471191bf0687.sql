@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_grupos ADD COLUMN gestor_responsavel text DEFAULT NULL;

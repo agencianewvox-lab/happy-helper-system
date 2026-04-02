@@ -21,8 +21,11 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp,
-  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone, UserCheck,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { MetaAdsTab } from "@/components/MetaAdsTab";
 
 interface Conversa {
@@ -89,6 +92,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     aniversario_cliente: "",
     aniversario_empresa: "",
     acessos_cliente: "",
+    gestor_responsavel: "",
   });
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
@@ -147,7 +151,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     if (!grupo?.id) return;
     const { data } = await supabase
       .from("whatsapp_grupos")
-      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente")
+      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel")
       .eq("id", grupo.id)
       .single();
     if (data) {
@@ -159,6 +163,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         aniversario_cliente: (data as any).aniversario_cliente || "",
         aniversario_empresa: (data as any).aniversario_empresa || "",
         acessos_cliente: (data as any).acessos_cliente || "",
+        gestor_responsavel: (data as any).gestor_responsavel || "",
       });
     }
   }, [grupo?.id]);
@@ -177,6 +182,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         aniversario_cliente: clientInfo.aniversario_cliente || null,
         aniversario_empresa: clientInfo.aniversario_empresa || null,
         acessos_cliente: clientInfo.acessos_cliente || null,
+        gestor_responsavel: clientInfo.gestor_responsavel || null,
       } as any)
       .eq("id", grupo.id);
     setSavingInfo(false);
@@ -633,6 +639,27 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                         className="mt-1 h-8 text-sm bg-background/50"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Gestor Responsável */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Gestor Responsável</Label>
+                    <Select
+                      value={clientInfo.gestor_responsavel}
+                      onValueChange={(val) => setClientInfo(prev => ({ ...prev, gestor_responsavel: val }))}
+                    >
+                      <SelectTrigger className="mt-1 h-8 text-sm bg-background/50">
+                        <SelectValue placeholder="Selecione o gestor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Netto Monge">Netto Monge</SelectItem>
+                        <SelectItem value="Murilo Araújo">Murilo Araújo</SelectItem>
+                        <SelectItem value="Jader Costa">Jader Costa</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
