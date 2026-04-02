@@ -73,9 +73,19 @@ Deno.serve(async (req) => {
     // Fetch Meta Ads data for groups with linked ad accounts
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
     const adsDataMap = new Map<string, any>();
+    const adsLinkedGroups = new Map<string, string>(); // group_id -> ad_account_id
+    
+    console.log(`Found ${groupsWithAds.length} groups with ad accounts, META_TOKEN available: ${!!META_TOKEN}`);
+    
+    for (const g of groupsWithAds) {
+      adsLinkedGroups.set(g.group_id, g.ad_account_id);
+    }
+    
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
+        console.log(`Fetching ads for group "${g.nome}" account ${g.ad_account_id}`);
         const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
+        console.log(`Ads result for "${g.nome}":`, adsData ? "has data" : "no data");
         if (adsData) adsDataMap.set(g.group_id, adsData);
       });
       await Promise.all(adsPromises);
