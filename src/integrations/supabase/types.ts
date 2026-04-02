@@ -110,6 +110,7 @@ export type Database = {
       whatsapp_grupos: {
         Row: {
           acessos_cliente: string | null
+          ad_account_id: string | null
           aniversario_cliente: string | null
           aniversario_empresa: string | null
           categoria: string | null
@@ -123,6 +124,7 @@ export type Database = {
         }
         Insert: {
           acessos_cliente?: string | null
+          ad_account_id?: string | null
           aniversario_cliente?: string | null
           aniversario_empresa?: string | null
           categoria?: string | null
@@ -136,6 +138,7 @@ export type Database = {
         }
         Update: {
           acessos_cliente?: string | null
+          ad_account_id?: string | null
           aniversario_cliente?: string | null
           aniversario_empresa?: string | null
           categoria?: string | null
