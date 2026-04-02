@@ -85,6 +85,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     plano: "",
     investimento_ads: "",
     data_entrada: "",
+    data_ciclo_ads: "",
     aniversario_cliente: "",
     aniversario_empresa: "",
     acessos_cliente: "",
