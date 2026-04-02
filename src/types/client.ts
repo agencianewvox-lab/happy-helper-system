@@ -53,4 +53,6 @@ export interface Grupo {
   sla_violated: boolean;
   /** Minutes of delay beyond the 30-min SLA threshold */
   sla_delay_minutes: number;
+  investimento_ads: number | null;
+  data_ciclo_ads: string | null;
 }

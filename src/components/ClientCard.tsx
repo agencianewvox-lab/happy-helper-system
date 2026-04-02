@@ -3,7 +3,7 @@ import { Grupo } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff } from "lucide-react";
+import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays } from "lucide-react";
 
 interface ClientCardProps {
   grupo: Grupo;
@@ -128,6 +128,22 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="truncate">
                 {new Date(grupo.ultimo_horario).toLocaleDateString("pt-BR")}
+              </span>
+            </div>
+          )}
+          {grupo.investimento_ads != null && (
+            <div className="flex items-center gap-1.5">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-emerald-500 font-medium">
+                R$ {grupo.investimento_ads.toLocaleString("pt-BR")}
+              </span>
+            </div>
+          )}
+          {grupo.data_ciclo_ads && (
+            <div className="flex items-center gap-1.5">
+              <CalendarDays className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="truncate" title="Data de Ciclo de Ads">
+                Ciclo: {new Date(grupo.data_ciclo_ads).toLocaleDateString("pt-BR")}
               </span>
             </div>
           )}

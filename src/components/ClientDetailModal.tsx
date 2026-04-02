@@ -85,6 +85,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     plano: "",
     investimento_ads: "",
     data_entrada: "",
+    data_ciclo_ads: "",
     aniversario_cliente: "",
     aniversario_empresa: "",
     acessos_cliente: "",
@@ -146,7 +147,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     if (!grupo?.id) return;
     const { data } = await supabase
       .from("whatsapp_grupos")
-      .select("plano, investimento_ads, data_entrada, aniversario_cliente, aniversario_empresa, acessos_cliente")
+      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente")
       .eq("id", grupo.id)
       .single();
     if (data) {
@@ -154,6 +155,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         plano: (data as any).plano || "",
         investimento_ads: (data as any).investimento_ads != null ? String((data as any).investimento_ads) : "",
         data_entrada: (data as any).data_entrada || "",
+        data_ciclo_ads: (data as any).data_ciclo_ads || "",
         aniversario_cliente: (data as any).aniversario_cliente || "",
         aniversario_empresa: (data as any).aniversario_empresa || "",
         acessos_cliente: (data as any).acessos_cliente || "",
@@ -171,6 +173,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         plano: clientInfo.plano || null,
         investimento_ads: clientInfo.investimento_ads ? Number(clientInfo.investimento_ads) : null,
         data_entrada: clientInfo.data_entrada || null,
+        data_ciclo_ads: clientInfo.data_ciclo_ads || null,
         aniversario_cliente: clientInfo.aniversario_cliente || null,
         aniversario_empresa: clientInfo.aniversario_empresa || null,
         acessos_cliente: clientInfo.acessos_cliente || null,
@@ -583,6 +586,25 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                       onChange={(e) => setClientInfo(prev => ({ ...prev, data_entrada: e.target.value }))}
                       className="mt-1 h-8 text-sm bg-background/50"
                     />
+                  </div>
+                </div>
+
+                {/* Data de Ciclo de Ads */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                  <CalendarDays className="w-4 h-4 mt-2 text-emerald-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground font-medium">Data de Ciclo de Ads</Label>
+                    <Input
+                      type="date"
+                      value={clientInfo.data_ciclo_ads}
+                      onChange={(e) => setClientInfo(prev => ({ ...prev, data_ciclo_ads: e.target.value }))}
+                      className="mt-1 h-8 text-sm bg-background/50"
+                    />
+                    {clientInfo.data_ciclo_ads && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Próximo ciclo: {new Date(new Date(clientInfo.data_ciclo_ads).getTime() + 30 * 86400000).toLocaleDateString("pt-BR")}
+                      </p>
+                    )}
                   </div>
                 </div>
 

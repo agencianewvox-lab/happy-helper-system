@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_grupos ADD COLUMN data_ciclo_ads date DEFAULT NULL;
