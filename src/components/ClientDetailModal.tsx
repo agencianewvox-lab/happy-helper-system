@@ -265,6 +265,9 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
               Conversas ({conversas.length})
             </TabsTrigger>
             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
+            <TabsTrigger value="meta-ads" className="flex-1 gap-1">
+              <Megaphone className="w-3 h-3" /> Ads
+            </TabsTrigger>
           </TabsList>
 
           {/* Tab: Indicadores */}
