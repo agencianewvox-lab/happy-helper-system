@@ -16,6 +16,7 @@ async function fetchMetaAdsForAccount(accountId: string, token: string): Promise
     const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
+    console.log(`Meta API response for ${actId}:`, JSON.stringify({ error: data.error, hasData: !!data.data?.length }));
     if (data.error || !data.data?.length) return null;
     const row = data.data[0];
     const actions = row.actions || [];
