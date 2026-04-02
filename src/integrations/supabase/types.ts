@@ -148,6 +148,7 @@ export type Database = {
           ad_account_id: string | null
           aniversario_cliente: string | null
           aniversario_empresa: string | null
+          briefing: string | null
           categoria: string | null
           created_at: string
           data_ciclo_ads: string | null
@@ -164,6 +165,7 @@ export type Database = {
           ad_account_id?: string | null
           aniversario_cliente?: string | null
           aniversario_empresa?: string | null
+          briefing?: string | null
           categoria?: string | null
           created_at?: string
           data_ciclo_ads?: string | null
@@ -180,6 +182,7 @@ export type Database = {
           ad_account_id?: string | null
           aniversario_cliente?: string | null
           aniversario_empresa?: string | null
+          briefing?: string | null
           categoria?: string | null
           created_at?: string
           data_ciclo_ads?: string | null
