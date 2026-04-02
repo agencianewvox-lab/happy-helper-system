@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_grupos ADD COLUMN IF NOT EXISTS ad_account_id text DEFAULT NULL;

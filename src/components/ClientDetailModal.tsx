@@ -21,8 +21,9 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp,
-  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone,
 } from "lucide-react";
+import { MetaAdsTab } from "@/components/MetaAdsTab";
 
 interface Conversa {
   id: string;
@@ -265,6 +266,9 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
               Conversas ({conversas.length})
             </TabsTrigger>
             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
+            <TabsTrigger value="meta-ads" className="flex-1 gap-1">
+              <Megaphone className="w-3 h-3" /> Ads
+            </TabsTrigger>
           </TabsList>
 
           {/* Tab: Indicadores */}
@@ -641,6 +645,11 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                 </Button>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Tab: Meta Ads */}
+          <TabsContent value="meta-ads" className="mt-4">
+            <MetaAdsTab grupoId={grupo.group_id} grupoDbId={grupo.id} />
           </TabsContent>
         </Tabs>
       </DialogContent>
