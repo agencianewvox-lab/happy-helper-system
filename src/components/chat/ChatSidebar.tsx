@@ -76,7 +76,7 @@ export function ChatSidebar({
             if (collapsed && memberConvos.length === 0) return null;
 
             return (
-              <SidebarGroup key={member} defaultOpen={memberConvos.some((c) => c.id === activeId)}>
+              <SidebarGroup key={member}>
                 <SidebarGroupLabel className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <FolderOpen className="w-3.5 h-3.5" />
