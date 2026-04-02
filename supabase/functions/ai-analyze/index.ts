@@ -16,6 +16,7 @@ async function fetchMetaAdsForAccount(accountId: string, token: string): Promise
     const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
+    console.log(`Meta API response for ${actId}:`, JSON.stringify({ error: data.error, hasData: !!data.data?.length }));
     if (data.error || !data.data?.length) return null;
     const row = data.data[0];
     const actions = row.actions || [];
@@ -73,9 +74,19 @@ Deno.serve(async (req) => {
     // Fetch Meta Ads data for groups with linked ad accounts
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
     const adsDataMap = new Map<string, any>();
+    const adsLinkedGroups = new Map<string, string>(); // group_id -> ad_account_id
+    
+    console.log(`Found ${groupsWithAds.length} groups with ad accounts, META_TOKEN available: ${!!META_TOKEN}`);
+    
+    for (const g of groupsWithAds) {
+      adsLinkedGroups.set(g.group_id, g.ad_account_id);
+    }
+    
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
+        console.log(`Fetching ads for group "${g.nome}" account ${g.ad_account_id}`);
         const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
+        console.log(`Ads result for "${g.nome}":`, adsData ? "has data" : "no data");
         if (adsData) adsDataMap.set(g.group_id, adsData);
       });
       await Promise.all(adsPromises);
@@ -100,8 +111,11 @@ Deno.serve(async (req) => {
       
       // Add Meta Ads data if available
       const ads = adsDataMap.get(gid);
+      const linkedAccount = adsLinkedGroups.get(gid);
       if (ads) {
-        line += ` | META ADS (últimos 30 dias): Investimento R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, CPM R$${ads.cpm.toFixed(2)}, Alcance ${ads.reach}, Frequência ${ads.frequency.toFixed(2)}, Leads ${ads.leads}, Compras ${ads.purchases}`;
+        line += ` | 📊 META ADS (últimos 30 dias): Investimento R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, CPM R$${ads.cpm.toFixed(2)}, Alcance ${ads.reach}, Frequência ${ads.frequency.toFixed(2)}, Leads ${ads.leads}, Compras ${ads.purchases}`;
+      } else if (linkedAccount) {
+        line += ` | 📊 META ADS: Conta vinculada (ID: ${linkedAccount}) mas sem dados de gastos nos últimos 30 dias`;
       }
       contextLines.push(line);
     }
