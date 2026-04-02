@@ -115,6 +115,7 @@ export type Database = {
           aniversario_empresa: string | null
           categoria: string | null
           created_at: string
+          data_ciclo_ads: string | null
           data_entrada: string | null
           group_id: string
           id: string
@@ -129,6 +130,7 @@ export type Database = {
           aniversario_empresa?: string | null
           categoria?: string | null
           created_at?: string
+          data_ciclo_ads?: string | null
           data_entrada?: string | null
           group_id: string
           id?: string
@@ -143,6 +145,7 @@ export type Database = {
           aniversario_empresa?: string | null
           categoria?: string | null
           created_at?: string
+          data_ciclo_ads?: string | null
           data_entrada?: string | null
           group_id?: string
           id?: string
