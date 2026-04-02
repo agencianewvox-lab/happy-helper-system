@@ -138,6 +138,13 @@ export default function Dashboard() {
               >
                 <BarChart3 className="w-4 h-4" />
               </a>
+              <a
+                href="/chat"
+                className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title="Chat IA"
+              >
+                <Brain className="w-4 h-4" />
+              </a>
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
               </button>
