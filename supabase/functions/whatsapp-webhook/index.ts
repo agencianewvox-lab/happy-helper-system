@@ -70,6 +70,7 @@ const ALLOWED_GROUPS: Record<string, string> = {
   "120363426488293045@g.us": "NV - MKT IMPLANTAR RIO VERDE",
   "120363404804672868@g.us": "NV - MKT ODONTONEO",
   "120363405316956579@g.us": "NV - Guardião e agilidade de tráfego",
+  "120363406017903305@g.us": "NV - Bass Importados",
 };
 
 function isGroupJid(jid: string): boolean {
