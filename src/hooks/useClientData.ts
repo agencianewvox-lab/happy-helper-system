@@ -160,6 +160,8 @@ export function useClientData() {
           ultimo_horario: stats?.last_time || null,
           sla_violated,
           sla_delay_minutes,
+          investimento_ads: g.investimento_ads ?? null,
+          data_ciclo_ads: g.data_ciclo_ads ?? null,
         };
       });
 
