@@ -162,6 +162,7 @@ export function useClientData() {
           sla_delay_minutes,
           investimento_ads: g.investimento_ads ?? null,
           data_ciclo_ads: g.data_ciclo_ads ?? null,
+          gestor_responsavel: g.gestor_responsavel ?? null,
         };
       });
 

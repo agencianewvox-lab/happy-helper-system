@@ -55,4 +55,5 @@ export interface Grupo {
   sla_delay_minutes: number;
   investimento_ads: number | null;
   data_ciclo_ads: string | null;
+  gestor_responsavel: string | null;
 }

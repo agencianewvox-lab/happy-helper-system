@@ -12,76 +12,89 @@ import { Badge } from "@/components/ui/badge";
 import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Dashboard() {
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
   const { signOut } = useAuth();
+  const { isAdmin, gestorFilter, loading: profileLoading } = useProfile();
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
 
+  // Filter groups by gestor for non-admin users
+  const roleGrupos = useMemo(() => {
+    if (isAdmin || !gestorFilter) return grupos;
+    return grupos.filter(g => g.gestor_responsavel === gestorFilter);
+  }, [grupos, isAdmin, gestorFilter]);
+
+  const roleAllGrupos = useMemo(() => {
+    if (isAdmin || !gestorFilter) return allGrupos;
+    return allGrupos.filter(g => g.gestor_responsavel === gestorFilter);
+  }, [allGrupos, isAdmin, gestorFilter]);
+
   // Sound alert for pending demands
   const pendingCount = useMemo(
-    () => allGrupos.filter((g) => g.analytics?.has_pending_demands).length,
-    [allGrupos]
+    () => roleAllGrupos.filter((g) => g.analytics?.has_pending_demands).length,
+    [roleAllGrupos]
   );
   const highRiskCount = useMemo(
-    () => allGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length,
-    [allGrupos]
+    () => roleAllGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length,
+    [roleAllGrupos]
   );
   usePendingAlert(pendingCount);
   useHighRiskAlert(highRiskCount);
 
   const stats = useMemo(() => {
-    const total = allGrupos.length;
-    const totalMsgsHoje = allGrupos.reduce((sum, g) => sum + (g.mensagens_hoje || 0), 0);
+    const total = roleAllGrupos.length;
+    const totalMsgsHoje = roleAllGrupos.reduce((sum, g) => sum + (g.mensagens_hoje || 0), 0);
     const now24 = Date.now() - 24 * 60 * 60 * 1000;
-    const comMsgs = allGrupos.filter((g) => g.ultimo_horario && new Date(g.ultimo_horario).getTime() > now24).length;
-    const highRisk = allGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length;
-    const avgFrtAll = allGrupos.filter((g) => g.analytics?.avg_frt_minutes != null);
+    const comMsgs = roleAllGrupos.filter((g) => g.ultimo_horario && new Date(g.ultimo_horario).getTime() > now24).length;
+    const highRisk = roleAllGrupos.filter((g) => g.analytics && g.analytics.churn_risk >= 60).length;
+    const avgFrtAll = roleAllGrupos.filter((g) => g.analytics?.avg_frt_minutes != null);
     const avgFrt = avgFrtAll.length > 0
       ? Math.round(avgFrtAll.reduce((s, g) => s + (g.analytics!.avg_frt_minutes || 0), 0) / avgFrtAll.length)
       : null;
-    const positiveSent = allGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
-    const pendencias = allGrupos.filter((g) => g.analytics?.has_pending_demands).length;
-    const slaViolations = allGrupos.filter((g) => g.sla_violated).length;
-    const priorityCount = allGrupos.filter((g) => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)).length;
+    const positiveSent = roleAllGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
+    const pendencias = roleAllGrupos.filter((g) => g.analytics?.has_pending_demands).length;
+    const slaViolations = roleAllGrupos.filter((g) => g.sla_violated).length;
+    const priorityCount = roleAllGrupos.filter((g) => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)).length;
     const now = Date.now();
     const h24 = 24 * 60 * 60 * 1000;
-    const inativos = allGrupos.filter((g) => {
+    const inativos = roleAllGrupos.filter((g) => {
       if (!g.ultimo_horario) return true;
       return now - new Date(g.ultimo_horario).getTime() > h24;
     }).length;
     const h48 = 48 * 60 * 60 * 1000;
-    const dengue = allGrupos.filter((g) => {
+    const dengue = roleAllGrupos.filter((g) => {
       if (!g.ultimo_horario) return true;
       return now - new Date(g.ultimo_horario).getTime() > h48;
     }).length;
     return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue, slaViolations, priorityCount };
-  }, [allGrupos]);
+  }, [roleAllGrupos]);
 
   // Filter groups by clicked metric
   const metricFilteredGrupos = useMemo(() => {
-    let result = grupos;
+    let result = roleGrupos;
     if (metricFilter) {
       switch (metricFilter) {
-        case "total": result = grupos; break;
-        case "totalMsgs": result = grupos.filter(g => g.total_mensagens > 0); break;
-        case "ativos": result = grupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000); break;
-        case "highRisk": result = grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60); break;
-        case "pendencias": result = grupos.filter(g => g.analytics?.has_pending_demands); break;
-        case "frt": result = grupos.filter(g => g.analytics?.avg_frt_minutes != null); break;
-        case "positive": result = grupos.filter(g => g.analytics?.sentiment === "positivo"); break;
-        case "inativos": result = grupos.filter(g => {
+        case "total": result = roleGrupos; break;
+        case "totalMsgs": result = roleGrupos.filter(g => g.total_mensagens > 0); break;
+        case "ativos": result = roleGrupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000); break;
+        case "highRisk": result = roleGrupos.filter(g => g.analytics && g.analytics.churn_risk >= 60); break;
+        case "pendencias": result = roleGrupos.filter(g => g.analytics?.has_pending_demands); break;
+        case "frt": result = roleGrupos.filter(g => g.analytics?.avg_frt_minutes != null); break;
+        case "positive": result = roleGrupos.filter(g => g.analytics?.sentiment === "positivo"); break;
+        case "inativos": result = roleGrupos.filter(g => {
           if (!g.ultimo_horario) return true;
           return Date.now() - new Date(g.ultimo_horario).getTime() > 24 * 60 * 60 * 1000;
         }); break;
-        case "dengue": result = grupos.filter(g => {
+        case "dengue": result = roleGrupos.filter(g => {
           if (!g.ultimo_horario) return true;
           return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
         }); break;
-        case "sla": result = grupos.filter(g => g.sla_violated); break;
-        case "priority": result = grupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
+        case "sla": result = roleGrupos.filter(g => g.sla_violated); break;
+        case "priority": result = roleGrupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
         default: break;
       }
     }
@@ -92,7 +105,7 @@ export default function Dashboard() {
       if (a.sla_violated && b.sla_violated) return b.sla_delay_minutes - a.sla_delay_minutes;
       return 0;
     });
-  }, [grupos, metricFilter]);
+  }, [roleGrupos, metricFilter]);
 
   const metricLabels: Record<string, string> = {
     total: "Total Grupos",
@@ -234,7 +247,7 @@ export default function Dashboard() {
 
       {tvMode && (
         <TVModeOverlay
-          grupos={allGrupos}
+          grupos={roleAllGrupos}
           onSelectGrupo={setSelectedGrupo}
           onClose={() => setTvMode(false)}
         />
