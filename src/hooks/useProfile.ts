@@ -1,0 +1,46 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./useAuth";
+
+export interface Profile {
+  id: string;
+  user_id: string;
+  full_name: string;
+  role: "admin" | "gestor";
+}
+
+// Maps profile full_name to the gestor_responsavel value in whatsapp_grupos
+const GESTOR_NAME_MAP: Record<string, string> = {
+  "Murillo": "Murilo Araújo",
+  "Netto": "Netto Monge",
+  "Jader": "Jader Costa",
+};
+
+export function useProfile() {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        setProfile(data as Profile | null);
+        setLoading(false);
+      });
+  }, [user]);
+
+  const isAdmin = profile?.role === "admin";
+  const gestorFilter = profile ? GESTOR_NAME_MAP[profile.full_name] || null : null;
+
+  return { profile, loading, isAdmin, gestorFilter };
+}
