@@ -423,6 +423,13 @@ export default function Pendencias() {
                             <AlertTriangle className="w-3 h-3 inline mr-1 text-orange-400" />
                             {item.term}
                           </p>
+                          {item.due_date && (
+                            <p className={cn("text-[10px] flex items-center gap-1", isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground")}>
+                              <CalendarIcon className="w-3 h-3" />
+                              Entrega: {new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                              {isOverdue && " (atrasado)"}
+                            </p>
+                          )}
                           {/* Status move buttons */}
                           <div className="flex gap-1.5 pt-1">
                             {status !== "pendente" && (
