@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
   const { signOut } = useAuth();
   const { isAdmin, gestorFilter, loading: profileLoading } = useProfile();
