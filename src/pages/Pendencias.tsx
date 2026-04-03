@@ -147,23 +147,28 @@ export default function Pendencias() {
   const handleCreate = useCallback(async () => {
     if (!newGroupId || !newTerm.trim()) return;
     setCreating(true);
+    const insertData: any = {
+      group_id: newGroupId,
+      term: newTerm.trim(),
+      requested_at: new Date().toISOString(),
+      status: "pendente",
+      resolved: false,
+    };
+    if (newDueDate) {
+      insertData.due_date = format(newDueDate, "yyyy-MM-dd");
+    }
     const { error } = await supabase
       .from("pending_demand_resolutions")
-      .insert({
-        group_id: newGroupId,
-        term: newTerm.trim(),
-        requested_at: new Date().toISOString(),
-        status: "pendente",
-        resolved: false,
-      });
+      .insert(insertData);
     if (!error) {
       setNewTerm("");
       setNewGroupId("");
       setNewGestor("");
+      setNewDueDate(undefined);
       setCreateOpen(false);
     }
     setCreating(false);
-  }, [newGroupId, newTerm]);
+  }, [newGroupId, newTerm, newDueDate]);
 
   // Filter demands by role
   const filteredDemands = useMemo(() => {
