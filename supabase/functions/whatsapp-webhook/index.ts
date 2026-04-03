@@ -6,6 +6,259 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Alisson's phone for AI auto-reply
+const ALISSON_PHONE = "64992565779";
+const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
+
+// Messages that should NOT trigger AI response
+const IGNORE_PATTERNS = [
+  /^(ok|sim|não|nao|certo|beleza|combinado|pode ser|tá bom|ta bom|tá|ta|blz|vlw|valeu|top|show|perfeito|obrigado|obrigada|bom dia|boa tarde|boa noite|oi|olá|ola)$/i,
+  /^[\p{Emoji}\s]+$/u,
+  /^\[Figurinha\]$/,
+  /^\[Imagem\]$/,
+  /^\[Vídeo\]$/,
+  /^\[Áudio\]$/,
+  /^\[Documento\]/,
+  /^\[Contato\]$/,
+  /^\[Localização\]$/,
+];
+
+function shouldRespondToMessage(text: string): boolean {
+  if (!text || text.trim().length < 3) return false;
+  const trimmed = text.trim();
+  for (const pattern of IGNORE_PATTERNS) {
+    if (pattern.test(trimmed)) return false;
+  }
+  return true;
+}
+
+const META_API_VERSION = "v21.0";
+const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
+
+async function fetchMetaAdsForAccount(accountId: string, token: string): Promise<any | null> {
+  try {
+    const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
+    const fields = "spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,reach,frequency";
+    const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error || !data.data?.length) return null;
+    const row = data.data[0];
+    const actions = row.actions || [];
+    const leads = actions.find((a: any) => a.action_type === "lead")?.value || 0;
+    const cpaArr = row.cost_per_action_type || [];
+    const cpa = cpaArr.find((a: any) => a.action_type === "lead")?.value || null;
+    return {
+      spend: parseFloat(row.spend || "0"),
+      impressions: parseInt(row.impressions || "0"),
+      clicks: parseInt(row.clicks || "0"),
+      ctr: parseFloat(row.ctr || "0"),
+      cpc: parseFloat(row.cpc || "0"),
+      leads: parseInt(leads),
+      cpa: cpa ? parseFloat(cpa) : null,
+      reach: parseInt(row.reach || "0"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Handle Alisson's AI auto-reply: analyze message, build context, call OpenAI, send response via webhook
+ */
+async function handleAlissonAIReply(
+  messageText: string,
+  groupId: string,
+  supabase: any
+) {
+  try {
+    const OPENAI_API_KEY = Deno.env.get("openai");
+    if (!OPENAI_API_KEY) {
+      console.error("OpenAI key not configured for Alisson AI reply");
+      return;
+    }
+    const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
+
+    // Fetch all groups
+    const { data: grupos } = await supabase.from("whatsapp_grupos").select("*").order("nome");
+    if (!grupos?.length) return;
+
+    // Fetch last 30 messages per group (lighter for webhook speed)
+    const groupIds = grupos.map((g: any) => g.group_id);
+    const conversasPromises = groupIds.map((gid: string) =>
+      supabase
+        .from("whatsapp_conversas")
+        .select("group_id, nome_contato, mensagem, recebido_em, direcao")
+        .eq("group_id", gid)
+        .order("recebido_em", { ascending: false })
+        .limit(30)
+    );
+
+    const pendingResPromise = supabase
+      .from("pending_demand_resolutions")
+      .select("*")
+      .eq("resolved", false);
+
+    const [pendingResResult, ...conversasResults] = await Promise.all([
+      pendingResPromise,
+      ...conversasPromises,
+    ]);
+
+    const pendingResolutions = pendingResResult.data || [];
+    const groupMsgsMap = new Map<string, any[]>();
+    for (let i = 0; i < groupIds.length; i++) {
+      groupMsgsMap.set(groupIds[i], conversasResults[i].data || []);
+    }
+
+    // Fetch ads data
+    const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
+    const adsDataMap = new Map<string, any>();
+    if (META_TOKEN && groupsWithAds.length > 0) {
+      const adsPromises = groupsWithAds.map(async (g: any) => {
+        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
+        if (adsData) adsDataMap.set(g.group_id, adsData);
+      });
+      await Promise.all(adsPromises);
+    }
+
+    // Pending by group
+    const pendingByGroup = new Map<string, any[]>();
+    for (const p of pendingResolutions) {
+      if (!pendingByGroup.has(p.group_id)) pendingByGroup.set(p.group_id, []);
+      pendingByGroup.get(p.group_id)!.push(p);
+    }
+
+    // Build context
+    const contextLines: string[] = [];
+    for (const g of grupos) {
+      const gid = g.group_id;
+      const msgs = groupMsgsMap.get(gid) || [];
+      const clientMsgs = msgs.filter((m: any) => m.direcao === "entrada");
+      const teamMsgs = msgs.filter((m: any) => m.direcao === "saida");
+
+      let mesesCliente = "";
+      if (g.data_entrada) {
+        const months = Math.floor((Date.now() - new Date(g.data_entrada).getTime()) / (1000 * 60 * 60 * 24 * 30));
+        mesesCliente = `${months}m`;
+      }
+
+      const groupPending = pendingByGroup.get(gid) || [];
+      const ads = adsDataMap.get(gid);
+
+      let line = `### ${g.nome}`;
+      line += `\n  Responsável: ${g.gestor_responsavel || "N/D"} | Plano: ${g.plano || "N/A"} | Investimento: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}${mesesCliente ? ` | Cliente há ${mesesCliente}` : ""}`;
+      line += `\n  Msgs: ${clientMsgs.length} cliente, ${teamMsgs.length} equipe`;
+
+      if (groupPending.length > 0) {
+        line += `\n  ⚠️ ${groupPending.length} pendência(s): ${groupPending.slice(0, 3).map((p: any) => `"${p.term}"`).join(", ")}`;
+      }
+
+      if (ads) {
+        line += `\n  📊 Ads 30d: R$${ads.spend.toFixed(0)} gasto, ${ads.leads} leads${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, CTR ${ads.ctr.toFixed(2)}%`;
+      }
+
+      // Last 5 messages for context
+      const last5 = msgs.slice(0, 5).reverse();
+      if (last5.length > 0) {
+        line += `\n  Últimas msgs:`;
+        for (const m of last5) {
+          const dir = m.direcao === "entrada" ? "👤" : "👨‍💼";
+          line += `\n    ${dir} ${m.nome_contato || "?"}: ${(m.mensagem || "").slice(0, 80)}`;
+        }
+      }
+      contextLines.push(line);
+    }
+
+    // Load Alisson's recent chat history for context continuity
+    const { data: recentAlissonMsgs } = await supabase
+      .from("whatsapp_conversas")
+      .select("mensagem, direcao, recebido_em, nome_contato")
+      .or(`telefone.eq.${ALISSON_PHONE},nome_contato.ilike.%alisson%`)
+      .order("recebido_em", { ascending: false })
+      .limit(10);
+
+    let conversationHistory = "";
+    if (recentAlissonMsgs?.length) {
+      const reversed = [...recentAlissonMsgs].reverse();
+      conversationHistory = "\n\nHISTÓRICO RECENTE DA CONVERSA COM ALISSON:\n" +
+        reversed.map((m: any) => {
+          const dir = m.direcao === "entrada" ? "Alisson" : "Vox (IA)";
+          return `${dir}: ${m.mensagem}`;
+        }).join("\n");
+    }
+
+    const systemPrompt = `Você é a Vox, analista sênior de Customer Success da agência New Vox. Está respondendo diretamente ao Alisson (sócio da empresa) via WhatsApp.
+
+EQUIPE: Jader Costa e Murilo Araújo e Netto Monge (gestores de tráfego), Priscilla (social media/sócia), Joel (gerente geral), Thais (auxiliar social media), Daniella, Victor Botto, Jiza (equipe operacional).
+
+REGRAS:
+- Responda de forma DIRETA e CONCISA (máximo 300 palavras) — é WhatsApp, não email
+- Use emojis com moderação para facilitar leitura
+- Nunca invente dados. Se não tem, diga
+- Quando sugerir ações, diga QUEM da equipe deve fazer
+- Se Alisson pedir para criar/designar pendência, confirme com os detalhes
+- Contextualize métricas: FRT ideal <30min, bom até 60, ruim >120
+- Benchmarks: churn <30 tranquilo, >60 precisa ação
+- Formate com 🔴 crítico, 🟡 atenção, 🟢 ok, ⚡ urgente
+
+CAPACIDADES: resumo de grupo, comparação, análise geral, diagnóstico, recomendações, alertas, análise de equipe, dados de ads, criação de pendências.
+
+Se Alisson pedir para adicionar pendência a um responsável, responda confirmando: qual cliente, qual pendência, para quem, e prazo se mencionado.
+
+DADOS DA OPERAÇÃO (${grupos.length} grupos):
+
+${contextLines.join("\n\n")}
+${conversationHistory}`;
+
+    // Call OpenAI
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: messageText },
+        ],
+        max_tokens: 1000,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("OpenAI error for Alisson reply:", response.status, await response.text());
+      return;
+    }
+
+    const aiData = await response.json();
+    const aiReply = aiData.choices?.[0]?.message?.content;
+    if (!aiReply) {
+      console.log("No AI reply generated");
+      return;
+    }
+
+    console.log("AI reply for Alisson:", aiReply.substring(0, 100) + "...");
+
+    // Send response via n8n webhook
+    const webhookResponse = await fetch(ALISSON_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone: ALISSON_PHONE,
+        message: aiReply,
+        groupId: groupId,
+        type: "ai_response",
+      }),
+    });
+
+    console.log("Webhook response status:", webhookResponse.status);
+  } catch (err) {
+    console.error("Error in Alisson AI reply:", err);
+  }
+}
+
 // Nomes do time New Vox — mensagens desses contatos são "saida"
 const TEAM_MEMBERS = [
   "jader", "jader costa",
@@ -81,29 +334,18 @@ function isAllowedGroup(jid: string): boolean {
   return jid in ALLOWED_GROUPS;
 }
 
-/**
- * Transcribe audio using OpenAI Whisper API.
- * Accepts base64-encoded audio data.
- */
 async function transcribeAudio(base64Audio: string, mimetype?: string): Promise<string | null> {
   const openaiKey = Deno.env.get("openai");
-  if (!openaiKey) {
-    console.error("OpenAI API key not configured (secret name: 'openai')");
-    return null;
-  }
+  if (!openaiKey) return null;
 
   try {
-    // Decode base64 to binary
     const binaryStr = atob(base64Audio);
     const bytes = new Uint8Array(binaryStr.length);
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
-
-    // Determine file extension from mimetype
     const ext = mimetype?.includes("ogg") ? "ogg" : mimetype?.includes("mp4") ? "m4a" : "ogg";
     const blob = new Blob([bytes], { type: mimetype || "audio/ogg" });
-
     const formData = new FormData();
     formData.append("file", blob, `audio.${ext}`);
     formData.append("model", "whisper-1");
@@ -111,64 +353,35 @@ async function transcribeAudio(base64Audio: string, mimetype?: string): Promise<
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-      },
+      headers: { Authorization: `Bearer ${openaiKey}` },
       body: formData,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Whisper API error:", response.status, errText);
-      return null;
-    }
-
+    if (!response.ok) return null;
     const result = await response.json();
     return result.text || null;
-  } catch (err) {
-    console.error("Audio transcription error:", err);
+  } catch {
     return null;
   }
 }
 
-/**
- * Extract message text from Evolution API message object.
- * For audio messages with base64 data, attempts transcription.
- */
 async function extractMessageText(message: any, data: any): Promise<string | null> {
   if (!message) return null;
-
-  // Text messages
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
-
-  // Image with caption
   if (message.imageMessage?.caption) return `[Imagem] ${message.imageMessage.caption}`;
   if (message.imageMessage) return "[Imagem]";
-
-  // Video
   if (message.videoMessage?.caption) return `[Vídeo] ${message.videoMessage.caption}`;
   if (message.videoMessage) return "[Vídeo]";
-
-  // Audio — attempt transcription if base64 is available
   if (message.audioMessage) {
     const base64 = message.base64 || data?.message?.base64 || message.audioMessage?.base64;
     if (base64) {
       const mimetype = message.audioMessage?.mimetype || "audio/ogg; codecs=opus";
-      console.log("Attempting audio transcription...");
       const transcription = await transcribeAudio(base64, mimetype);
-      if (transcription) {
-        console.log("Transcription successful:", transcription.substring(0, 50) + "...");
-        return `[Áudio Transcrito] ${transcription}`;
-      }
-      console.log("Transcription failed, falling back to [Áudio]");
-    } else {
-      console.log("No base64 data for audio message, storing as [Áudio]");
+      if (transcription) return `[Áudio Transcrito] ${transcription}`;
     }
     return "[Áudio]";
   }
-
-  // Other media types
   if (message.documentMessage?.fileName) return `[Documento] ${message.documentMessage.fileName}`;
   if (message.documentMessage) return "[Documento]";
   if (message.stickerMessage) return "[Figurinha]";
@@ -176,7 +389,6 @@ async function extractMessageText(message: any, data: any): Promise<string | nul
   if (message.locationMessage) return "[Localização]";
   if (message.reactionMessage) return null;
   if (message.protocolMessage) return null;
-
   return null;
 }
 
@@ -200,7 +412,6 @@ Deno.serve(async (req) => {
       const key = data.key || {};
       const remoteJid = key.remoteJid || "";
 
-      // Ignorar mensagens que NÃO são de grupos permitidos
       const isGroup = isGroupJid(remoteJid);
       if (!isGroup || !isAllowedGroup(remoteJid)) {
         return new Response(
@@ -213,13 +424,11 @@ Deno.serve(async (req) => {
       const pushName = data.pushName || "";
       const messageTimestamp = data.messageTimestamp;
 
-      // Extract message text (now async for audio transcription)
       let messageText = await extractMessageText(data.message, data);
       if (!messageText && data.messageBody) {
         messageText = data.messageBody;
       }
 
-      // Skip if no meaningful content
       if (messageText === null) {
         return new Response(
           JSON.stringify({ success: true, skipped: true, reason: "no_text_content" }),
@@ -235,7 +444,6 @@ Deno.serve(async (req) => {
       const contactName = pushName || phone || "Desconhecido";
       const direction = detectDirection(fromMe, contactName);
 
-      // Build timestamp from messageTimestamp (unix epoch)
       let receivedAt: string;
       if (messageTimestamp) {
         const ts = typeof messageTimestamp === "number"
@@ -287,13 +495,23 @@ Deno.serve(async (req) => {
         });
       }
 
+      // ===== ALISSON AI AUTO-REPLY =====
+      // Check if message is from Alisson's phone and deserves a response
+      if (phone === ALISSON_PHONE && messageText && shouldRespondToMessage(messageText)) {
+        console.log("Alisson message detected, triggering AI reply...");
+        // Fire and forget — don't block webhook response
+        handleAlissonAIReply(messageText, groupId, supabase).catch((err) =>
+          console.error("Alisson AI reply error:", err)
+        );
+      }
+
       return new Response(
         JSON.stringify({ success: true, count: insertedData?.length || 1, source: "evolution_api" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ===== LEGACY N8N FORMAT (backward compatible) =====
+    // ===== LEGACY N8N FORMAT =====
     const mensagens = Array.isArray(body) ? body : [body];
     const clean = (val: any) =>
       typeof val === "string" && val.startsWith("=") ? val.slice(1) : val;
