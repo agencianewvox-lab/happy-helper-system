@@ -22,25 +22,19 @@ export default function Dashboard() {
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
 
-  if (profileLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   const roleGrupos = useMemo(() => {
+    if (profileLoading) return [];
     if (isAdmin) return grupos;
     if (!gestorFilter) return [];
     return grupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [grupos, isAdmin, gestorFilter]);
+  }, [grupos, isAdmin, gestorFilter, profileLoading]);
 
   const roleAllGrupos = useMemo(() => {
+    if (profileLoading) return [];
     if (isAdmin) return allGrupos;
     if (!gestorFilter) return [];
     return allGrupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [allGrupos, isAdmin, gestorFilter]);
+  }, [allGrupos, isAdmin, gestorFilter, profileLoading]);
 
   // Sound alert for pending demands
   const pendingCount = useMemo(
@@ -53,6 +47,14 @@ export default function Dashboard() {
   );
   usePendingAlert(pendingCount);
   useHighRiskAlert(highRiskCount);
+
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const stats = useMemo(() => {
     const total = roleAllGrupos.length;
