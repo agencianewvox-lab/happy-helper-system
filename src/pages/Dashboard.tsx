@@ -61,7 +61,6 @@ export default function Dashboard() {
       ? Math.round(avgFrtAll.reduce((s, g) => s + (g.analytics!.avg_frt_minutes || 0), 0) / avgFrtAll.length)
       : null;
     const positiveSent = roleAllGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
-    const pendencias = roleAllGrupos.filter((g) => g.analytics?.has_pending_demands).length;
     const slaViolations = roleAllGrupos.filter((g) => g.sla_violated).length;
     const priorityCount = roleAllGrupos.filter((g) => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)).length;
     const now = Date.now();
@@ -75,7 +74,26 @@ export default function Dashboard() {
       if (!g.ultimo_horario) return true;
       return now - new Date(g.ultimo_horario).getTime() > h48;
     }).length;
-    return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, inativos, dengue, slaViolations, priorityCount };
+
+    // Pending breakdown by priority/confidence
+    let pendUrgentes = 0;
+    let pendNormais = 0;
+    let pendPossiveis = 0;
+    for (const g of roleAllGrupos) {
+      const details = g.analytics?.pending_demand_details || [];
+      for (const d of details) {
+        if (d.category === "possivel" || d.confidence === "media") {
+          pendPossiveis++;
+        } else if (d.priority === "urgente") {
+          pendUrgentes++;
+        } else {
+          pendNormais++;
+        }
+      }
+    }
+    const pendencias = roleAllGrupos.filter((g) => g.analytics?.has_pending_demands).length;
+
+    return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, pendUrgentes, pendNormais, pendPossiveis, inativos, dengue, slaViolations, priorityCount };
   }, [roleAllGrupos]);
 
   // Filter groups by clicked metric
