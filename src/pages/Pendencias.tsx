@@ -33,6 +33,7 @@ interface DemandItem {
   status: DemandStatus;
   grupo_nome?: string;
   gestor_responsavel?: string | null;
+  due_date?: string | null;
 }
 
 interface GrupoOption {
