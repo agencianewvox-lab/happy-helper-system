@@ -79,6 +79,7 @@ export type Database = {
           resolved: boolean
           resolved_at: string | null
           resolved_by: string | null
+          status: string
           term: string
         }
         Insert: {
@@ -89,6 +90,7 @@ export type Database = {
           resolved?: boolean
           resolved_at?: string | null
           resolved_by?: string | null
+          status?: string
           term: string
         }
         Update: {
@@ -99,6 +101,7 @@ export type Database = {
           resolved?: boolean
           resolved_at?: string | null
           resolved_by?: string | null
+          status?: string
           term?: string
         }
         Relationships: []
