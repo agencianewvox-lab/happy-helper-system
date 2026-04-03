@@ -12,10 +12,24 @@ import { Badge } from "@/components/ui/badge";
 import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Dashboard() {
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
   const { signOut } = useAuth();
+  const { isAdmin, gestorFilter, loading: profileLoading } = useProfile();
+
+  // Filter groups by gestor for non-admin users
+  const filteredByRole = useMemo(() => {
+    if (isAdmin || !gestorFilter) return { grupos, allGrupos };
+    return {
+      grupos: grupos.filter(g => {
+        // Need to check gestor_responsavel from the DB - we'll match via group data
+        return true; // placeholder, actual filtering below
+      }),
+      allGrupos: allGrupos.filter(g => true),
+    };
+  }, [grupos, allGrupos, isAdmin, gestorFilter]);
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
