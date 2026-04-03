@@ -166,12 +166,34 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
               🔥 {a.churn_risk}%
             </span>
             {/* Pending */}
-            {a.has_pending_demands && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
-                <AlertCircle className="w-3 h-3" />
-                Pendente
-              </span>
-            )}
+            {a.has_pending_demands && (() => {
+              const details = a.pending_demand_details || [];
+              const urgentes = details.filter(d => d.category === "confirmada" && d.priority === "urgente");
+              const normais = details.filter(d => d.category === "confirmada" && d.priority !== "urgente");
+              const possiveis = details.filter(d => d.category === "possivel");
+              return (
+                <>
+                  {urgentes.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500">
+                      <AlertCircle className="w-3 h-3" />
+                      {urgentes.length} Urgente{urgentes.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {normais.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
+                      <AlertCircle className="w-3 h-3" />
+                      {normais.length} Pendente{normais.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {possiveis.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground">
+                      <AlertCircle className="w-3 h-3" />
+                      {possiveis.length} Possível
+                    </span>
+                  )}
+                </>
+              );
+            })()}
             {/* Intent */}
             {a.intent && intentConfig[a.intent] && (
               <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", intentConfig[a.intent].bg, intentConfig[a.intent].color)}>
@@ -183,25 +205,38 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
 
         {/* Motivo pendência resumido + solução */}
         {a?.has_pending_demands && !compact && (
-          <div className="text-[10px] text-orange-400 bg-orange-500/5 rounded px-2 py-1 border border-orange-500/20 space-y-0.5">
-            <div>
-              <span className="font-semibold">Pendência: </span>
-              {a.pending_demand_details && a.pending_demand_details.length > 0
-                ? (() => {
-                    const d = a.pending_demand_details[0];
-                    const dt = new Date(d.requested_at);
-                    const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-                    const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                    return `Pediu "${d.term}" em ${dateStr} às ${timeStr}`;
-                  })()
-                : "Sem resposta há +2h"}
-            </div>
-            {a.pending_demand_details && a.pending_demand_details.length > 0 && a.pending_demand_details[0].suggested_solution && (
-              <div className="text-emerald-400">
-                <span className="font-semibold">Solução: </span>
-                {a.pending_demand_details[0].suggested_solution}
-              </div>
-            )}
+          <div className="space-y-1">
+            {(a.pending_demand_details || []).slice(0, 2).map((d, i) => {
+              const isPossivel = d.category === "possivel" || d.confidence === "media";
+              const isUrgente = d.priority === "urgente" && !isPossivel;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "text-[10px] rounded px-2 py-1 space-y-0.5",
+                    isPossivel
+                      ? "text-muted-foreground bg-muted/30 border border-dashed border-muted-foreground/30"
+                      : isUrgente
+                        ? "text-red-400 bg-red-500/5 border border-red-500/20"
+                        : "text-orange-400 bg-orange-500/5 border border-orange-500/20"
+                  )}
+                >
+                  <div>
+                    <span className="font-semibold">
+                      {isPossivel ? "Possível: " : isUrgente ? "🔴 Urgente: " : "Pendência: "}
+                    </span>
+                    {d.message_excerpt ? `"${d.message_excerpt.slice(0, 80)}"` : d.term}
+                    {d.hours_waiting > 0 && <span className="ml-1 opacity-70">({d.hours_waiting}h)</span>}
+                  </div>
+                  {d.suggested_solution && !isPossivel && (
+                    <div className="text-emerald-400">
+                      <span className="font-semibold">Ação: </span>
+                      {d.suggested_solution}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
