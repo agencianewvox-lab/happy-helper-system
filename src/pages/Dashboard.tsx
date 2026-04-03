@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 
 export default function Dashboard() {
-  const { grupos, roleAllGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
+  const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
   const { signOut } = useAuth();
   const { isAdmin, gestorFilter, loading: profileLoading } = useProfile();
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
