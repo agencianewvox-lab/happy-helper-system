@@ -215,7 +215,7 @@ async function handleAlissonAIReply(
     const { data: recentAlissonMsgs } = await supabase
       .from("whatsapp_conversas")
       .select("mensagem, direcao, recebido_em, nome_contato")
-      .or(`telefone.eq.64992565779,telefone.eq.5564992565779,nome_contato.ilike.%alisson%`)
+      .or(`${ALISSON_PHONE_FILTERS.join(",")},nome_contato.ilike.%alisson%`)
       .order("recebido_em", { ascending: false })
       .limit(10);
 
