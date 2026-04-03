@@ -22,16 +22,19 @@ export default function Dashboard() {
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
 
-  // Filter groups by gestor for non-admin users
   const roleGrupos = useMemo(() => {
-    if (isAdmin || !gestorFilter) return grupos;
+    if (profileLoading) return [];
+    if (isAdmin) return grupos;
+    if (!gestorFilter) return [];
     return grupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [grupos, isAdmin, gestorFilter]);
+  }, [grupos, isAdmin, gestorFilter, profileLoading]);
 
   const roleAllGrupos = useMemo(() => {
-    if (isAdmin || !gestorFilter) return allGrupos;
+    if (profileLoading) return [];
+    if (isAdmin) return allGrupos;
+    if (!gestorFilter) return [];
     return allGrupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [allGrupos, isAdmin, gestorFilter]);
+  }, [allGrupos, isAdmin, gestorFilter, profileLoading]);
 
   // Sound alert for pending demands
   const pendingCount = useMemo(
@@ -120,6 +123,14 @@ export default function Dashboard() {
     sla: "SLA Violado",
     priority: "Prioridade Máxima",
   };
+
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

@@ -22,21 +22,35 @@ export function useProfile() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     if (!user) {
       setProfile(null);
       setLoading(false);
       return;
     }
 
+    setLoading(true);
+
     supabase
       .from("profiles")
       .select("*")
       .eq("user_id", user.id)
       .single()
-      .then(({ data }) => {
-        setProfile(data as Profile | null);
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          console.error("Profile fetch error:", error);
+          setProfile(null);
+        } else {
+          setProfile(data as Profile | null);
+        }
         setLoading(false);
       });
+
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
   const isAdmin = profile?.role === "admin";
