@@ -6,50 +6,46 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 
 export type Conversation = {
   id: string;
-  folder: string;
   title: string;
   created_at: string;
   updated_at: string;
+  user_id: string | null;
 };
-
-const TEAM_MEMBERS = [
-  "Jader",
-  "Murillo",
-  "Priscilla",
-  "Alisson",
-  "Joel",
-  "Thais",
-  "Daniella",
-  "Victor Botto",
-];
 
 export default function Chat() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { profile, isAdmin, gestorFilter } = useProfile();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (user) loadConversations();
+  }, [user]);
 
   const loadConversations = async () => {
+    if (!user) return;
     const { data, error } = await supabase
       .from("ai_conversations")
-      .select("*")
+      .select("id, title, created_at, updated_at, user_id")
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
     if (!error && data) setConversations(data);
     setLoading(false);
   };
 
-  const createConversation = async (folder: string) => {
+  const createConversation = async () => {
+    if (!user) return;
     const { data, error } = await supabase
       .from("ai_conversations")
-      .insert({ folder, title: "Nova conversa" })
-      .select()
+      .insert({ folder: profile?.full_name || "Chat", title: "Nova conversa", user_id: user.id })
+      .select("id, title, created_at, updated_at, user_id")
       .single();
     if (!error && data) {
       setConversations((prev) => [data, ...prev]);
@@ -77,7 +73,6 @@ export default function Chat() {
         <ChatSidebar
           conversations={conversations}
           activeId={activeConversationId}
-          teamMembers={TEAM_MEMBERS}
           onSelect={setActiveConversationId}
           onNewChat={createConversation}
           onDelete={deleteConversation}
@@ -97,6 +92,7 @@ export default function Chat() {
           </header>
           <ChatArea
             conversationId={activeConversationId}
+            gestorFilter={isAdmin ? null : gestorFilter}
             onTitleUpdate={(title) => {
               if (activeConversationId) updateConversationTitle(activeConversationId, title);
             }}

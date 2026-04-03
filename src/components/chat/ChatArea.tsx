@@ -14,10 +14,11 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 
 interface ChatAreaProps {
   conversationId: string | null;
+  gestorFilter?: string | null;
   onTitleUpdate: (title: string) => void;
 }
 
-export function ChatArea({ conversationId, onTitleUpdate }: ChatAreaProps) {
+export function ChatArea({ conversationId, gestorFilter, onTitleUpdate }: ChatAreaProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -80,7 +81,7 @@ export function ChatArea({ conversationId, onTitleUpdate }: ChatAreaProps) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages, type: "chat" }),
+        body: JSON.stringify({ messages: allMessages, type: "chat", gestorFilter }),
       });
 
       if (!resp.ok) {
