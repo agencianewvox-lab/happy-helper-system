@@ -62,7 +62,7 @@ export default function Dashboard() {
       : null;
     const positiveSent = roleAllGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
     const slaViolations = roleAllGrupos.filter((g) => g.sla_violated).length;
-    const priorityCount = roleAllGrupos.filter((g) => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)).length;
+    const priorityCount = roleAllGrupos.filter((g) => g.analytics?.priority_level === "maxima").length;
     const now = Date.now();
     const h24 = 24 * 60 * 60 * 1000;
     const inativos = roleAllGrupos.filter((g) => {
