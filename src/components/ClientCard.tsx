@@ -166,12 +166,34 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
               🔥 {a.churn_risk}%
             </span>
             {/* Pending */}
-            {a.has_pending_demands && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
-                <AlertCircle className="w-3 h-3" />
-                Pendente
-              </span>
-            )}
+            {a.has_pending_demands && (() => {
+              const details = a.pending_demand_details || [];
+              const urgentes = details.filter(d => d.category === "confirmada" && d.priority === "urgente");
+              const normais = details.filter(d => d.category === "confirmada" && d.priority !== "urgente");
+              const possiveis = details.filter(d => d.category === "possivel");
+              return (
+                <>
+                  {urgentes.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500">
+                      <AlertCircle className="w-3 h-3" />
+                      {urgentes.length} Urgente{urgentes.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {normais.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
+                      <AlertCircle className="w-3 h-3" />
+                      {normais.length} Pendente{normais.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {possiveis.length > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground">
+                      <AlertCircle className="w-3 h-3" />
+                      {possiveis.length} Possível
+                    </span>
+                  )}
+                </>
+              );
+            })()}
             {/* Intent */}
             {a.intent && intentConfig[a.intent] && (
               <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", intentConfig[a.intent].bg, intentConfig[a.intent].color)}>
