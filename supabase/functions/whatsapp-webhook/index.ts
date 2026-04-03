@@ -460,7 +460,7 @@ Deno.serve(async (req) => {
       const earlyPhone = isGroup
         ? (key.participant ? extractPhoneFromJid(key.participant) : null)
         : extractPhoneFromJid(remoteJid);
-      const isAlisson = earlyPhone ? ALISSON_PHONES.includes(earlyPhone) : false;
+      const isAlisson = isKnownPhone(earlyPhone, ALISSON_PHONES);
       console.log("isGroup:", isGroup, "| earlyPhone:", earlyPhone, "| isAlisson:", isAlisson, "| isAllowedGroup:", isGroup && isAllowedGroup(remoteJid));
 
       // Allow Alisson's messages through even from non-whitelisted groups/DMs
