@@ -169,6 +169,13 @@ export default function Dashboard() {
               >
                 <Brain className="w-4 h-4" />
               </a>
+              <a
+                href="/pendencias"
+                className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title="Quadro de Pendências"
+              >
+                <ClipboardList className="w-4 h-4" />
+              </a>
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
               </button>
