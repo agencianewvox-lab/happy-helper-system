@@ -400,6 +400,7 @@ export default function Pendencias() {
                       const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
                       const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
                       const isUpdating = updating === item.id;
+                      const isOverdue = item.due_date && new Date(item.due_date + "T23:59:59") < new Date() && item.status !== "feito";
                       return (
                         <div
                           key={item.id}
