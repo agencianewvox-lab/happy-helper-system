@@ -6,9 +6,51 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Alisson's phone for AI auto-reply (with and without country code)
+// Alisson's phone for AI auto-reply (with country-code and 9th-digit variations)
 const ALISSON_PHONES = ["64992565779", "5564992565779"];
 const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
+
+function digitsOnly(value: string | null | undefined): string {
+  return (value || "").replace(/\D/g, "");
+}
+
+function getBrazilPhoneVariants(phone: string | null | undefined): string[] {
+  const digits = digitsOnly(phone);
+  if (!digits) return [];
+
+  const variants = new Set<string>([digits]);
+  const local = digits.startsWith("55") && digits.length >= 12 ? digits.slice(2) : digits;
+
+  if (local) {
+    variants.add(local);
+
+    if (local.length === 11 && local[2] === "9") {
+      variants.add(`${local.slice(0, 2)}${local.slice(3)}`);
+    }
+
+    if (local.length === 10) {
+      variants.add(`${local.slice(0, 2)}9${local.slice(2)}`);
+    }
+  }
+
+  for (const variant of [...variants]) {
+    if (!variant.startsWith("55")) {
+      variants.add(`55${variant}`);
+    }
+  }
+
+  return [...variants];
+}
+
+function isKnownPhone(candidate: string | null | undefined, knownPhones: string[]): boolean {
+  const candidateVariants = new Set(getBrazilPhoneVariants(candidate));
+  return knownPhones.some((phone) =>
+    getBrazilPhoneVariants(phone).some((variant) => candidateVariants.has(variant))
+  );
+}
+
+const ALISSON_PHONE_FILTERS = [...new Set(ALISSON_PHONES.flatMap((phone) => getBrazilPhoneVariants(phone)))]
+  .map((phone) => `telefone.eq.${phone}`);
 
 // Messages that should NOT trigger AI response
 const IGNORE_PATTERNS = [
@@ -173,7 +215,7 @@ async function handleAlissonAIReply(
     const { data: recentAlissonMsgs } = await supabase
       .from("whatsapp_conversas")
       .select("mensagem, direcao, recebido_em, nome_contato")
-      .or(`telefone.eq.64992565779,telefone.eq.5564992565779,nome_contato.ilike.%alisson%`)
+      .or(`${ALISSON_PHONE_FILTERS.join(",")},nome_contato.ilike.%alisson%`)
       .order("recebido_em", { ascending: false })
       .limit(10);
 
@@ -418,7 +460,7 @@ Deno.serve(async (req) => {
       const earlyPhone = isGroup
         ? (key.participant ? extractPhoneFromJid(key.participant) : null)
         : extractPhoneFromJid(remoteJid);
-      const isAlisson = earlyPhone ? ALISSON_PHONES.includes(earlyPhone) : false;
+      const isAlisson = isKnownPhone(earlyPhone, ALISSON_PHONES);
       console.log("isGroup:", isGroup, "| earlyPhone:", earlyPhone, "| isAlisson:", isAlisson, "| isAllowedGroup:", isGroup && isAllowedGroup(remoteJid));
 
       // Allow Alisson's messages through even from non-whitelisted groups/DMs
