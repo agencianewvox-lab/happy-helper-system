@@ -75,26 +75,26 @@ export default function Dashboard() {
 
   // Filter groups by clicked metric
   const metricFilteredGrupos = useMemo(() => {
-    let result = grupos;
+    let result = roleGrupos;
     if (metricFilter) {
       switch (metricFilter) {
-        case "total": result = grupos; break;
-        case "totalMsgs": result = grupos.filter(g => g.total_mensagens > 0); break;
-        case "ativos": result = grupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000); break;
-        case "highRisk": result = grupos.filter(g => g.analytics && g.analytics.churn_risk >= 60); break;
-        case "pendencias": result = grupos.filter(g => g.analytics?.has_pending_demands); break;
-        case "frt": result = grupos.filter(g => g.analytics?.avg_frt_minutes != null); break;
-        case "positive": result = grupos.filter(g => g.analytics?.sentiment === "positivo"); break;
-        case "inativos": result = grupos.filter(g => {
+        case "total": result = roleGrupos; break;
+        case "totalMsgs": result = roleGrupos.filter(g => g.total_mensagens > 0); break;
+        case "ativos": result = roleGrupos.filter(g => g.ultimo_horario && Date.now() - new Date(g.ultimo_horario).getTime() < 24 * 60 * 60 * 1000); break;
+        case "highRisk": result = roleGrupos.filter(g => g.analytics && g.analytics.churn_risk >= 60); break;
+        case "pendencias": result = roleGrupos.filter(g => g.analytics?.has_pending_demands); break;
+        case "frt": result = roleGrupos.filter(g => g.analytics?.avg_frt_minutes != null); break;
+        case "positive": result = roleGrupos.filter(g => g.analytics?.sentiment === "positivo"); break;
+        case "inativos": result = roleGrupos.filter(g => {
           if (!g.ultimo_horario) return true;
           return Date.now() - new Date(g.ultimo_horario).getTime() > 24 * 60 * 60 * 1000;
         }); break;
-        case "dengue": result = grupos.filter(g => {
+        case "dengue": result = roleGrupos.filter(g => {
           if (!g.ultimo_horario) return true;
           return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
         }); break;
-        case "sla": result = grupos.filter(g => g.sla_violated); break;
-        case "priority": result = grupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
+        case "sla": result = roleGrupos.filter(g => g.sla_violated); break;
+        case "priority": result = roleGrupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
         default: break;
       }
     }
@@ -105,7 +105,7 @@ export default function Dashboard() {
       if (a.sla_violated && b.sla_violated) return b.sla_delay_minutes - a.sla_delay_minutes;
       return 0;
     });
-  }, [grupos, metricFilter]);
+  }, [roleGrupos, metricFilter]);
 
   const metricLabels: Record<string, string> = {
     total: "Total Grupos",
