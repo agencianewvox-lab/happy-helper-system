@@ -205,25 +205,40 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
 
         {/* Motivo pendência resumido + solução */}
         {a?.has_pending_demands && !compact && (
-          <div className="text-[10px] text-orange-400 bg-orange-500/5 rounded px-2 py-1 border border-orange-500/20 space-y-0.5">
-            <div>
-              <span className="font-semibold">Pendência: </span>
-              {a.pending_demand_details && a.pending_demand_details.length > 0
-                ? (() => {
-                    const d = a.pending_demand_details[0];
-                    const dt = new Date(d.requested_at);
-                    const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-                    const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                    return `Pediu "${d.term}" em ${dateStr} às ${timeStr}`;
-                  })()
-                : "Sem resposta há +2h"}
-            </div>
-            {a.pending_demand_details && a.pending_demand_details.length > 0 && a.pending_demand_details[0].suggested_solution && (
-              <div className="text-emerald-400">
-                <span className="font-semibold">Solução: </span>
-                {a.pending_demand_details[0].suggested_solution}
-              </div>
-            )}
+          <div className="space-y-1">
+            {(a.pending_demand_details || []).slice(0, 2).map((d, i) => {
+              const isPossivel = d.category === "possivel" || d.confidence === "media";
+              const isUrgente = d.priority === "urgente" && !isPossivel;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "text-[10px] rounded px-2 py-1 space-y-0.5",
+                    isPossivel
+                      ? "text-muted-foreground bg-muted/30 border border-dashed border-muted-foreground/30"
+                      : isUrgente
+                        ? "text-red-400 bg-red-500/5 border border-red-500/20"
+                        : "text-orange-400 bg-orange-500/5 border border-orange-500/20"
+                  )}
+                >
+                  <div>
+                    <span className="font-semibold">
+                      {isPossivel ? "Possível: " : isUrgente ? "🔴 Urgente: " : "Pendência: "}
+                    </span>
+                    {d.message_excerpt ? `"${d.message_excerpt.slice(0, 80)}"` : d.term}
+                    {d.hours_waiting > 0 && <span className="ml-1 opacity-70">({d.hours_waiting}h)</span>}
+                  </div>
+                  {d.suggested_solution && !isPossivel && (
+                    <div className="text-emerald-400">
+                      <span className="font-semibold">Ação: </span>
+                      {d.suggested_solution}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
           </div>
         )}
 
