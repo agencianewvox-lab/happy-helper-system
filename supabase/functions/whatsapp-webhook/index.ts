@@ -404,13 +404,14 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json();
-    console.log("Webhook received, event:", body.event);
+    console.log("Webhook received, event:", body.event, "| has data:", !!body.data);
 
     // ===== EVOLUTION API FORMAT =====
     if (body.event === "messages.upsert" && body.data) {
       const data = body.data;
       const key = data.key || {};
       const remoteJid = key.remoteJid || "";
+      console.log("Processing message, remoteJid:", remoteJid, "| fromMe:", key.fromMe, "| pushName:", data.pushName);
 
       // Extract phone early to check if it's Alisson
       const isGroup = isGroupJid(remoteJid);
@@ -418,6 +419,7 @@ Deno.serve(async (req) => {
         ? (key.participant ? extractPhoneFromJid(key.participant) : null)
         : extractPhoneFromJid(remoteJid);
       const isAlisson = earlyPhone ? ALISSON_PHONES.includes(earlyPhone) : false;
+      console.log("isGroup:", isGroup, "| earlyPhone:", earlyPhone, "| isAlisson:", isAlisson, "| isAllowedGroup:", isGroup && isAllowedGroup(remoteJid));
 
       // Allow Alisson's messages through even from non-whitelisted groups/DMs
       if (!isAlisson && (!isGroup || !isAllowedGroup(remoteJid))) {
