@@ -1,0 +1,1 @@
+ALTER TABLE public.pending_demand_resolutions ADD COLUMN due_date date DEFAULT NULL;

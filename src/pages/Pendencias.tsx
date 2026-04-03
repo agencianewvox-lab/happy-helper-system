@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -6,10 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, ClipboardList, Clock, CheckCircle2, Loader2,
-  AlertTriangle, User, Plus, X,
+  AlertTriangle, User, Plus, X, CalendarIcon,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -30,6 +33,7 @@ interface DemandItem {
   status: DemandStatus;
   grupo_nome?: string;
   gestor_responsavel?: string | null;
+  due_date?: string | null;
 }
 
 interface GrupoOption {
@@ -59,6 +63,7 @@ export default function Pendencias() {
   const [newGestor, setNewGestor] = useState("");
   const [newGroupId, setNewGroupId] = useState("");
   const [newTerm, setNewTerm] = useState("");
+  const [newDueDate, setNewDueDate] = useState<Date | undefined>(undefined);
   const [creating, setCreating] = useState(false);
 
   const fetchDemands = useCallback(async () => {
@@ -93,6 +98,7 @@ export default function Pendencias() {
           status: (r.status as DemandStatus) || (r.resolved ? "feito" : "pendente"),
           grupo_nome: grp?.nome || r.group_id,
           gestor_responsavel: grp?.gestor || null,
+          due_date: r.due_date || null,
         };
       });
 
@@ -141,23 +147,28 @@ export default function Pendencias() {
   const handleCreate = useCallback(async () => {
     if (!newGroupId || !newTerm.trim()) return;
     setCreating(true);
+    const insertData: any = {
+      group_id: newGroupId,
+      term: newTerm.trim(),
+      requested_at: new Date().toISOString(),
+      status: "pendente",
+      resolved: false,
+    };
+    if (newDueDate) {
+      insertData.due_date = format(newDueDate, "yyyy-MM-dd");
+    }
     const { error } = await supabase
       .from("pending_demand_resolutions")
-      .insert({
-        group_id: newGroupId,
-        term: newTerm.trim(),
-        requested_at: new Date().toISOString(),
-        status: "pendente",
-        resolved: false,
-      });
+      .insert(insertData);
     if (!error) {
       setNewTerm("");
       setNewGroupId("");
       setNewGestor("");
+      setNewDueDate(undefined);
       setCreateOpen(false);
     }
     setCreating(false);
-  }, [newGroupId, newTerm]);
+  }, [newGroupId, newTerm, newDueDate]);
 
   // Filter demands by role
   const filteredDemands = useMemo(() => {
@@ -276,6 +287,33 @@ export default function Pendencias() {
                           onChange={(e) => setNewTerm(e.target.value)}
                         />
                       </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium">Data de Entrega</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !newDueDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {newDueDate ? format(newDueDate, "dd/MM/yyyy") : "Selecione a data"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={newDueDate}
+                              onSelect={setNewDueDate}
+                              disabled={(date) => date < new Date()}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                       <div className="flex gap-2 justify-end">
                         <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>
                           Cancelar
@@ -362,6 +400,7 @@ export default function Pendencias() {
                       const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
                       const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
                       const isUpdating = updating === item.id;
+                      const isOverdue = item.due_date && new Date(item.due_date + "T23:59:59") < new Date() && item.status !== "feito";
                       return (
                         <div
                           key={item.id}
@@ -384,6 +423,13 @@ export default function Pendencias() {
                             <AlertTriangle className="w-3 h-3 inline mr-1 text-orange-400" />
                             {item.term}
                           </p>
+                          {item.due_date && (
+                            <p className={cn("text-[10px] flex items-center gap-1", isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground")}>
+                              <CalendarIcon className="w-3 h-3" />
+                              Entrega: {new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                              {isOverdue && " (atrasado)"}
+                            </p>
+                          )}
                           {/* Status move buttons */}
                           <div className="flex gap-1.5 pt-1">
                             {status !== "pendente" && (

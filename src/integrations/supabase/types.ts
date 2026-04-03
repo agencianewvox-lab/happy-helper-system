@@ -73,6 +73,7 @@ export type Database = {
       pending_demand_resolutions: {
         Row: {
           created_at: string
+          due_date: string | null
           group_id: string
           id: string
           requested_at: string
@@ -84,6 +85,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          due_date?: string | null
           group_id: string
           id?: string
           requested_at: string
@@ -95,6 +97,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          due_date?: string | null
           group_id?: string
           id?: string
           requested_at?: string
