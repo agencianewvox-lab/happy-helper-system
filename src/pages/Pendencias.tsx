@@ -63,6 +63,7 @@ export default function Pendencias() {
   const [newGestor, setNewGestor] = useState("");
   const [newGroupId, setNewGroupId] = useState("");
   const [newTerm, setNewTerm] = useState("");
+  const [newDueDate, setNewDueDate] = useState<Date | undefined>(undefined);
   const [creating, setCreating] = useState(false);
 
   const fetchDemands = useCallback(async () => {
