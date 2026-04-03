@@ -9,12 +9,14 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain, ClipboardList } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
   const { signOut } = useAuth();
   const { isAdmin, gestorFilter, loading: profileLoading } = useProfile();
@@ -169,13 +171,6 @@ export default function Dashboard() {
               >
                 <Brain className="w-4 h-4" />
               </a>
-              <a
-                href="/pendencias"
-                className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                title="Quadro de Pendências"
-              >
-                <ClipboardList className="w-4 h-4" />
-              </a>
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
               </button>
@@ -202,7 +197,13 @@ export default function Dashboard() {
           ].map(({ key, label, desc, value, icon: Icon, color }) => (
             <button
               key={key}
-              onClick={() => setMetricFilter(metricFilter === key ? null : key)}
+              onClick={() => {
+                if (key === "pendencias") {
+                  navigate("/pendencias");
+                } else {
+                  setMetricFilter(metricFilter === key ? null : key);
+                }
+              }}
               className={cn(
                 "bg-card/60 border rounded-lg p-4 flex items-center gap-3 transition-all text-left w-full",
                 "hover:border-primary/40 hover:bg-card/80 cursor-pointer",

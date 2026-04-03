@@ -5,11 +5,18 @@ import { useProfile } from "@/hooks/useProfile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, ClipboardList, Clock, CheckCircle2, Loader2,
-  AlertTriangle, GripVertical, User,
+  AlertTriangle, User, Plus, X,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 
 type DemandStatus = "pendente" | "fazendo" | "feito";
@@ -23,6 +30,12 @@ interface DemandItem {
   status: DemandStatus;
   grupo_nome?: string;
   gestor_responsavel?: string | null;
+}
+
+interface GrupoOption {
+  group_id: string;
+  nome: string;
+  gestor_responsavel: string | null;
 }
 
 const STATUS_CONFIG: Record<DemandStatus, { label: string; color: string; bg: string; icon: typeof ClipboardList }> = {
@@ -39,25 +52,33 @@ export default function Pendencias() {
   const [demands, setDemands] = useState<DemandItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [grupos, setGrupos] = useState<GrupoOption[]>([]);
+
+  // Admin create form state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newGestor, setNewGestor] = useState("");
+  const [newGroupId, setNewGroupId] = useState("");
+  const [newTerm, setNewTerm] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const fetchDemands = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch all pending demand resolutions
       const { data: resolutions, error: resError } = await supabase
         .from("pending_demand_resolutions")
         .select("*")
         .order("requested_at", { ascending: false });
       if (resError) throw resError;
 
-      // Fetch group names and gestor
-      const { data: grupos, error: grpError } = await supabase
+      const { data: grps, error: grpError } = await supabase
         .from("whatsapp_grupos")
         .select("group_id, nome, gestor_responsavel");
       if (grpError) throw grpError;
 
+      setGrupos(grps || []);
+
       const grupoMap = new Map<string, { nome: string; gestor: string | null }>();
-      for (const g of grupos || []) {
+      for (const g of grps || []) {
         grupoMap.set(g.group_id, { nome: g.nome, gestor: g.gestor_responsavel });
       }
 
@@ -116,6 +137,28 @@ export default function Pendencias() {
     setUpdating(null);
   }, []);
 
+  // Admin: create new demand
+  const handleCreate = useCallback(async () => {
+    if (!newGroupId || !newTerm.trim()) return;
+    setCreating(true);
+    const { error } = await supabase
+      .from("pending_demand_resolutions")
+      .insert({
+        group_id: newGroupId,
+        term: newTerm.trim(),
+        requested_at: new Date().toISOString(),
+        status: "pendente",
+        resolved: false,
+      });
+    if (!error) {
+      setNewTerm("");
+      setNewGroupId("");
+      setNewGestor("");
+      setCreateOpen(false);
+    }
+    setCreating(false);
+  }, [newGroupId, newTerm]);
+
   // Filter demands by role
   const filteredDemands = useMemo(() => {
     if (profileLoading) return [];
@@ -129,8 +172,10 @@ export default function Pendencias() {
     if (!isAdmin) return [];
     const set = new Set<string>();
     demands.forEach((d) => { if (d.gestor_responsavel) set.add(d.gestor_responsavel); });
+    // Also include gestores from grupos that may not have demands yet
+    grupos.forEach((g) => { if (g.gestor_responsavel) set.add(g.gestor_responsavel); });
     return Array.from(set).sort();
-  }, [demands, isAdmin]);
+  }, [demands, isAdmin, grupos]);
 
   const [selectedGestor, setSelectedGestor] = useState<string | null>(null);
 
@@ -148,6 +193,12 @@ export default function Pendencias() {
     }
     return map;
   }, [displayDemands]);
+
+  // Grupos filtered by selected gestor for the create form
+  const gestorGrupos = useMemo(() => {
+    if (!newGestor) return [];
+    return grupos.filter((g) => g.gestor_responsavel === newGestor);
+  }, [grupos, newGestor]);
 
   if (profileLoading || loading) {
     return (
@@ -175,9 +226,76 @@ export default function Pendencias() {
                 </p>
               </div>
             </div>
-            <Badge variant="secondary" className="text-xs">
-              {displayDemands.length} pendência{displayDemands.length !== 1 ? "s" : ""}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="h-8 text-xs gap-1.5">
+                      <Plus className="w-3.5 h-3.5" />
+                      Nova Pendência
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Criar Nova Pendência</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium">Responsável</label>
+                        <Select value={newGestor} onValueChange={(v) => { setNewGestor(v); setNewGroupId(""); }}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o responsável" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {gestores.map((g) => (
+                              <SelectItem key={g} value={g}>{g}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {newGestor && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium">Cliente (Grupo)</label>
+                          <Select value={newGroupId} onValueChange={setNewGroupId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o cliente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {gestorGrupos.map((g) => (
+                                <SelectItem key={g.group_id} value={g.group_id}>{g.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium">Descrição da Pendência</label>
+                        <Input
+                          placeholder="Ex: Enviar relatório mensal"
+                          value={newTerm}
+                          onChange={(e) => setNewTerm(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!newGroupId || !newTerm.trim() || creating}
+                          onClick={handleCreate}
+                        >
+                          {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Criar"}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+              <Badge variant="secondary" className="text-xs">
+                {displayDemands.length} pendência{displayDemands.length !== 1 ? "s" : ""}
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
