@@ -18,7 +18,7 @@ interface ChatAreaProps {
   onTitleUpdate: (title: string) => void;
 }
 
-export function ChatArea({ conversationId, onTitleUpdate }: ChatAreaProps) {
+export function ChatArea({ conversationId, gestorFilter, onTitleUpdate }: ChatAreaProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
