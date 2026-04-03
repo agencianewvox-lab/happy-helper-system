@@ -48,14 +48,6 @@ export default function Dashboard() {
   usePendingAlert(pendingCount);
   useHighRiskAlert(highRiskCount);
 
-  if (profileLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   const stats = useMemo(() => {
     const total = roleAllGrupos.length;
     const totalMsgsHoje = roleAllGrupos.reduce((sum, g) => sum + (g.mensagens_hoje || 0), 0);
