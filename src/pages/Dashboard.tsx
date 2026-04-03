@@ -18,21 +18,20 @@ export default function Dashboard() {
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
   const { signOut } = useAuth();
   const { isAdmin, gestorFilter, loading: profileLoading } = useProfile();
-
-  // Filter groups by gestor for non-admin users
-  const filteredByRole = useMemo(() => {
-    if (isAdmin || !gestorFilter) return { grupos, allGrupos };
-    return {
-      grupos: grupos.filter(g => {
-        // Need to check gestor_responsavel from the DB - we'll match via group data
-        return true; // placeholder, actual filtering below
-      }),
-      allGrupos: allGrupos.filter(g => true),
-    };
-  }, [grupos, allGrupos, isAdmin, gestorFilter]);
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
+
+  // Filter groups by gestor for non-admin users
+  const roleGrupos = useMemo(() => {
+    if (isAdmin || !gestorFilter) return grupos;
+    return grupos.filter(g => g.gestor_responsavel === gestorFilter);
+  }, [grupos, isAdmin, gestorFilter]);
+
+  const roleAllGrupos = useMemo(() => {
+    if (isAdmin || !gestorFilter) return allGrupos;
+    return allGrupos.filter(g => g.gestor_responsavel === gestorFilter);
+  }, [allGrupos, isAdmin, gestorFilter]);
 
   // Sound alert for pending demands
   const pendingCount = useMemo(
