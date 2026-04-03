@@ -166,9 +166,11 @@ export function AIChatPanel() {
 
   const quickActions = [
     "📊 Análise geral de todos os grupos",
-    "🔴 Quais grupos estão inativos?",
-    "⭐ Top 5 grupos mais engajados",
-    "💡 Recomendações de ação",
+    "🔴 O que precisa de atenção agora?",
+    "⭐ Top 5 clientes mais saudáveis",
+    "💡 Recomendações de ação para hoje",
+    "👥 Performance da equipe",
+    "📈 Oportunidades de upsell",
   ];
 
   if (!open) {
