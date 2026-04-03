@@ -14,6 +14,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 
 interface ChatAreaProps {
   conversationId: string | null;
+  gestorFilter?: string | null;
   onTitleUpdate: (title: string) => void;
 }
 
