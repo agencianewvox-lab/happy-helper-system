@@ -1,0 +1,312 @@
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import {
+  ArrowLeft, ClipboardList, Clock, CheckCircle2, Loader2,
+  AlertTriangle, GripVertical, User,
+} from "lucide-react";
+import newvoxLogo from "@/assets/newvox-logo.jpg";
+
+type DemandStatus = "pendente" | "fazendo" | "feito";
+
+interface DemandItem {
+  id: string;
+  group_id: string;
+  term: string;
+  requested_at: string;
+  resolved: boolean;
+  status: DemandStatus;
+  grupo_nome?: string;
+  gestor_responsavel?: string | null;
+}
+
+const STATUS_CONFIG: Record<DemandStatus, { label: string; color: string; bg: string; icon: typeof ClipboardList }> = {
+  pendente: { label: "A Fazer", color: "text-orange-500", bg: "bg-orange-500/10 border-orange-500/30", icon: ClipboardList },
+  fazendo: { label: "Fazendo", color: "text-blue-500", bg: "bg-blue-500/10 border-blue-500/30", icon: Clock },
+  feito: { label: "Feito", color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/30", icon: CheckCircle2 },
+};
+
+const COLUMNS: DemandStatus[] = ["pendente", "fazendo", "feito"];
+
+export default function Pendencias() {
+  const { user } = useAuth();
+  const { isAdmin, gestorFilter, profile, loading: profileLoading } = useProfile();
+  const [demands, setDemands] = useState<DemandItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const fetchDemands = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch all pending demand resolutions
+      const { data: resolutions, error: resError } = await supabase
+        .from("pending_demand_resolutions")
+        .select("*")
+        .order("requested_at", { ascending: false });
+      if (resError) throw resError;
+
+      // Fetch group names and gestor
+      const { data: grupos, error: grpError } = await supabase
+        .from("whatsapp_grupos")
+        .select("group_id, nome, gestor_responsavel");
+      if (grpError) throw grpError;
+
+      const grupoMap = new Map<string, { nome: string; gestor: string | null }>();
+      for (const g of grupos || []) {
+        grupoMap.set(g.group_id, { nome: g.nome, gestor: g.gestor_responsavel });
+      }
+
+      const items: DemandItem[] = (resolutions || []).map((r: any) => {
+        const grp = grupoMap.get(r.group_id);
+        return {
+          id: r.id,
+          group_id: r.group_id,
+          term: r.term,
+          requested_at: r.requested_at,
+          resolved: r.resolved,
+          status: (r.status as DemandStatus) || (r.resolved ? "feito" : "pendente"),
+          grupo_nome: grp?.nome || r.group_id,
+          gestor_responsavel: grp?.gestor || null,
+        };
+      });
+
+      setDemands(items);
+    } catch (err) {
+      console.error("Error fetching demands:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDemands();
+
+    const channel = supabase
+      .channel("kanban-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pending_demand_resolutions" }, () => {
+        fetchDemands();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchDemands]);
+
+  const updateStatus = useCallback(async (id: string, newStatus: DemandStatus) => {
+    setUpdating(id);
+    const resolved = newStatus === "feito";
+    const { error } = await supabase
+      .from("pending_demand_resolutions")
+      .update({
+        status: newStatus,
+        resolved,
+        resolved_at: resolved ? new Date().toISOString() : null,
+      } as any)
+      .eq("id", id);
+
+    if (!error) {
+      setDemands((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, status: newStatus, resolved } : d))
+      );
+    }
+    setUpdating(null);
+  }, []);
+
+  // Filter demands by role
+  const filteredDemands = useMemo(() => {
+    if (profileLoading) return [];
+    if (isAdmin) return demands;
+    if (!gestorFilter) return [];
+    return demands.filter((d) => d.gestor_responsavel === gestorFilter);
+  }, [demands, isAdmin, gestorFilter, profileLoading]);
+
+  // For admin: group by gestor
+  const gestores = useMemo(() => {
+    if (!isAdmin) return [];
+    const set = new Set<string>();
+    demands.forEach((d) => { if (d.gestor_responsavel) set.add(d.gestor_responsavel); });
+    return Array.from(set).sort();
+  }, [demands, isAdmin]);
+
+  const [selectedGestor, setSelectedGestor] = useState<string | null>(null);
+
+  const displayDemands = useMemo(() => {
+    if (isAdmin && selectedGestor) {
+      return filteredDemands.filter((d) => d.gestor_responsavel === selectedGestor);
+    }
+    return filteredDemands;
+  }, [filteredDemands, isAdmin, selectedGestor]);
+
+  const columnDemands = useMemo(() => {
+    const map: Record<DemandStatus, DemandItem[]> = { pendente: [], fazendo: [], feito: [] };
+    for (const d of displayDemands) {
+      map[d.status]?.push(d);
+    }
+    return map;
+  }, [displayDemands]);
+
+  if (profileLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-40">
+        <div className="max-w-[1600px] mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <a href="/" className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+              </a>
+              <img src={newvoxLogo} alt="New Vox" className="w-8 h-8 rounded object-cover" />
+              <div>
+                <h1 className="text-lg font-bold tracking-tight">Quadro de Pendências</h1>
+                <p className="text-xs text-muted-foreground">
+                  {isAdmin ? "Visão Administrativa" : `Pendências de ${gestorFilter || profile?.full_name}`}
+                </p>
+              </div>
+            </div>
+            <Badge variant="secondary" className="text-xs">
+              {displayDemands.length} pendência{displayDemands.length !== 1 ? "s" : ""}
+            </Badge>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
+        {/* Admin: Gestor filter tabs */}
+        {isAdmin && gestores.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant={selectedGestor === null ? "default" : "outline"}
+              onClick={() => setSelectedGestor(null)}
+              className="text-xs h-8"
+            >
+              Todos
+            </Button>
+            {gestores.map((g) => {
+              const count = filteredDemands.filter((d) => d.gestor_responsavel === g).length;
+              return (
+                <Button
+                  key={g}
+                  size="sm"
+                  variant={selectedGestor === g ? "default" : "outline"}
+                  onClick={() => setSelectedGestor(g)}
+                  className="text-xs h-8 gap-1.5"
+                >
+                  <User className="w-3 h-3" />
+                  {g}
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 ml-1">
+                    {count}
+                  </Badge>
+                </Button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Kanban Board */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 min-h-[60vh]">
+          {COLUMNS.map((status) => {
+            const config = STATUS_CONFIG[status];
+            const items = columnDemands[status];
+            const Icon = config.icon;
+            return (
+              <div key={status} className={cn("rounded-xl border p-4 flex flex-col", config.bg)}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Icon className={cn("w-5 h-5", config.color)} />
+                    <h2 className={cn("font-bold text-sm", config.color)}>{config.label}</h2>
+                  </div>
+                  <Badge variant="outline" className={cn("text-xs", config.color)}>
+                    {items.length}
+                  </Badge>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="space-y-3 pr-2">
+                    {items.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-8">
+                        Nenhuma pendência
+                      </p>
+                    )}
+                    {items.map((item) => {
+                      const dt = new Date(item.requested_at);
+                      const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+                      const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+                      const isUpdating = updating === item.id;
+                      return (
+                        <div
+                          key={item.id}
+                          className="bg-card border border-border/40 rounded-lg p-3 space-y-2 shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold truncate">{item.grupo_nome}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {dateStr} às {timeStr}
+                              </p>
+                            </div>
+                            {isAdmin && item.gestor_responsavel && (
+                              <Badge variant="outline" className="text-[9px] shrink-0">
+                                {item.gestor_responsavel.split(" ")[0]}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <AlertTriangle className="w-3 h-3 inline mr-1 text-orange-400" />
+                            {item.term}
+                          </p>
+                          {/* Status move buttons */}
+                          <div className="flex gap-1.5 pt-1">
+                            {status !== "pendente" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[10px] px-2 flex-1"
+                                disabled={isUpdating}
+                                onClick={() => {
+                                  const prev = COLUMNS[COLUMNS.indexOf(status) - 1];
+                                  if (prev) updateStatus(item.id, prev);
+                                }}
+                              >
+                                ← {STATUS_CONFIG[COLUMNS[COLUMNS.indexOf(status) - 1]]?.label}
+                              </Button>
+                            )}
+                            {status !== "feito" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[10px] px-2 flex-1"
+                                disabled={isUpdating}
+                                onClick={() => {
+                                  const next = COLUMNS[COLUMNS.indexOf(status) + 1];
+                                  if (next) updateStatus(item.id, next);
+                                }}
+                              >
+                                {STATUS_CONFIG[COLUMNS[COLUMNS.indexOf(status) + 1]]?.label} →
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </div>
+            );
+          })}
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "./pages/Dashboard";
 import Performance from "./pages/Performance";
 import Chat from "./pages/Chat";
+import Pendencias from "./pages/Pendencias";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
