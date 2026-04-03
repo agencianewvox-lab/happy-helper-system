@@ -412,8 +412,15 @@ Deno.serve(async (req) => {
       const key = data.key || {};
       const remoteJid = key.remoteJid || "";
 
+      // Extract phone early to check if it's Alisson
       const isGroup = isGroupJid(remoteJid);
-      if (!isGroup || !isAllowedGroup(remoteJid)) {
+      const earlyPhone = isGroup
+        ? (key.participant ? extractPhoneFromJid(key.participant) : null)
+        : extractPhoneFromJid(remoteJid);
+      const isAlisson = earlyPhone ? ALISSON_PHONES.includes(earlyPhone) : false;
+
+      // Allow Alisson's messages through even from non-whitelisted groups/DMs
+      if (!isAlisson && (!isGroup || !isAllowedGroup(remoteJid))) {
         return new Response(
           JSON.stringify({ success: true, skipped: true, reason: "group_not_allowed" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
