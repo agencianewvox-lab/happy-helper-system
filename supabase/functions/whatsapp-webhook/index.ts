@@ -246,7 +246,7 @@ ${conversationHistory}`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        phone: ALISSON_PHONE,
+        phone: "5564992565779",
         message: aiReply,
         groupId: groupId,
         type: "ai_response",
