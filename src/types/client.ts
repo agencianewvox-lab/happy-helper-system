@@ -9,37 +9,40 @@ export interface PendingDemandDetail {
   category: "confirmada" | "possivel";
 }
 
-export interface ChurnBreakdown {
-  base: number;
-  dissatisfaction: number;
-  complaints: number;
-  demands: number;
-  positive: number;
-  frt: number;
-  no_response: number;
-  inactivity: number;
+export interface ChurnDriver {
+  label: string;
+  points: number;
 }
 
+export type SentimentTrend = "melhorando" | "piorando" | "estavel";
+
 export type IntentCategory = "Aprovação" | "Suporte Técnico" | "Financeiro" | "Urgência" | "Informativo" | null;
+
+export type PriorityLevel = "maxima" | "alta" | "normal" | null;
 
 export interface GroupAnalytics {
   group_id: string;
   avg_frt_minutes: number | null;
   sentiment: "positivo" | "neutro" | "negativo";
   sentiment_score: number;
+  sentiment_trend: SentimentTrend;
+  critical_terms: string[];
   complaint_count: number;
   complaint_terms: string[];
   positive_count: number;
   demand_count: number;
   engagement_type: "saudável" | "cobrança" | "misto" | "inativo";
   churn_risk: number;
-  churn_breakdown?: ChurnBreakdown;
+  churn_risk_label: "baixo" | "moderado" | "alto" | "crítico";
+  churn_drivers: ChurnDriver[];
   total_client_msgs: number;
   total_team_msgs: number;
   has_pending_demands: boolean;
   pending_demand_terms: string[];
   pending_demand_details?: PendingDemandDetail[];
   intent?: IntentCategory;
+  priority_level: PriorityLevel;
+  priority_reason: string | null;
 }
 
 export interface Grupo {
