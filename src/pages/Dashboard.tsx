@@ -121,8 +121,11 @@ export default function Dashboard() {
         default: break;
       }
     }
-    // Sort: SLA violated groups always on top
+    // Sort: Priority máxima first, then SLA violated, then rest
     return [...result].sort((a, b) => {
+      const aPM = a.analytics?.priority_level === "maxima" ? 1 : 0;
+      const bPM = b.analytics?.priority_level === "maxima" ? 1 : 0;
+      if (aPM !== bPM) return bPM - aPM;
       if (a.sla_violated && !b.sla_violated) return -1;
       if (!a.sla_violated && b.sla_violated) return 1;
       if (a.sla_violated && b.sla_violated) return b.sla_delay_minutes - a.sla_delay_minutes;
