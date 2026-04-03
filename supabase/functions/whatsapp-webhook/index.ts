@@ -6,8 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Alisson's phone for AI auto-reply
-const ALISSON_PHONE = "64992565779";
+// Alisson's phone for AI auto-reply (with and without country code)
+const ALISSON_PHONES = ["64992565779", "5564992565779"];
 const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
 
 // Messages that should NOT trigger AI response
