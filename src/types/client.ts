@@ -3,6 +3,10 @@ export interface PendingDemandDetail {
   requested_at: string; // ISO timestamp
   message_excerpt: string;
   suggested_solution: string;
+  priority: "urgente" | "normal" | "baixa";
+  hours_waiting: number;
+  confidence: "alta" | "media";
+  category: "confirmada" | "possivel";
 }
 
 export interface ChurnBreakdown {
