@@ -105,8 +105,46 @@ async function fetchMetaAdsForAccount(accountId: string, token: string): Promise
   }
 }
 
+// OpenAI tools for the WhatsApp agent
+const AGENT_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "criar_pendencia",
+      description: "Cria uma pendência/tarefa para um colaborador responsável em um cliente específico. Use quando Alisson pedir para designar, criar ou adicionar uma pendência, tarefa ou ação para alguém da equipe.",
+      parameters: {
+        type: "object",
+        properties: {
+          group_name: { type: "string", description: "Nome do grupo/cliente (parcial ou completo)" },
+          term: { type: "string", description: "Descrição da pendência/tarefa" },
+          responsible: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge)" },
+          due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
+          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da pendência" },
+        },
+        required: ["group_name", "term", "responsible", "priority"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "perguntar_detalhes",
+      description: "Envia uma pergunta de volta ao Alisson via WhatsApp para obter mais detalhes antes de executar uma ação. Use quando faltarem informações essenciais para completar uma tarefa.",
+      parameters: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "A pergunta a ser enviada para o Alisson" },
+        },
+        required: ["question"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 /**
- * Handle Alisson's AI auto-reply: analyze message, build context, call OpenAI, send response via webhook
+ * Handle Alisson's AI auto-reply: full agent with dashboard access, tool calling, and follow-up questions
  */
 async function handleAlissonAIReply(
   messageText: string,
@@ -125,7 +163,7 @@ async function handleAlissonAIReply(
     const { data: grupos } = await supabase.from("whatsapp_grupos").select("*").order("nome");
     if (!grupos?.length) return;
 
-    // Fetch last 30 messages per group (lighter for webhook speed)
+    // Fetch last 50 messages per group for richer context
     const groupIds = grupos.map((g: any) => g.group_id);
     const conversasPromises = groupIds.map((gid: string) =>
       supabase
@@ -133,7 +171,7 @@ async function handleAlissonAIReply(
         .select("group_id, nome_contato, mensagem, recebido_em, direcao")
         .eq("group_id", gid)
         .order("recebido_em", { ascending: false })
-        .limit(30)
+        .limit(50)
     );
 
     const pendingResPromise = supabase
@@ -170,89 +208,171 @@ async function handleAlissonAIReply(
       pendingByGroup.get(p.group_id)!.push(p);
     }
 
-    // Build context
+    // Build enriched context for each group (matching ai-analyze quality)
     const contextLines: string[] = [];
+    let totalMsgs = 0;
+
     for (const g of grupos) {
       const gid = g.group_id;
       const msgs = groupMsgsMap.get(gid) || [];
+      totalMsgs += msgs.length;
+
       const clientMsgs = msgs.filter((m: any) => m.direcao === "entrada");
       const teamMsgs = msgs.filter((m: any) => m.direcao === "saida");
 
       let mesesCliente = "";
       if (g.data_entrada) {
         const months = Math.floor((Date.now() - new Date(g.data_entrada).getTime()) / (1000 * 60 * 60 * 24 * 30));
-        mesesCliente = `${months}m`;
+        mesesCliente = `${months} meses como cliente`;
       }
+
+      // Calculate FRT
+      const frtSamples: number[] = [];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].direcao === "entrada") {
+          for (let j = i - 1; j >= 0; j--) {
+            if (msgs[j].direcao === "saida") {
+              const diff = (new Date(msgs[j].recebido_em).getTime() - new Date(msgs[i].recebido_em).getTime()) / 60000;
+              if (diff > 0 && diff < 1440) frtSamples.push(diff);
+              break;
+            }
+          }
+        }
+      }
+      const frtMinutes = frtSamples.length > 0 ? Math.round(frtSamples.reduce((a, b) => a + b, 0) / frtSamples.length) : null;
+
+      // Sentiment
+      const recentClientMsgs = clientMsgs.slice(0, 20);
+      const negativeWords = ["insatisfeito", "cancelar", "péssimo", "horrível", "absurdo", "reclamação", "problema", "demora", "atraso", "ruim", "piorou", "cadê", "esperando"];
+      const positiveWords = ["excelente", "parabéns", "ótimo", "perfeito", "adorei", "amei", "top", "show", "maravilhoso", "obrigado", "obrigada", "satisfeito"];
+      let negCount = 0, posCount = 0;
+      for (const m of recentClientMsgs) {
+        const txt = (m.mensagem || "").toLowerCase();
+        negativeWords.forEach(w => { if (txt.includes(w)) negCount++; });
+        positiveWords.forEach(w => { if (txt.includes(w)) posCount++; });
+      }
+      const sentiment = negCount > posCount + 2 ? "negativo" : posCount > negCount + 2 ? "positivo" : "neutro";
+
+      const lastMsg = msgs[0];
+      const lastActivity = lastMsg ? new Date(lastMsg.recebido_em) : null;
+      const daysInactive = lastActivity ? Math.floor((Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
       const groupPending = pendingByGroup.get(gid) || [];
       const ads = adsDataMap.get(gid);
 
       let line = `### ${g.nome}`;
-      line += `\n  Responsável: ${g.gestor_responsavel || "N/D"} | Plano: ${g.plano || "N/A"} | Investimento: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}${mesesCliente ? ` | Cliente há ${mesesCliente}` : ""}`;
-      line += `\n  Msgs: ${clientMsgs.length} cliente, ${teamMsgs.length} equipe`;
-
+      line += `\n  Group ID: ${gid}`;
+      line += `\n  Responsável CS: ${g.gestor_responsavel || "Não definido"}`;
+      line += `\n  Plano: ${g.plano || "N/A"} | Investimento ads: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
+      line += `\n  Categoria: ${g.categoria || "Sem categoria"}`;
+      if (g.data_entrada) line += `\n  Cliente desde: ${g.data_entrada} (${mesesCliente})`;
+      line += `\n  Mensagens recentes: ${msgs.length} total (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
+      if (frtMinutes !== null) {
+        const frtStatus = frtMinutes <= 30 ? "✅ excelente" : frtMinutes <= 60 ? "🟡 bom" : frtMinutes <= 120 ? "🟠 aceitável" : "🔴 ruim";
+        line += `\n  FRT médio: ${frtMinutes}min ${frtStatus}`;
+      }
+      line += `\n  Sentimento: ${sentiment === "positivo" ? "🟢 Positivo" : sentiment === "negativo" ? "🔴 Negativo" : "🟡 Neutro"}`;
+      if (daysInactive !== null) {
+        line += `\n  Última atividade: ${daysInactive === 0 ? "Hoje" : `há ${daysInactive} dia(s)`}`;
+      }
       if (groupPending.length > 0) {
-        line += `\n  ⚠️ ${groupPending.length} pendência(s): ${groupPending.slice(0, 3).map((p: any) => `"${p.term}"`).join(", ")}`;
+        line += `\n  ⚠️ Pendências abertas: ${groupPending.length}`;
+        for (const p of groupPending.slice(0, 5)) {
+          line += `\n    - "${p.term}" (desde ${p.created_at})${p.due_date ? ` prazo: ${p.due_date}` : ""}`;
+        }
       }
-
       if (ads) {
-        line += `\n  📊 Ads 30d: R$${ads.spend.toFixed(0)} gasto, ${ads.leads} leads${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, CTR ${ads.ctr.toFixed(2)}%`;
+        line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
+      } else if (g.ad_account_id) {
+        line += `\n  📊 META ADS: Conta vinculada mas sem dados nos últimos 30 dias`;
       }
 
-      // Last 5 messages for context
-      const last5 = msgs.slice(0, 5).reverse();
-      if (last5.length > 0) {
-        line += `\n  Últimas msgs:`;
-        for (const m of last5) {
-          const dir = m.direcao === "entrada" ? "👤" : "👨‍💼";
-          line += `\n    ${dir} ${m.nome_contato || "?"}: ${(m.mensagem || "").slice(0, 80)}`;
+      // Last 10 messages
+      const last10 = msgs.slice(0, 10).reverse();
+      if (last10.length > 0) {
+        line += `\n  Últimas mensagens:`;
+        for (const m of last10) {
+          const dir = m.direcao === "entrada" ? "👤 CLIENTE" : "👨‍💼 EQUIPE";
+          line += `\n    ${dir} (${m.nome_contato || "?"}, ${m.recebido_em}): ${(m.mensagem || "").slice(0, 120)}`;
         }
       }
       contextLines.push(line);
     }
 
-    // Load Alisson's recent chat history for context continuity
+    // Load Alisson's recent chat history for multi-turn context
     const { data: recentAlissonMsgs } = await supabase
       .from("whatsapp_conversas")
       .select("mensagem, direcao, recebido_em, nome_contato")
       .or(`${ALISSON_PHONE_FILTERS.join(",")},nome_contato.ilike.%alisson%`)
       .order("recebido_em", { ascending: false })
-      .limit(10);
+      .limit(20);
 
-    let conversationHistory = "";
+    const chatHistory: { role: string; content: string }[] = [];
     if (recentAlissonMsgs?.length) {
       const reversed = [...recentAlissonMsgs].reverse();
-      conversationHistory = "\n\nHISTÓRICO RECENTE DA CONVERSA COM ALISSON:\n" +
-        reversed.map((m: any) => {
-          const dir = m.direcao === "entrada" ? "Alisson" : "Vox (IA)";
-          return `${dir}: ${m.mensagem}`;
-        }).join("\n");
+      for (const m of reversed) {
+        // Skip the current message (it will be added as the latest user message)
+        if (m.mensagem === messageText && m.direcao === "entrada") continue;
+        chatHistory.push({
+          role: m.direcao === "entrada" ? "user" : "assistant",
+          content: m.mensagem || "",
+        });
+      }
     }
 
-    const systemPrompt = `Você é a Vox, analista sênior de Customer Success da agência New Vox. Está respondendo diretamente ao Alisson (sócio da empresa) via WhatsApp.
+    const systemPrompt = `Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você está respondendo diretamente ao Alisson (sócio proprietário) via WhatsApp. Você é o agente pessoal dele para gestão da operação.
 
-EQUIPE: Jader Costa e Murilo Araújo e Netto Monge (gestores de tráfego), Priscilla (social media/sócia), Joel (gerente geral), Thais (auxiliar social media), Daniella, Victor Botto, Jiza (equipe operacional).
+EQUIPE NEW VOX (conheça cada um para direcionar ações corretamente):
+- Jader Costa: Gestor de tráfego
+- Murilo Araújo (Murillo): Gestor de tráfego / Gerente
+- Netto Monge: Gestor de tráfego
+- Priscilla Borges: Social media e sócia da empresa
+- Alisson Lima: Sócio proprietário (é quem está falando com você)
+- Joel: Gerente geral
+- Thais: Auxiliar de social media
+- Daniella: Equipe operacional
+- Victor Botto: Design gráfico
+- Jiza Reis: Financeiro
+
+SUAS CAPACIDADES COMO AGENTE:
+
+1. PAINEL COMPLETO — Você tem acesso a TODOS os dados de TODOS os clientes em tempo real: mensagens, sentimento, FRT, pendências, dados de ads (Meta), responsáveis, planos, investimentos.
+
+2. RESUMO/ANÁLISE — De qualquer grupo individual, comparação entre grupos, panorama geral da operação, diagnóstico de problemas, tendências.
+
+3. CRIAR PENDÊNCIAS — Quando Alisson pedir para designar tarefas, use a ferramenta "criar_pendencia" para registrar no sistema. Sempre confirme os detalhes na resposta.
+
+4. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
+
+5. ANÁLISE DE EQUIPE — Performance individual dos gestores, volume de respostas, FRT por responsável.
+
+6. ANÁLISE DE ADS — Métricas de anúncios Meta por cliente: gasto, leads, CPA, CTR, alcance.
+
+7. ALERTAS E URGÊNCIAS — Pendências abertas, clientes inativos, sentimento piorando, SLA violado.
+
+8. RECOMENDAÇÕES PROATIVAS — Ações prioritárias com QUEM deve fazer, PARA QUAL cliente, e POR QUÊ.
 
 REGRAS:
-- Responda de forma DIRETA e CONCISA (máximo 300 palavras) — é WhatsApp, não email
-- Use emojis com moderação para facilitar leitura
-- Nunca invente dados. Se não tem, diga
-- Quando sugerir ações, diga QUEM da equipe deve fazer
-- Se Alisson pedir para criar/designar pendência, confirme com os detalhes
-- Contextualize métricas: FRT ideal <30min, bom até 60, ruim >120
-- Benchmarks: churn <30 tranquilo, >60 precisa ação
-- Formate com 🔴 crítico, 🟡 atenção, 🟢 ok, ⚡ urgente
+- Responda DIRETO e CONCISO (máximo 400 palavras) — é WhatsApp
+- Use emojis com moderação: 🔴 crítico, 🟡 atenção, 🟢 ok, ⚡ urgente, 📊 dados, 📋 tarefas
+- NUNCA invente dados. Se não tem, diga
+- Quando sugerir ações, diga QUEM da equipe deve fazer (use nomes)
+- Benchmarks: FRT ideal <30min, bom até 60, ruim >120. Churn <30 tranquilo, >60 ação necessária
+- Se Alisson falar algo sem contexto claro, tente inferir ou pergunte usando a ferramenta
+- Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
 
-CAPACIDADES: resumo de grupo, comparação, análise geral, diagnóstico, recomendações, alertas, análise de equipe, dados de ads, criação de pendências.
+DADOS DA OPERAÇÃO EM TEMPO REAL (${grupos.length} grupos, ${totalMsgs} mensagens, ${adsDataMap.size} contas de ads):
 
-Se Alisson pedir para adicionar pendência a um responsável, responda confirmando: qual cliente, qual pendência, para quem, e prazo se mencionado.
+${contextLines.join("\n\n")}`;
 
-DADOS DA OPERAÇÃO (${grupos.length} grupos):
+    // Build messages array with conversation history
+    const aiMessages: any[] = [
+      { role: "system", content: systemPrompt },
+      ...chatHistory.slice(-10), // Last 10 messages for context
+      { role: "user", content: messageText },
+    ];
 
-${contextLines.join("\n\n")}
-${conversationHistory}`;
-
-    // Call OpenAI
+    // Call OpenAI with tool calling
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -260,12 +380,10 @@ ${conversationHistory}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: messageText },
-        ],
-        max_tokens: 1000,
+        model: "gpt-4o",
+        messages: aiMessages,
+        tools: AGENT_TOOLS,
+        max_tokens: 1500,
       }),
     });
 
@@ -275,13 +393,108 @@ ${conversationHistory}`;
     }
 
     const aiData = await response.json();
-    const aiReply = aiData.choices?.[0]?.message?.content;
+    const choice = aiData.choices?.[0];
+    if (!choice) {
+      console.log("No AI choice generated");
+      return;
+    }
+
+    let aiReply = choice.message?.content || "";
+    const toolCalls = choice.message?.tool_calls || [];
+
+    // Process tool calls
+    const toolResults: string[] = [];
+    for (const tc of toolCalls) {
+      const fnName = tc.function?.name;
+      const args = JSON.parse(tc.function?.arguments || "{}");
+      console.log(`Tool call: ${fnName}`, JSON.stringify(args));
+
+      if (fnName === "criar_pendencia") {
+        // Find the group by name match
+        const matchedGroup = grupos.find((g: any) =>
+          g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+          args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+        );
+
+        if (matchedGroup) {
+          const { error: insertErr } = await supabase.from("pending_demand_resolutions").insert({
+            group_id: matchedGroup.group_id,
+            term: `[${args.responsible}] ${args.term}`,
+            requested_at: new Date().toISOString(),
+            status: "pendente",
+            due_date: args.due_date || null,
+          });
+
+          if (insertErr) {
+            console.error("Error creating pendência:", insertErr);
+            toolResults.push(`❌ Erro ao criar pendência: ${insertErr.message}`);
+          } else {
+            toolResults.push(`✅ Pendência criada: "${args.term}" para ${args.responsible} no cliente ${matchedGroup.nome}${args.due_date ? ` (prazo: ${args.due_date})` : ""}`);
+            console.log("Pendência criada com sucesso para", matchedGroup.nome);
+          }
+        } else {
+          toolResults.push(`❌ Cliente "${args.group_name}" não encontrado. Clientes disponíveis: ${grupos.slice(0, 10).map((g: any) => g.nome).join(", ")}`);
+        }
+      }
+
+      if (fnName === "perguntar_detalhes") {
+        // The question IS the reply — send it directly
+        aiReply = args.question;
+        console.log("AI asking follow-up question:", args.question);
+      }
+    }
+
+    // If there were tool calls and we need a follow-up response with results
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => tc.function?.name === "criar_pendencia")) {
+      // Call OpenAI again with tool results for a natural confirmation message
+      const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
+        role: "tool",
+        tool_call_id: tc.id,
+        content: toolResults[i] || "OK",
+      }));
+
+      const followUp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            ...aiMessages,
+            choice.message,
+            ...toolResultMessages,
+          ],
+          max_tokens: 500,
+        }),
+      });
+
+      if (followUp.ok) {
+        const followUpData = await followUp.json();
+        aiReply = followUpData.choices?.[0]?.message?.content || toolResults.join("\n");
+      } else {
+        aiReply = toolResults.join("\n");
+      }
+    }
+
     if (!aiReply) {
       console.log("No AI reply generated");
       return;
     }
 
     console.log("AI reply for Alisson:", aiReply.substring(0, 100) + "...");
+
+    // Save AI response as a conversation record for history continuity
+    await supabase.from("whatsapp_conversas").insert({
+      telefone: "5564992565779",
+      nome_contato: "Vox (IA)",
+      mensagem: aiReply,
+      group_id: groupId,
+      direcao: "saida",
+      status: "enviada",
+      recebido_em: new Date().toISOString(),
+    });
 
     // Send response via n8n webhook
     const webhookResponse = await fetch(ALISSON_WEBHOOK_URL, {
