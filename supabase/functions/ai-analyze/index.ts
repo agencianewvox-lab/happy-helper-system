@@ -56,11 +56,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { messages, type } = await req.json();
+    const { messages, type, gestorFilter } = await req.json();
 
-    // Fetch all groups and recent conversations for context
+    // Fetch groups (filtered by gestor if provided) and recent conversations
+    let gruposQuery = supabase.from("whatsapp_grupos").select("*").order("nome");
+    if (gestorFilter) {
+      gruposQuery = gruposQuery.eq("gestor_responsavel", gestorFilter);
+    }
+
     const [gruposRes, conversasRes] = await Promise.all([
-      supabase.from("whatsapp_grupos").select("*").order("nome"),
+      gruposQuery,
       supabase
         .from("whatsapp_conversas")
         .select("group_id, nome_contato, mensagem, created_at, direcao")
