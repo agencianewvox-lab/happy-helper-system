@@ -239,8 +239,6 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
             })}
           </div>
         )}
-          </div>
-        )}
 
         {grupo.ultima_mensagem && !compact && (
           <p className="text-xs text-muted-foreground truncate italic">
