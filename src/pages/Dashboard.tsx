@@ -29,9 +29,9 @@ export default function Dashboard() {
   }, [grupos, isAdmin, gestorFilter]);
 
   const roleAllGrupos = useMemo(() => {
-    if (isAdmin || !gestorFilter) return roleAllGrupos;
-    return roleAllGrupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [roleAllGrupos, isAdmin, gestorFilter]);
+    if (isAdmin || !gestorFilter) return allGrupos;
+    return allGrupos.filter(g => g.gestor_responsavel === gestorFilter);
+  }, [allGrupos, isAdmin, gestorFilter]);
 
   // Sound alert for pending demands
   const pendingCount = useMemo(
