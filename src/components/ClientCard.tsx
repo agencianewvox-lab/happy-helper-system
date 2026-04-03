@@ -3,7 +3,7 @@ import { Grupo } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays } from "lucide-react";
+import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays, Siren, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface ClientCardProps {
   grupo: Grupo;
@@ -40,14 +40,15 @@ function formatFrt(minutes: number | null | undefined): string {
 }
 
 function churnColor(risk: number): string {
-  if (risk >= 70) return "text-red-500";
-  if (risk >= 40) return "text-amber-500";
+  if (risk >= 80) return "text-red-600";
+  if (risk >= 60) return "text-red-500";
+  if (risk >= 30) return "text-amber-500";
   return "text-emerald-500";
 }
 
 function churnBg(risk: number): string {
-  if (risk >= 70) return "bg-red-500/10";
-  if (risk >= 40) return "bg-amber-500/10";
+  if (risk >= 60) return "bg-red-500/10";
+  if (risk >= 30) return "bg-amber-500/10";
   return "bg-emerald-500/10";
 }
 
@@ -58,20 +59,27 @@ function formatDelay(minutes: number): string {
   return m > 0 ? `${h}h${m}m` : `${h}h`;
 }
 
+function TrendArrow({ trend }: { trend?: string }) {
+  if (trend === "melhorando") return <ArrowUpRight className="w-3 h-3 text-emerald-500" />;
+  if (trend === "piorando") return <ArrowDownRight className="w-3 h-3 text-red-500" />;
+  return <Minus className="w-2.5 h-2.5 text-muted-foreground" />;
+}
+
 export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
   const sent = a ? sentimentConfig[a.sentiment] : null;
   const SentIcon = sent?.icon || Minus;
+  const isPriorityMax = a?.priority_level === "maxima";
 
   // Live tick for SLA timer
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (!grupo.sla_violated) return;
+    if (!grupo.sla_violated && !isPriorityMax) return;
     const interval = setInterval(() => setTick((t) => t + 1), 60000);
     return () => clearInterval(interval);
-  }, [grupo.sla_violated]);
+  }, [grupo.sla_violated, isPriorityMax]);
 
   return (
     <Card
@@ -79,11 +87,13 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
       className={cn(
         "cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2",
         "bg-card/80 backdrop-blur-sm",
-        grupo.sla_violated
-          ? "border-red-500/60 ring-1 ring-red-500/20 shadow-red-500/10 shadow-lg"
-          : temMensagens
-            ? "border-border/50 hover:border-primary/30"
-            : "border-border/20 opacity-70 hover:opacity-100",
+        isPriorityMax
+          ? "border-red-500 ring-2 ring-red-500/30 shadow-red-500/20 shadow-xl animate-pulse"
+          : grupo.sla_violated
+            ? "border-red-500/60 ring-1 ring-red-500/20 shadow-red-500/10 shadow-lg"
+            : temMensagens
+              ? "border-border/50 hover:border-primary/30"
+              : "border-border/20 opacity-70 hover:opacity-100",
         compact && "text-sm"
       )}
     >
@@ -94,12 +104,20 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
             {grupo.nome}
           </CardTitle>
           <div className="flex items-center gap-1.5">
-            {a && a.churn_risk >= 60 && (
+            {isPriorityMax && (
+              <Siren className="w-4 h-4 text-red-500 animate-bounce" />
+            )}
+            {a && a.churn_risk >= 60 && !isPriorityMax && (
               <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
             )}
             <div className={cn("w-3 h-3 rounded-full shrink-0", catConfig.color)} />
           </div>
         </div>
+        {isPriorityMax && a?.priority_reason && (
+          <p className="text-[10px] text-red-500 font-semibold mt-1 leading-tight">
+            🚨 {a.priority_reason}
+          </p>
+        )}
       </CardHeader>
       <CardContent className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}>
         {/* SLA Violation Banner */}
@@ -152,10 +170,11 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
         {/* Analytics badges */}
         {a && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {/* Sentiment */}
+            {/* Sentiment + Trend */}
             <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", sent?.bg, sent?.color)}>
               <SentIcon className="w-3 h-3" />
               {sent?.label}
+              <TrendArrow trend={a.sentiment_trend} />
             </span>
             {/* FRT */}
             <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
@@ -163,7 +182,7 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
             </span>
             {/* Churn */}
             <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", churnBg(a.churn_risk), churnColor(a.churn_risk))}>
-              🔥 {a.churn_risk}%
+              🔥 {a.churn_risk}% {a.churn_risk_label}
             </span>
             {/* Pending */}
             {a.has_pending_demands && (() => {
@@ -194,6 +213,12 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
                 </>
               );
             })()}
+            {/* Critical Terms */}
+            {a.critical_terms && a.critical_terms.length > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-600 border border-red-600/30">
+                ⚠️ {a.critical_terms.length} termo{a.critical_terms.length > 1 ? "s" : ""} crítico{a.critical_terms.length > 1 ? "s" : ""}
+              </span>
+            )}
             {/* Intent */}
             {a.intent && intentConfig[a.intent] && (
               <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", intentConfig[a.intent].bg, intentConfig[a.intent].color)}>
@@ -203,7 +228,7 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
           </div>
         )}
 
-        {/* Motivo pendência resumido + solução */}
+        {/* Motivo pendência resumido */}
         {a?.has_pending_demands && !compact && (
           <div className="space-y-1">
             {(a.pending_demand_details || []).slice(0, 2).map((d, i) => {

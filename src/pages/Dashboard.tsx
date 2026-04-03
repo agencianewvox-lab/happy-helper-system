@@ -62,7 +62,7 @@ export default function Dashboard() {
       : null;
     const positiveSent = roleAllGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
     const slaViolations = roleAllGrupos.filter((g) => g.sla_violated).length;
-    const priorityCount = roleAllGrupos.filter((g) => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)).length;
+    const priorityCount = roleAllGrupos.filter((g) => g.analytics?.priority_level === "maxima").length;
     const now = Date.now();
     const h24 = 24 * 60 * 60 * 1000;
     const inativos = roleAllGrupos.filter((g) => {
@@ -117,12 +117,15 @@ export default function Dashboard() {
           return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
         }); break;
         case "sla": result = roleGrupos.filter(g => g.sla_violated); break;
-        case "priority": result = roleGrupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
+        case "priority": result = roleGrupos.filter(g => g.analytics?.priority_level === "maxima"); break;
         default: break;
       }
     }
-    // Sort: SLA violated groups always on top
+    // Sort: Priority máxima first, then SLA violated, then rest
     return [...result].sort((a, b) => {
+      const aPM = a.analytics?.priority_level === "maxima" ? 1 : 0;
+      const bPM = b.analytics?.priority_level === "maxima" ? 1 : 0;
+      if (aPM !== bPM) return bPM - aPM;
       if (a.sla_violated && !b.sla_violated) return -1;
       if (!a.sla_violated && b.sla_violated) return 1;
       if (a.sla_violated && b.sla_violated) return b.sla_delay_minutes - a.sla_delay_minutes;
@@ -211,7 +214,7 @@ export default function Dashboard() {
             { key: "inativos", label: "Grupos Inativos", desc: "Sem atividade há mais de 24h", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
             { key: "dengue", label: "Grupos da Dengue", desc: "Sem atividade há mais de 48h", value: stats.dengue, icon: Flame, color: "text-red-600" },
             { key: "sla", label: "SLA Violado", desc: "Equipe sem responder há +30min", value: stats.slaViolations, icon: AlertCircle, color: "text-red-500" },
-            { key: "priority", label: "Prioridade Máxima", desc: "Churn alto OU SLA violado", value: stats.priorityCount, icon: ShieldAlert, color: "text-red-600" },
+            { key: "priority", label: "Prioridade Máxima", desc: "Clientes em estado crítico combinado", value: stats.priorityCount, icon: ShieldAlert, color: "text-red-600" },
           ].map(({ key, label, desc, value, icon: Icon, color }) => (
             <button
               key={key}
