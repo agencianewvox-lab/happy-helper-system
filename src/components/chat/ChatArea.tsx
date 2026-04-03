@@ -81,7 +81,7 @@ export function ChatArea({ conversationId, gestorFilter, onTitleUpdate }: ChatAr
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages, type: "chat" }),
+        body: JSON.stringify({ messages: allMessages, type: "chat", gestorFilter }),
       });
 
       if (!resp.ok) {
