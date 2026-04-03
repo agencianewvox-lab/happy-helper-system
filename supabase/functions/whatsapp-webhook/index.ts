@@ -444,9 +444,7 @@ Deno.serve(async (req) => {
       }
 
       const groupId = remoteJid;
-      const phone = isGroup
-        ? (key.participant ? extractPhoneFromJid(key.participant) : null)
-        : extractPhoneFromJid(remoteJid);
+      const phone = earlyPhone;
 
       const contactName = pushName || phone || "Desconhecido";
       const direction = detectDirection(fromMe, contactName);
@@ -461,60 +459,63 @@ Deno.serve(async (req) => {
         receivedAt = new Date().toISOString();
       }
 
-      // Auto-create group if not yet registered
-      if (groupId) {
-        const groupName = ALLOWED_GROUPS[groupId] || data.groupName || remoteJid;
-        const { data: existingGroup } = await supabase
-          .from("whatsapp_grupos")
-          .select("id")
-          .eq("group_id", groupId)
-          .maybeSingle();
+      const isAllowedSource = isGroup && isAllowedGroup(remoteJid);
 
-        if (!existingGroup) {
-          await supabase.from("whatsapp_grupos").insert({
+      // Only insert into DB for whitelisted groups
+      if (isAllowedSource) {
+        // Auto-create group if not yet registered
+        if (groupId) {
+          const groupName = ALLOWED_GROUPS[groupId] || data.groupName || remoteJid;
+          const { data: existingGroup } = await supabase
+            .from("whatsapp_grupos")
+            .select("id")
+            .eq("group_id", groupId)
+            .maybeSingle();
+
+          if (!existingGroup) {
+            await supabase.from("whatsapp_grupos").insert({
+              group_id: groupId,
+              nome: groupName,
+            });
+            console.log("Auto-created group:", groupId, groupName);
+          }
+        }
+
+        // Insert conversation record
+        const { data: insertedData, error: insertError } = await supabase
+          .from("whatsapp_conversas")
+          .insert({
+            telefone: phone,
+            nome_contato: contactName,
+            mensagem: messageText,
             group_id: groupId,
-            nome: groupName,
+            direcao: direction,
+            status: "recebida",
+            recebido_em: receivedAt,
+            dados_extras: body,
+          })
+          .select();
+
+        if (insertError) {
+          console.error("Erro ao inserir:", insertError);
+          return new Response(JSON.stringify({ error: insertError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
-          console.log("Auto-created group:", groupId, groupName);
         }
       }
 
-      // Insert conversation record
-      const { data: insertedData, error: insertError } = await supabase
-        .from("whatsapp_conversas")
-        .insert({
-          telefone: phone,
-          nome_contato: contactName,
-          mensagem: messageText,
-          group_id: groupId,
-          direcao: direction,
-          status: "recebida",
-          recebido_em: receivedAt,
-          dados_extras: body,
-        })
-        .select();
-
-      if (insertError) {
-        console.error("Erro ao inserir:", insertError);
-        return new Response(JSON.stringify({ error: insertError.message }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
       // ===== ALISSON AI AUTO-REPLY =====
-      // Check if message is from Alisson's phone and deserves a response
-      console.log("Phone extracted:", phone, "| Direction:", direction, "| Message:", messageText?.substring(0, 50));
-      if (phone && ALISSON_PHONES.includes(phone) && messageText && shouldRespondToMessage(messageText)) {
+      console.log("Phone:", phone, "| isAlisson:", isAlisson, "| Message:", messageText?.substring(0, 50));
+      if (isAlisson && messageText && shouldRespondToMessage(messageText)) {
         console.log("Alisson message detected, triggering AI reply...");
-        // Fire and forget — don't block webhook response
         handleAlissonAIReply(messageText, groupId, supabase).catch((err) =>
           console.error("Alisson AI reply error:", err)
         );
       }
 
       return new Response(
-        JSON.stringify({ success: true, count: insertedData?.length || 1, source: "evolution_api" }),
+        JSON.stringify({ success: true, count: 1, source: "evolution_api" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
