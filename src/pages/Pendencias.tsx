@@ -98,6 +98,7 @@ export default function Pendencias() {
           status: (r.status as DemandStatus) || (r.resolved ? "feito" : "pendente"),
           grupo_nome: grp?.nome || r.group_id,
           gestor_responsavel: grp?.gestor || null,
+          due_date: r.due_date || null,
         };
       });
 
