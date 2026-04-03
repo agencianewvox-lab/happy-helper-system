@@ -6,8 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Alisson's phone for AI auto-reply
-const ALISSON_PHONE = "64992565779";
+// Alisson's phone for AI auto-reply (with and without country code)
+const ALISSON_PHONES = ["64992565779", "5564992565779"];
 const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
 
 // Messages that should NOT trigger AI response
@@ -246,7 +246,7 @@ ${conversationHistory}`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        phone: ALISSON_PHONE,
+        phone: "5564992565779",
         message: aiReply,
         groupId: groupId,
         type: "ai_response",
@@ -497,7 +497,8 @@ Deno.serve(async (req) => {
 
       // ===== ALISSON AI AUTO-REPLY =====
       // Check if message is from Alisson's phone and deserves a response
-      if (phone === ALISSON_PHONE && messageText && shouldRespondToMessage(messageText)) {
+      console.log("Phone extracted:", phone, "| Direction:", direction, "| Message:", messageText?.substring(0, 50));
+      if (phone && ALISSON_PHONES.includes(phone) && messageText && shouldRespondToMessage(messageText)) {
         console.log("Alisson message detected, triggering AI reply...");
         // Fire and forget — don't block webhook response
         handleAlissonAIReply(messageText, groupId, supabase).catch((err) =>
