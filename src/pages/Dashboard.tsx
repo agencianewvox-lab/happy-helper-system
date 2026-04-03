@@ -205,7 +205,7 @@ export default function Dashboard() {
             { key: "totalMsgs", label: "Mensagens Hoje", desc: "Total de mensagens do dia", value: stats.totalMsgsHoje, icon: MessageSquare, color: "text-emerald-500" },
             { key: "ativos", label: "Grupos Ativos", desc: "Com atividade nas últimas 24h", value: stats.comMsgs, icon: Activity, color: "text-amber-500" },
             { key: "highRisk", label: "Risco Alto", desc: "Risco de churn ≥ 60%", value: stats.highRisk, icon: AlertTriangle, color: "text-red-500" },
-            { key: "pendencias", label: "Pendências", desc: "Demandas ainda não resolvidas", value: stats.pendencias, icon: AlertCircle, color: "text-orange-500" },
+            { key: "pendencias", label: "Pendências", desc: `${stats.pendUrgentes} urgentes / ${stats.pendNormais} normais / ${stats.pendPossiveis} possíveis`, value: stats.pendencias, icon: AlertCircle, color: "text-orange-500" },
             { key: "frt", label: "FRT Médio", desc: "Tempo médio de 1ª resposta", value: stats.avgFrt != null ? `${stats.avgFrt}min` : "—", icon: Timer, color: "text-blue-500" },
             { key: "positive", label: "Sentimento +", desc: "Grupos com sentimento positivo", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
             { key: "inativos", label: "Grupos Inativos", desc: "Sem atividade há mais de 24h", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
