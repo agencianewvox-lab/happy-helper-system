@@ -197,7 +197,13 @@ export default function Dashboard() {
           ].map(({ key, label, desc, value, icon: Icon, color }) => (
             <button
               key={key}
-              onClick={() => setMetricFilter(metricFilter === key ? null : key)}
+              onClick={() => {
+                if (key === "pendencias") {
+                  navigate("/pendencias");
+                } else {
+                  setMetricFilter(metricFilter === key ? null : key);
+                }
+              }}
               className={cn(
                 "bg-card/60 border rounded-lg p-4 flex items-center gap-3 transition-all text-left w-full",
                 "hover:border-primary/40 hover:bg-card/80 cursor-pointer",
