@@ -387,57 +387,100 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                     return resolutions[key] !== true;
                   });
                   if (unresolvedDetails.length === 0) return null;
+
+                  const confirmadas = unresolvedDetails.filter(d => d.category === "confirmada" || d.confidence === "alta");
+                  const possiveis = unresolvedDetails.filter(d => d.category === "possivel" || d.confidence === "media");
+
+                  const renderDetail = (d: typeof unresolvedDetails[0], i: number, isPossivel: boolean) => {
+                    const dt = new Date(d.requested_at);
+                    const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+                    const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+                    const key = makeKey(d.term, d.requested_at);
+                    const isSaving = savingKey === key;
+                    const priorityBadge = d.priority === "urgente"
+                      ? <Badge className="text-[9px] bg-red-500/20 text-red-500 border-red-500/30">🔴 Urgente</Badge>
+                      : d.priority === "baixa"
+                        ? <Badge variant="outline" className="text-[9px] text-muted-foreground">⚪ Baixa</Badge>
+                        : <Badge className="text-[9px] bg-amber-500/20 text-amber-500 border-amber-500/30">🟡 Normal</Badge>;
+
+                    return (
+                      <div key={i} className={cn(
+                        "text-xs text-muted-foreground rounded p-2 border bg-muted/30",
+                        isPossivel ? "border-dashed border-muted-foreground/30" : "border-border/20"
+                      )}>
+                        <div className="flex items-center gap-2 mb-1">
+                          {priorityBadge}
+                          {d.hours_waiting > 0 && (
+                            <span className="text-[10px] text-muted-foreground">⏱ {d.hours_waiting}h esperando</span>
+                          )}
+                        </div>
+                        {d.message_excerpt && (
+                          <p className="mt-1 italic text-[11px] text-foreground/80">
+                            "{d.message_excerpt}"
+                          </p>
+                        )}
+                        <p className="mt-1 text-[10px]">
+                          Solicitado em <strong>{dateStr}</strong> às <strong>{timeStr}</strong>
+                        </p>
+                        {d.suggested_solution && (
+                          <p className="mt-1 text-[10px] text-emerald-400">
+                            <span className="font-semibold">Ação sugerida: </span>{d.suggested_solution}
+                          </p>
+                        )}
+                        <div className="flex gap-2 mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-[10px] px-2 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            disabled={isSaving}
+                            onClick={() => handleResolve(d.term, d.requested_at, true)}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            Resolvido
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-[10px] px-2 gap-1"
+                            disabled={isSaving}
+                            onClick={() => handleResolve(d.term, d.requested_at, true)}
+                          >
+                            <XCircle className="w-3 h-3" />
+                            Não é pendência
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  };
+
                   return (
-                    <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <AlertTriangle className="w-4 h-4 text-orange-500" />
-                        <span className="text-xs font-medium text-orange-500 uppercase tracking-wider">Motivo Pendência</span>
-                      </div>
-                      <div className="space-y-2">
-                        {unresolvedDetails.map((d, i) => {
-                          const dt = new Date(d.requested_at);
-                          const dateStr = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
-                          const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-                          const key = makeKey(d.term, d.requested_at);
-                          const isSaving = savingKey === key;
-                          return (
-                            <div key={i} className="text-xs text-muted-foreground rounded p-2 border bg-muted/30 border-border/20">
-                              <p>
-                                Cliente solicitou <strong className="text-orange-400">{d.term}</strong> em{" "}
-                                <strong>{dateStr}</strong> às <strong>{timeStr}</strong>
-                                {" e ainda não foi atendido."}
-                              </p>
-                              {d.message_excerpt && (
-                                <p className="mt-1 italic text-[10px] text-muted-foreground/70 truncate">
-                                  "{d.message_excerpt}"
-                                </p>
-                              )}
-                              <div className="flex gap-2 mt-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-6 text-[10px] px-2 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                                  disabled={isSaving}
-                                  onClick={() => handleResolve(d.term, d.requested_at, true)}
-                                >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  Resolvido
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-6 text-[10px] px-2 gap-1"
-                                  disabled={isSaving}
-                                  onClick={() => handleResolve(d.term, d.requested_at, false)}
-                                >
-                                  <XCircle className="w-3 h-3" />
-                                  Não resolvido
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <div className="space-y-3">
+                      {confirmadas.length > 0 && (
+                        <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="w-4 h-4 text-orange-500" />
+                            <span className="text-xs font-medium text-orange-500 uppercase tracking-wider">
+                              Pendências Confirmadas ({confirmadas.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {confirmadas.map((d, i) => renderDetail(d, i, false))}
+                          </div>
+                        </div>
+                      )}
+                      {possiveis.length > 0 && (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-dashed border-muted-foreground/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                              Possíveis Pendências ({possiveis.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {possiveis.map((d, i) => renderDetail(d, i, true))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
