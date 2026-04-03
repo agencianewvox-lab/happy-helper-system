@@ -287,6 +287,33 @@ export default function Pendencias() {
                           onChange={(e) => setNewTerm(e.target.value)}
                         />
                       </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium">Data de Entrega</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !newDueDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {newDueDate ? format(newDueDate, "dd/MM/yyyy") : "Selecione a data"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={newDueDate}
+                              onSelect={setNewDueDate}
+                              disabled={(date) => date < new Date()}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                       <div className="flex gap-2 justify-end">
                         <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>
                           Cancelar
