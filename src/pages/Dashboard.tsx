@@ -117,7 +117,7 @@ export default function Dashboard() {
           return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
         }); break;
         case "sla": result = roleGrupos.filter(g => g.sla_violated); break;
-        case "priority": result = roleGrupos.filter(g => g.sla_violated || (g.analytics && g.analytics.churn_risk >= 60)); break;
+        case "priority": result = roleGrupos.filter(g => g.analytics?.priority_level === "maxima"); break;
         default: break;
       }
     }
