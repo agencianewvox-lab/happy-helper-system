@@ -497,7 +497,8 @@ Deno.serve(async (req) => {
 
       // ===== ALISSON AI AUTO-REPLY =====
       // Check if message is from Alisson's phone and deserves a response
-      if (phone === ALISSON_PHONE && messageText && shouldRespondToMessage(messageText)) {
+      console.log("Phone extracted:", phone, "| Direction:", direction, "| Message:", messageText?.substring(0, 50));
+      if (phone && ALISSON_PHONES.includes(phone) && messageText && shouldRespondToMessage(messageText)) {
         console.log("Alisson message detected, triggering AI reply...");
         // Fire and forget — don't block webhook response
         handleAlissonAIReply(messageText, groupId, supabase).catch((err) =>
