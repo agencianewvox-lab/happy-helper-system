@@ -494,7 +494,7 @@ ${contextLines.join("\n\n")}`;
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => tc.function?.name === "criar_pendencia")) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "criar_tarefa"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
