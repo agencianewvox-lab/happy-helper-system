@@ -939,7 +939,31 @@ async function handleTeamCoachReply(
       ? "todos os clientes da agência (acesso total como sócia/proprietária)"
       : `seus clientes como gestor(a) (${allGroups.length} clientes)`;
 
+    // Priscilla (sócia) gets tool-calling capabilities like Alisson
+    const isOwner = firstName.toLowerCase().startsWith("prisc");
+
+    let toolsPromptSection = "";
+    if (isOwner) {
+      toolsPromptSection = `
+SUAS CAPACIDADES COMO AGENTE:
+- Você pode CRIAR pendências e tarefas para qualquer membro da equipe quando ${firstName} pedir
+- Você pode REMOVER pendências e tarefas do quadro quando ${firstName} pedir
+- Se faltar informação, pergunte antes de agir
+- Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar), EXECUTE usando as ferramentas disponíveis`;
+    }
+
     const systemPrompt = `Você é a Vox, analista sênior de CS da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp.
+
+EQUIPE NEW VOX:
+- Jader Costa: Gestor de tráfego
+- Murilo Araújo (Murillo): Gestor de tráfego / Gerente
+- Netto Monge: Gestor de tráfego
+- Priscilla Borges: Social media e sócia da empresa
+- Alisson Lima: Sócio proprietário
+- Joel: Gerente geral
+- Thais: Auxiliar de social media
+- Victor Botto: Design gráfico
+- Jiza Reis: Financeiro
 
 REGRAS:
 - Tom: colega de trabalho gente boa, profissional, direto
@@ -948,6 +972,8 @@ REGRAS:
 - Responda em português brasileiro natural
 - ${firstName} tem acesso a ${accessScope}
 - Responda APENAS sobre os clientes listados abaixo. Se perguntar sobre algo fora do escopo, diga que não tem acesso a esses dados.
+- Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
+${toolsPromptSection}
 
 CONTEXTO DOS CLIENTES:
 ${contextLines.join("\n\n") || "Nenhum cliente encontrado."}
@@ -955,20 +981,31 @@ ${contextLines.join("\n\n") || "Nenhum cliente encontrado."}
 CUTUCADAS RECENTES ENVIADAS:
 ${coachContext || "Nenhuma cutucada recente."}`;
 
+    const aiMessages: any[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: messageText },
+    ];
+
+    const requestBody: any = {
+      model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+      messages: aiMessages,
+      max_tokens: isOwner ? 1500 : 400,
+    };
+
+    // Add tools for Priscilla
+    if (isOwner) {
+      requestBody.tools = AGENT_TOOLS;
+      // Use a more capable model for tool calling
+      requestBody.model = lovableKey ? "google/gemini-2.5-flash" : "gpt-4o";
+    }
+
     const aiResp = await fetch(aiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${aiKey}`,
       },
-      body: JSON.stringify({
-        model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: messageText },
-        ],
-        max_tokens: 400,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!aiResp.ok) {
@@ -977,7 +1014,129 @@ ${coachContext || "Nenhuma cutucada recente."}`;
     }
 
     const aiData = await aiResp.json();
-    const reply = aiData.choices?.[0]?.message?.content?.trim();
+    const choice = aiData.choices?.[0];
+    if (!choice) return;
+
+    let reply = choice.message?.content?.trim() || "";
+    const toolCalls = choice.message?.tool_calls || [];
+
+    // Process tool calls for Priscilla (same logic as Alisson)
+    if (isOwner && toolCalls.length > 0) {
+      const toolResults: string[] = [];
+      for (const tc of toolCalls) {
+        const fnName = tc.function?.name;
+        const args = JSON.parse(tc.function?.arguments || "{}");
+        console.log(`Tool call from ${firstName}: ${fnName}`, JSON.stringify(args));
+
+        if (fnName === "criar_pendencia") {
+          const matchedGroup = allGroups.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+          );
+          if (matchedGroup) {
+            const { error: insertErr } = await supabase.from("pending_demand_resolutions").insert({
+              group_id: matchedGroup.group_id,
+              term: `[${args.responsible}] ${args.term}`,
+              requested_at: new Date().toISOString(),
+              status: "pendente",
+              due_date: args.due_date || null,
+            });
+            toolResults.push(insertErr ? `❌ Erro: ${insertErr.message}` : `✅ Pendência criada: "${args.term}" para ${args.responsible} no cliente ${matchedGroup.nome}`);
+          } else {
+            toolResults.push(`❌ Cliente "${args.group_name}" não encontrado.`);
+          }
+        }
+
+        if (fnName === "remover_pendencias") {
+          const responsibles = Array.isArray(args.responsibles) ? args.responsibles.filter(Boolean) : [];
+          const normalizedStatus = args.status === "todos" ? null : (args.status || "pendente");
+          let groupIds2: string[] | null = null;
+          if (args.group_name) {
+            groupIds2 = allGroups.filter((g: any) => g.nome.toLowerCase().includes(args.group_name.toLowerCase())).map((g: any) => g.group_id);
+          }
+          const { data: existing } = await supabase.from("pending_demand_resolutions").select("id, term, group_id, status");
+          const idsToDelete = (existing || []).filter((item: any) => {
+            const term = (item.term || "").toLowerCase();
+            const responsibleMatch = responsibles.length === 0 || responsibles.some((name: string) => term.includes(name.toLowerCase()));
+            const statusMatch = !normalizedStatus || item.status === normalizedStatus;
+            const groupMatch = !groupIds2 || groupIds2.includes(item.group_id);
+            return responsibleMatch && statusMatch && groupMatch;
+          }).map((item: any) => item.id);
+          if (idsToDelete.length === 0) {
+            toolResults.push(`⚠️ Nenhuma pendência encontrada para remover.`);
+          } else {
+            const { error: deleteErr } = await supabase.from("pending_demand_resolutions").delete().in("id", idsToDelete);
+            toolResults.push(deleteErr ? `❌ Erro: ${deleteErr.message}` : `✅ ${idsToDelete.length} pendência(s) removida(s).`);
+          }
+        }
+
+        if (fnName === "criar_tarefa") {
+          let matchedGroupId: string | null = null;
+          if (args.group_name) {
+            const mg = allGroups.find((g: any) => g.nome.toLowerCase().includes(args.group_name.toLowerCase()));
+            matchedGroupId = mg?.group_id || null;
+          }
+          const { error: insertErr } = await supabase.from("tasks").insert({
+            title: args.title,
+            description: args.description || null,
+            assigned_to: args.assigned_to,
+            group_id: matchedGroupId,
+            priority: args.priority || "normal",
+            due_date: args.due_date || null,
+            created_by: `${firstName} (via WhatsApp)`,
+            status: "pendente",
+          });
+          toolResults.push(insertErr ? `❌ Erro: ${insertErr.message}` : `✅ Tarefa criada: "${args.title}" para ${args.assigned_to}`);
+        }
+
+        if (fnName === "remover_tarefas") {
+          const responsibles = Array.isArray(args.responsibles) ? args.responsibles.filter(Boolean) : [];
+          const normalizedStatus = args.status === "todos" ? null : (args.status || "pendente");
+          const { data: existing } = await supabase.from("tasks").select("id, assigned_to, status, group_id");
+          const idsToDelete = (existing || []).filter((item: any) => {
+            const assigned = (item.assigned_to || "").toLowerCase();
+            const responsibleMatch = responsibles.length === 0 || responsibles.some((name: string) => assigned.includes(name.toLowerCase()));
+            const statusMatch = !normalizedStatus || item.status === normalizedStatus;
+            return responsibleMatch && statusMatch;
+          }).map((item: any) => item.id);
+          if (idsToDelete.length === 0) {
+            toolResults.push(`⚠️ Nenhuma tarefa encontrada para remover.`);
+          } else {
+            const { error: deleteErr } = await supabase.from("tasks").delete().in("id", idsToDelete);
+            toolResults.push(deleteErr ? `❌ Erro: ${deleteErr.message}` : `✅ ${idsToDelete.length} tarefa(s) removida(s).`);
+          }
+        }
+
+        if (fnName === "perguntar_detalhes") {
+          reply = args.question;
+        }
+      }
+
+      // Follow-up with tool results
+      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas"].includes(tc.function?.name))) {
+        const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: toolResults[i] || "OK",
+        }));
+        const followUp = await fetch(aiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
+          body: JSON.stringify({
+            model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+            messages: [...aiMessages, choice.message, ...toolResultMessages],
+            max_tokens: 500,
+          }),
+        });
+        if (followUp.ok) {
+          const followUpData = await followUp.json();
+          reply = followUpData.choices?.[0]?.message?.content?.trim() || toolResults.join("\n");
+        } else {
+          reply = toolResults.join("\n");
+        }
+      }
+    }
+
     if (!reply) return;
 
     // Send reply via webhook (GET)
