@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, ad_account_id, date_preset } = body;
+    const { action, ad_account_id, date_preset, since, until } = body;
 
     // Action: list all ad accounts available to this token
     if (action === "list_accounts") {
