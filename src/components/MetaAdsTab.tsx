@@ -164,9 +164,14 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("meta-ads", {
-        body: { ad_account_id: savedAccountId, date_preset: datePreset },
-      });
+      const body: any = { ad_account_id: savedAccountId };
+      if (useCustomRange && customSince && customUntil) {
+        body.since = format(customSince, "yyyy-MM-dd");
+        body.until = format(customUntil, "yyyy-MM-dd");
+      } else {
+        body.date_preset = datePreset;
+      }
+      const { data, error: fnError } = await supabase.functions.invoke("meta-ads", { body });
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
       setSummary(data.summary);
@@ -177,7 +182,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [savedAccountId, datePreset]);
+  }, [savedAccountId, datePreset, useCustomRange, customSince, customUntil]);
 
   useEffect(() => {
     if (savedAccountId) fetchAds();
