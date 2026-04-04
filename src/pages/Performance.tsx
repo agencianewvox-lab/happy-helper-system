@@ -145,6 +145,9 @@ export default function Performance() {
   const clientNpsData = useMemo(() => getClientNpsData(gestorName), [getClientNpsData, gestorName]);
   const clientTasksData = useMemo(() => getClientTasksData(gestorName), [getClientTasksData, gestorName]);
   const clientPendingData = useMemo(() => getClientPendingData(gestorName), [getClientPendingData, gestorName]);
+  const clientLtvData = useMemo(() => getClientLtvData(gestorName), [getClientLtvData, gestorName]);
+  const ltvEvolution = useMemo(() => getLtvEvolution(gestorName), [getLtvEvolution, gestorName]);
+  const ltvStats = useMemo(() => getLtvStats(gestorName), [getLtvStats, gestorName]);
 
   // Filter team data by gestor
   const filteredCollaborators = useMemo(() => {
