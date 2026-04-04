@@ -10,6 +10,7 @@ import Chat from "./pages/Chat";
 import Pendencias from "./pages/Pendencias";
 import Tarefas from "./pages/Tarefas";
 import NpsPreditivo from "./pages/NpsPreditivo";
+import NpsReal from "./pages/NpsReal";
 import Agenda from "./pages/Agenda";
 import PesquisaNps from "./pages/PesquisaNps";
 import Login from "./pages/Login";
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/pendencias" element={<ProtectedRoute><Pendencias /></ProtectedRoute>} />
           <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
           <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
+          <Route path="/nps-real" element={<ProtectedRoute><NpsReal /></ProtectedRoute>} />
           <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
           <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
           <Route path="*" element={<NotFound />} />

@@ -1,4 +1,4 @@
-import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle } from "lucide-react";
+import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -25,6 +25,7 @@ const navItems = [
   { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false },
   { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false },
   { title: "NPS Preditivo", url: "/nps", icon: Heart, adminOnly: true },
+  { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: true },
 ];
 
 export function DashboardSidebar({ isAdmin, onSignOut }: DashboardSidebarProps) {
