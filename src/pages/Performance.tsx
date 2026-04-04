@@ -522,15 +522,15 @@ export default function Performance() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <DollarSign className="w-5 h-5 text-emerald-500" />
-            <h2 className="text-sm font-semibold">LTV — Lifetime Value</h2>
+            <h2 className="text-sm font-semibold">LTV — Tempo de Vida do Cliente</h2>
             <Badge variant="outline" className="text-xs">
-              LTV Total: R$ {ltvStats.totalLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              Total Meses Acumulados: {ltvStats.totalMonths}
             </Badge>
             <Badge variant="secondary" className="text-xs">
-              LTV Médio: R$ {ltvStats.avgLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              Média: {ltvStats.avgMonths.toFixed(1)} meses
             </Badge>
             <Badge variant="secondary" className="text-xs">
-              Tempo Médio: {ltvStats.avgMonths.toFixed(0)} meses
+              {ltvStats.clientCount} clientes
             </Badge>
           </div>
 
