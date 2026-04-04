@@ -271,6 +271,8 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
                   {intentConfig[a.intent].emoji} {a.intent}
                 </span>
               )}
+              {/* NPS Score */}
+              <NpsScoreBadge prediction={npsPrediction} />
             </div>
           )}
 
