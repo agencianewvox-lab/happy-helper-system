@@ -102,6 +102,8 @@ export interface Grupo {
   investimento_ads: number | null;
   data_ciclo_ads: string | null;
   gestor_responsavel: string | null;
+  estrelas: number | null;
+  estrelas_motivo: string | null;
 }
 
 export interface NpsDimensionScore {
