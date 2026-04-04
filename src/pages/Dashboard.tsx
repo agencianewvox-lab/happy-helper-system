@@ -236,7 +236,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Filters */}
+        {/* Filters + Birthday Alerts */}
         <div className="flex items-center justify-between">
           <DashboardFilters
             categorias={categorias}
@@ -256,6 +256,9 @@ export default function Dashboard() {
             </Badge>
           </div>
         </div>
+
+        {/* Birthday Alerts for Admins */}
+        {isAdmin && <BirthdayAlerts />}
 
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
