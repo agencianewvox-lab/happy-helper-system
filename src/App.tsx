@@ -11,6 +11,7 @@ import Pendencias from "./pages/Pendencias";
 import Tarefas from "./pages/Tarefas";
 import NpsPreditivo from "./pages/NpsPreditivo";
 import Agenda from "./pages/Agenda";
+import PesquisaNps from "./pages/PesquisaNps";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
