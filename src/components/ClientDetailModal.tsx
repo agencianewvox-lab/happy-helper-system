@@ -250,6 +250,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
             <TabsTrigger value="conversas" className="flex-1">Conversas ({conversas.length})</TabsTrigger>
             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
             <TabsTrigger value="meta-ads" className="flex-1 gap-1"><Megaphone className="w-3 h-3" /> Ads</TabsTrigger>
+            <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
           </TabsList>
 
           <TabsContent value="indicadores" className="space-y-4 mt-4">
