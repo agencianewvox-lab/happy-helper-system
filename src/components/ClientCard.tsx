@@ -145,16 +145,19 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
       >
         <CardHeader className={cn("pb-2", compact ? "p-3" : "p-4")}>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className={cn("truncate", compact ? "text-sm" : "text-base")}>
-              <span className="mr-1.5">{catConfig.icon}</span>
-              {grupo.nome}
-              {(grupo.estrelas_dificuldade || grupo.estrelas_financeiro || grupo.estrelas_temperamento) && (
-                <span className="ml-1.5 text-[10px] inline-flex gap-1" title="Dificuldade | Financeiro | Temperamento">
-                  {grupo.estrelas_dificuldade ? <span>🎯{"⭐".repeat(grupo.estrelas_dificuldade)}</span> : null}
-                  {grupo.estrelas_financeiro ? <span>💰{"⭐".repeat(grupo.estrelas_financeiro)}</span> : null}
-                  {grupo.estrelas_temperamento ? <span>🧠{"⭐".repeat(grupo.estrelas_temperamento)}</span> : null}
-                </span>
-              )}
+            <CardTitle className={cn("truncate flex items-center gap-1.5", compact ? "text-sm" : "text-base")}>
+              <span className="shrink-0">{catConfig.icon}</span>
+              <span className="truncate">{grupo.nome}</span>
+              {(() => {
+                const vals = [grupo.estrelas_dificuldade, grupo.estrelas_financeiro, grupo.estrelas_temperamento].filter((v): v is number => v != null && v > 0);
+                if (vals.length === 0) return null;
+                const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1).replace(".", ",");
+                return (
+                  <span className="shrink-0 text-[11px] font-semibold text-amber-500" title="Média: Dificuldade | Financeiro | Temperamento">
+                    {avg}⭐
+                  </span>
+                );
+              })()}
             </CardTitle>
             <div className="flex items-center gap-1.5">
               {isPriorityMax && (
