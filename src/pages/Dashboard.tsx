@@ -164,7 +164,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               <img src={newvoxLogo} alt="New Vox" className="w-8 h-8 rounded object-cover" />
               <div>
-                <h1 className="text-lg font-bold tracking-tight">Painel de Controle New Vox</h1>
+                <h1 className="text-lg font-bold tracking-tight">Bem-vindo de volta, {profile?.full_name || "Usuário"}</h1>
                 <p className="text-xs text-muted-foreground">
                   Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
                 </p>
