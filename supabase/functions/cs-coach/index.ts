@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
       { data: conversasRecentes },
       { data: pendencias },
       { data: mensagensHoje },
+      { data: npsSurveys },
     ] = await Promise.all([
       supabase.from("whatsapp_grupos").select("*"),
       supabase.from("whatsapp_conversas")
@@ -113,6 +114,9 @@ Deno.serve(async (req) => {
       supabase.from("coach_messages")
         .select("*")
         .gte("created_at", new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()),
+      supabase.from("nps_surveys")
+        .select("group_id, created_at")
+        .order("created_at", { ascending: false }),
     ]);
 
     if (!grupos || grupos.length === 0) {
