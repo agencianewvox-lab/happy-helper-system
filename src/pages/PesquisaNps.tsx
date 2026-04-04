@@ -293,33 +293,6 @@ export default function PesquisaNps() {
               )}
             </div>
 
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="name" className="text-xs">
-                  Seu nome *
-                </Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Digite seu nome"
-                  maxLength={100}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs">
-                  E-mail (opcional)
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
-                  maxLength={255}
-                />
-              </div>
-            </div>
           </div>
         )}
 
