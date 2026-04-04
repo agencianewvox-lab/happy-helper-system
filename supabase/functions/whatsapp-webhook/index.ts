@@ -129,6 +129,26 @@ const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "criar_tarefa",
+      description: "Cria uma tarefa geral (não vinculada necessariamente a um cliente) para um membro da equipe. Use para tarefas do dia a dia, comandos operacionais, ou qualquer ação que não seja uma pendência de cliente específico.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título curto da tarefa" },
+          description: { type: "string", description: "Descrição detalhada (opcional)", nullable: true },
+          assigned_to: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge, Priscilla Borges, Joel, Thais, Daniella, Victor Botto, Jiza Reis)" },
+          group_name: { type: "string", description: "Nome do cliente associado (opcional)", nullable: true },
+          due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
+          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" },
+        },
+        required: ["title", "assigned_to", "priority"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "perguntar_detalhes",
       description: "Envia uma pergunta de volta ao Alisson via WhatsApp para obter mais detalhes antes de executar uma ação. Use quando faltarem informações essenciais para completar uma tarefa.",
       parameters: {
