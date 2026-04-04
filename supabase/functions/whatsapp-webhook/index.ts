@@ -725,6 +725,97 @@ ${contextLines.join("\n\n")}`;
   }
 }
 
+/**
+ * Handle team member replies to coach messages
+ */
+async function handleTeamCoachReply(
+  messageText: string,
+  pushName: string,
+  teamWebhook: { name: string; url: string },
+  supabase: any
+) {
+  try {
+    // Check for 👍 reaction - mark last coach message as "feito"
+    const trimmed = messageText.trim();
+    if (trimmed === "👍" || trimmed === "👍🏻" || trimmed === "👍🏼" || trimmed === "👍🏽" || trimmed === "👍🏾" || trimmed === "👍🏿") {
+      const { data: lastMsg } = await supabase
+        .from("coach_messages")
+        .select("id")
+        .eq("destinatario_nome", teamWebhook.name)
+        .eq("enviada", true)
+        .is("resultado", null)
+        .order("enviada_em", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastMsg) {
+        await supabase.from("coach_messages").update({ resultado: "feito" }).eq("id", lastMsg.id);
+        console.log(`Marked coach message ${lastMsg.id} as 'feito' for ${teamWebhook.name}`);
+      }
+      return; // Don't reply to thumbs up
+    }
+
+    // Generate AI response using Vox persona
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    const openaiKey = Deno.env.get("openai");
+    const aiUrl = lovableKey
+      ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
+    const aiKey = lovableKey || openaiKey;
+    if (!aiKey) return;
+
+    const firstName = teamWebhook.name.split(" ")[0];
+
+    // Get recent coach messages for context
+    const { data: recentCoach } = await supabase
+      .from("coach_messages")
+      .select("mensagem, tipo, created_at")
+      .eq("destinatario_nome", teamWebhook.name)
+      .eq("enviada", true)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const coachContext = (recentCoach || [])
+      .map((m: any) => `[Coach → ${firstName}]: ${m.mensagem}`)
+      .reverse()
+      .join("\n");
+
+    const systemPrompt = `Você é a Vox, coach de CS da agência New Vox. Você está conversando com ${firstName} da equipe via WhatsApp. Tom: colega de trabalho gente boa, profissional, humanizada. Respostas curtas (máx 200 caracteres). Use emojis com moderação. Nunca seja robótica. Contexto das últimas cutucadas enviadas:\n${coachContext || "Nenhuma cutucada recente."}`;
+
+    const aiResp = await fetch(aiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${aiKey}`,
+      },
+      body: JSON.stringify({
+        model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: messageText },
+        ],
+        max_tokens: 150,
+      }),
+    });
+
+    if (!aiResp.ok) {
+      console.error("AI error for team reply:", await aiResp.text());
+      return;
+    }
+
+    const aiData = await aiResp.json();
+    const reply = aiData.choices?.[0]?.message?.content?.trim();
+    if (!reply) return;
+
+    // Send reply via webhook (GET)
+    const encodedReply = encodeURIComponent(reply);
+    const sendResp = await fetch(`${teamWebhook.url}?message=${encodedReply}`);
+    console.log(`Coach reply to ${firstName}: ${sendResp.status}`);
+  } catch (err) {
+    console.error("Error in team coach reply:", err);
+  }
+}
+
 // Nomes do time New Vox — mensagens desses contatos são "saida"
 const TEAM_MEMBERS = [
   "jader", "jader costa",
