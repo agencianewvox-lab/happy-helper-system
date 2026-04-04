@@ -611,8 +611,8 @@ export default function Performance() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-bold text-emerald-500">R$ {stats.totalLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-                            <p className="text-[10px] text-muted-foreground">LTV Total</p>
+                            <p className="text-sm font-bold text-emerald-500">{stats.totalMonths} meses</p>
+                            <p className="text-[10px] text-muted-foreground">Total Acumulado</p>
                           </div>
                         </div>
                       );
