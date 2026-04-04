@@ -120,7 +120,57 @@ export default function Performance() {
     }));
   }, [data]);
 
-  // Sort collaborators by FRT (best first) for ranking
+  // NPS per client chart data
+  const npsClientData = useMemo(() => {
+    return predictions
+      .filter(p => p.confianca >= 20)
+      .map(p => ({
+        name: gruposMap[p.group_id]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 18) || p.group_id.substring(0, 12),
+        score: Number(p.nps_score.toFixed(1)),
+        categoria: p.nps_categoria,
+        gestor: gruposMap[p.group_id]?.gestor_responsavel || "Sem gestor",
+      }))
+      .sort((a, b) => b.score - a.score);
+  }, [predictions, gruposMap]);
+
+  // NPS ranking by gestor
+  const npsGestorRanking = useMemo(() => {
+    const gestorMap = new Map<string, { scores: number[]; promotores: number; neutros: number; detratores: number }>();
+    for (const p of predictions) {
+      if (p.confianca < 20) continue;
+      const gestor = gruposMap[p.group_id]?.gestor_responsavel || "Sem gestor";
+      const entry = gestorMap.get(gestor) || { scores: [], promotores: 0, neutros: 0, detratores: 0 };
+      entry.scores.push(p.nps_score);
+      if (p.nps_categoria === "promotor") entry.promotores++;
+      else if (p.nps_categoria === "neutro") entry.neutros++;
+      else entry.detratores++;
+      gestorMap.set(gestor, entry);
+    }
+    return Array.from(gestorMap.entries())
+      .map(([name, d]) => ({
+        name,
+        avg: Number((d.scores.reduce((a, b) => a + b, 0) / d.scores.length).toFixed(1)),
+        total: d.scores.length,
+        promotores: d.promotores,
+        neutros: d.neutros,
+        detratores: d.detratores,
+        nps: d.scores.length > 0 ? Math.round(((d.promotores - d.detratores) / d.scores.length) * 100) : 0,
+      }))
+      .sort((a, b) => b.nps - a.nps);
+  }, [predictions, gruposMap]);
+
+  // Pie chart data for NPS distribution
+  const npsPieData = useMemo(() => [
+    { name: "Promotores", value: promotores, fill: "#10b981" },
+    { name: "Neutros", value: neutros, fill: "#f59e0b" },
+    { name: "Detratores", value: detratores, fill: "#ef4444" },
+  ], [promotores, neutros, detratores]);
+
+  const getNpsBarColor = (score: number) => {
+    if (score >= 9) return "#10b981";
+    if (score >= 7) return "#f59e0b";
+    return "#ef4444";
+  };
   const frtRanking = useMemo(() => {
     if (!data) return [];
     return [...data.collaborators]
