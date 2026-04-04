@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { CoachPanel } from "@/components/CoachPanel";
 
 export default function Dashboard() {
   const navigate = useNavigate();
