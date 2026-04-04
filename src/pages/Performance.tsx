@@ -186,12 +186,32 @@ export default function Performance() {
     if (score >= 7) return "#f59e0b";
     return "#ef4444";
   };
+  // FRT ranking balanced by client complexity
   const frtRanking = useMemo(() => {
     if (!data) return [];
+    // Calculate average complexity weight per collaborator (match by name = gestor_responsavel)
+    const gestorWeights = new Map<string, { totalWeight: number; count: number }>();
+    for (const [, g] of Object.entries(gruposMap)) {
+      if (!g.gestor_responsavel) continue;
+      const w = (g.estrelas_dificuldade || 1) * 0.4 + (g.estrelas_financeiro || 1) * 0.6;
+      const entry = gestorWeights.get(g.gestor_responsavel) || { totalWeight: 0, count: 0 };
+      entry.totalWeight += w;
+      entry.count++;
+      gestorWeights.set(g.gestor_responsavel, entry);
+    }
+
     return [...data.collaborators]
       .filter((c) => c.avg_frt_minutes != null && c.total_responses > 0)
-      .sort((a, b) => (a.avg_frt_minutes || 999) - (b.avg_frt_minutes || 999));
-  }, [data]);
+      .map((c) => {
+        const gw = gestorWeights.get(c.name);
+        // avgComplexity 1-3; normalize so complexity 1 = factor 1, complexity 3 = factor 0.6 (30% bonus)
+        const avgComplexity = gw && gw.count > 0 ? gw.totalWeight / gw.count : 1;
+        const complexityFactor = 1 - ((avgComplexity - 1) / 2) * 0.4; // 1→1, 3→0.6
+        const adjustedFrt = Math.round((c.avg_frt_minutes || 0) * complexityFactor);
+        return { ...c, adjustedFrt, avgComplexity: Number(avgComplexity.toFixed(1)), clientCount: gw?.count || 0 };
+      })
+      .sort((a, b) => a.adjustedFrt - b.adjustedFrt);
+  }, [data, gruposMap]);
 
   if (loading) {
     return (
