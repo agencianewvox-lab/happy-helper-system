@@ -5,13 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, Area, AreaChart,
+  ResponsiveContainer, Legend, Area, AreaChart, Cell, PieChart, Pie,
 } from "recharts";
 import {
   MessageSquare, Timer, CheckCircle, TrendingUp, Users, ArrowUpDown,
-  Trophy, Medal, Award,
+  Trophy, Medal, Award, Heart,
 } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
+import { useNpsPredictions } from "@/hooks/useNpsPredictions";
+import { supabase } from "@/integrations/supabase/client";
 
 type Period = "today" | "week" | "month";
 
@@ -58,6 +60,20 @@ export default function Performance() {
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gruposMap, setGruposMap] = useState<Record<string, { nome: string; gestor_responsavel: string | null }>>({});
+
+  const { predictions, npsGlobal, promotores, neutros, detratores, loading: npsLoading } = useNpsPredictions();
+
+  // Fetch grupos for name/gestor mapping
+  useEffect(() => {
+    supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel").then(({ data }) => {
+      if (data) {
+        const map: Record<string, { nome: string; gestor_responsavel: string | null }> = {};
+        for (const g of data) map[g.group_id] = { nome: g.nome, gestor_responsavel: g.gestor_responsavel };
+        setGruposMap(map);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -104,7 +120,57 @@ export default function Performance() {
     }));
   }, [data]);
 
-  // Sort collaborators by FRT (best first) for ranking
+  // NPS per client chart data
+  const npsClientData = useMemo(() => {
+    return predictions
+      .filter(p => p.confianca >= 20)
+      .map(p => ({
+        name: gruposMap[p.group_id]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 18) || p.group_id.substring(0, 12),
+        score: Number(p.nps_score.toFixed(1)),
+        categoria: p.nps_categoria,
+        gestor: gruposMap[p.group_id]?.gestor_responsavel || "Sem gestor",
+      }))
+      .sort((a, b) => b.score - a.score);
+  }, [predictions, gruposMap]);
+
+  // NPS ranking by gestor
+  const npsGestorRanking = useMemo(() => {
+    const gestorMap = new Map<string, { scores: number[]; promotores: number; neutros: number; detratores: number }>();
+    for (const p of predictions) {
+      if (p.confianca < 20) continue;
+      const gestor = gruposMap[p.group_id]?.gestor_responsavel || "Sem gestor";
+      const entry = gestorMap.get(gestor) || { scores: [], promotores: 0, neutros: 0, detratores: 0 };
+      entry.scores.push(p.nps_score);
+      if (p.nps_categoria === "promotor") entry.promotores++;
+      else if (p.nps_categoria === "neutro") entry.neutros++;
+      else entry.detratores++;
+      gestorMap.set(gestor, entry);
+    }
+    return Array.from(gestorMap.entries())
+      .map(([name, d]) => ({
+        name,
+        avg: Number((d.scores.reduce((a, b) => a + b, 0) / d.scores.length).toFixed(1)),
+        total: d.scores.length,
+        promotores: d.promotores,
+        neutros: d.neutros,
+        detratores: d.detratores,
+        nps: d.scores.length > 0 ? Math.round(((d.promotores - d.detratores) / d.scores.length) * 100) : 0,
+      }))
+      .sort((a, b) => b.nps - a.nps);
+  }, [predictions, gruposMap]);
+
+  // Pie chart data for NPS distribution
+  const npsPieData = useMemo(() => [
+    { name: "Promotores", value: promotores, fill: "#10b981" },
+    { name: "Neutros", value: neutros, fill: "#f59e0b" },
+    { name: "Detratores", value: detratores, fill: "#ef4444" },
+  ], [promotores, neutros, detratores]);
+
+  const getNpsBarColor = (score: number) => {
+    if (score >= 9) return "#10b981";
+    if (score >= 7) return "#f59e0b";
+    return "#ef4444";
+  };
   const frtRanking = useMemo(() => {
     if (!data) return [];
     return [...data.collaborators]
@@ -360,6 +426,126 @@ export default function Performance() {
               </Card>
             ))}
           </div>
+        </div>
+
+        {/* NPS Preditivo Section */}
+        <div className="space-y-6">
+          <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+            <Heart className="w-4 h-4 text-primary" /> NPS Preditivo
+          </h2>
+
+          {/* NPS Global KPI + Pie */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="bg-card/60 border-border/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">NPS Global da Agência</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center justify-center py-6">
+                <p className={cn("text-5xl font-black", npsGlobal > 50 ? "text-emerald-500" : npsGlobal >= 0 ? "text-amber-500" : "text-red-500")}>
+                  {npsGlobal > 0 ? "+" : ""}{npsGlobal}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Score NPS</p>
+                <div className="flex items-center gap-4 mt-4 text-xs">
+                  <span className="text-emerald-500 font-semibold">{promotores} promotores</span>
+                  <span className="text-amber-500 font-semibold">{neutros} neutros</span>
+                  <span className="text-red-500 font-semibold">{detratores} detratores</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/60 border-border/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Distribuição NPS</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={npsPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: ${value}`} labelLine={false} fontSize={11}>
+                      {npsPieData.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* NPS Ranking by Gestor */}
+            <Card className="bg-card/60 border-border/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-400" /> Ranking NPS por Responsável
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {npsGestorRanking.map((g, idx) => {
+                    const RankIcon = rankIcons[idx] || null;
+                    const rankColor = rankColors[idx] || "text-muted-foreground";
+                    return (
+                      <div key={g.name} className={cn("flex items-center justify-between p-3 rounded-lg border transition-colors", idx === 0 ? "bg-amber-500/5 border-amber-500/20" : "bg-card/40 border-border/20")}>
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 text-center">
+                            {RankIcon ? <RankIcon className={cn("w-5 h-5", rankColor)} /> : <span className="text-sm font-black text-muted-foreground">{idx + 1}º</span>}
+                          </span>
+                          <div>
+                            <p className="text-sm font-semibold">{g.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{g.total} clientes</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-right">
+                          <div>
+                            <p className={cn("text-sm font-bold", g.nps > 50 ? "text-emerald-500" : g.nps >= 0 ? "text-amber-500" : "text-red-500")}>
+                              {g.nps > 0 ? "+" : ""}{g.nps}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">NPS</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold">{g.avg}</p>
+                            <p className="text-[10px] text-muted-foreground">Média</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {npsGestorRanking.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">Sem dados de NPS disponíveis.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* NPS per Client Bar Chart */}
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">NPS Preditivo por Cliente</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[400px]">
+              {npsClientData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={npsClientData} margin={{ bottom: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={80} />
+                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                      formatter={(value: number, _: string, props: any) => [`${value} (${props.payload.categoria})`, "NPS"]}
+                      labelFormatter={(label: string) => `${label} — ${npsClientData.find(c => c.name === label)?.gestor || ""}`}
+                    />
+                    <Bar dataKey="score" name="NPS Score" radius={[4, 4, 0, 0]}>
+                      {npsClientData.map((entry, idx) => (
+                        <Cell key={idx} fill={getNpsBarColor(entry.score)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de NPS preditivo ainda.</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
