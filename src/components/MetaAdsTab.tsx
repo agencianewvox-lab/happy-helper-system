@@ -86,6 +86,9 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [datePreset, setDatePreset] = useState("last_30d");
+  const [customSince, setCustomSince] = useState<Date | undefined>(undefined);
+  const [customUntil, setCustomUntil] = useState<Date | undefined>(undefined);
+  const [useCustomRange, setUseCustomRange] = useState(false);
 
   // Fetch saved ad_account_id
   useEffect(() => {
