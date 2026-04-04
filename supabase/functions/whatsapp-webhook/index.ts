@@ -289,13 +289,19 @@ async function handleAlissonAIReply(
       groupMsgsMap.set(groupIds[i], conversasResults[i].data || []);
     }
 
-    // Fetch ads data
+    // Fetch ads data (30d + today)
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
     const adsDataMap = new Map<string, any>();
+    const adsTodayMap = new Map<string, any>();
+    const todayStr = new Date().toISOString().slice(0, 10);
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
-        if (adsData) adsDataMap.set(g.group_id, adsData);
+        const [ads30d, adsToday] = await Promise.all([
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStr, todayStr),
+        ]);
+        if (ads30d) adsDataMap.set(g.group_id, ads30d);
+        if (adsToday) adsTodayMap.set(g.group_id, adsToday);
       });
       await Promise.all(adsPromises);
     }
