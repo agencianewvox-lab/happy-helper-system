@@ -74,7 +74,7 @@ function TrendArrow({ trend }: { trend?: string }) {
 
 const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 
-export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
+export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
