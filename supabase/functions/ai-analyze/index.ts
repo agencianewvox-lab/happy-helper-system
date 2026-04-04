@@ -300,6 +300,63 @@ ${contextLines.join("\n")}
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
 
+    // Summary mode: generate a concise professional summary for a single client
+    if (type === "summary" && groupId) {
+      const targetGroup = grupos.find((g: any) => g.group_id === groupId);
+      if (!targetGroup) {
+        return new Response(JSON.stringify({ error: "Grupo não encontrado" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const gid = targetGroup.group_id;
+      const groupContext = contextLines.find((l: string) => l.includes(gid)) || "";
+
+      const summaryPrompt = `Você é a Vox, analista sênior de CS da New Vox. Gere um RESUMO EXECUTIVO prático e racional do cliente abaixo. 
+
+FORMATO DO RESUMO (máx 250 palavras):
+1. **Situação Atual** (2-3 frases): O que está acontecendo com esse cliente AGORA. Sentimento, engajamento, se tem problemas ativos.
+2. **Anúncios & Resultados** (2-3 frases): Se tem ads vinculados, como estão performando. Se não tem, mencione.
+3. **Riscos & Pendências** (1-2 frases): Pendências abertas, risco de churn, pontos de atenção.
+4. **Plano de Ação** (2-4 bullets): Ações concretas e específicas que a equipe deve tomar AGORA, com nome do responsável.
+
+REGRAS:
+- Seja DIRETO e PRÁTICO como um CS sênior falaria numa daily.
+- Use dados reais. NUNCA invente números.
+- Contextualize métricas: "CPA de R$15 está dentro do aceitável" ou "FRT de 2h está acima da meta de 30min".
+- Mencione o responsável CS pelo nome.
+- Use emojis sinalizadores: 🔴 crítico, 🟡 atenção, 🟢 ok, ⚡ ação.`;
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: summaryPrompt + "\n\nDADOS DO CLIENTE:\n" + groupContext },
+            { role: "user", content: `Gere o resumo executivo do cliente "${targetGroup.nome}".` },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const t = await response.text();
+        console.error("Summary AI error:", response.status, t);
+        return new Response(JSON.stringify({ error: "Erro ao gerar resumo" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || "Sem resposta da IA.";
+      return new Response(JSON.stringify({ summary: content }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Analyze mode
     if (type === "analyze") {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
