@@ -43,6 +43,7 @@ const App = () => (
           <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/pendencias" element={<ProtectedRoute><Pendencias /></ProtectedRoute>} />
           <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
+          <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
