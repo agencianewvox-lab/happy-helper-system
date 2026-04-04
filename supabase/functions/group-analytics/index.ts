@@ -454,8 +454,8 @@ interface CandidateMessage {
 function preFilterMessages(groupId: string, msgs: any[]): CandidateMessage[] {
   const now = Date.now();
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-  const TWO_HOURS = 2 * 60 * 60 * 1000;
   const THIRTY_MIN = 30 * 60 * 1000;
+  const TEN_MIN = 10 * 60 * 1000;
   const recentMsgs = msgs.filter(m => (now - new Date(m.created_at).getTime()) <= SEVEN_DAYS);
   if (recentMsgs.length === 0) return [];
   const candidates: CandidateMessage[] = [];
@@ -472,7 +472,9 @@ function preFilterMessages(groupId: string, msgs: any[]): CandidateMessage[] {
     if (teamResponded) continue;
     const elapsedMs = now - msgTime;
     const urgent = hasUrgency(text);
-    const minWait = urgent ? THIRTY_MIN : TWO_HOURS;
+    const isRequest = hasRequestOrQuestion(text);
+    // Urgent: 10min, Request/Question: 30min, Other: 30min (all reduced for faster detection)
+    const minWait = urgent ? TEN_MIN : THIRTY_MIN;
     if (elapsedMs < minWait) continue;
     const contextStart = Math.max(0, i - 5);
     const contextEnd = Math.min(recentMsgs.length, i + 6);
