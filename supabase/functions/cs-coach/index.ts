@@ -283,6 +283,46 @@ Deno.serve(async (req) => {
     }
 
     // ============================
+    // MONTHLY NFS TASK (Day 1 - Oral Center clinics)
+    // ============================
+    const dayOfMonth = brasiliaHour.getUTCDate();
+    const NFS_CLINICS = [
+      "120363145568211726@g.us", // Oral Center Araguari
+      "120363316048469386@g.us", // Oral Center Catalão
+    ];
+
+    if (dayOfMonth === 1 && currentTime >= "08:30" && currentTime < "10:00") {
+      for (const clinicId of NFS_CLINICS) {
+        const grupo = grupos.find((g: any) => g.group_id === clinicId);
+        if (!grupo) continue;
+        const responsavel = grupo.gestor_responsavel;
+        if (!responsavel) continue;
+
+        const monthKey = `${brasiliaHour.getUTCFullYear()}-${String(brasiliaHour.getUTCMonth() + 1).padStart(2, "0")}`;
+
+        const { data: existingTask } = await supabase
+          .from("tasks")
+          .select("id")
+          .eq("group_id", clinicId)
+          .ilike("title", "%NFS%Meta%Google%")
+          .gte("created_at", `${monthKey}-01T00:00:00Z`)
+          .limit(1);
+
+        if (!existingTask || existingTask.length === 0) {
+          await supabase.from("tasks").insert({
+            title: `Enviar NFS Meta e Google Ads - ${grupo.nome}`,
+            description: `Tarefa recorrente mensal (dia 01): Enviar as Notas Fiscais de Serviço referentes ao Meta Ads e Google Ads para o cliente ${grupo.nome}.`,
+            assigned_to: responsavel,
+            group_id: clinicId,
+            priority: "alta",
+            status: "pendente",
+            due_date: `${monthKey}-01`,
+          });
+        }
+      }
+    }
+
+    // ============================
     // WEEKLY REPORT TASKS (Fridays)
     // ============================
     if (dayOfWeek === 5) { // Friday
