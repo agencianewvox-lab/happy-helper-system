@@ -286,6 +286,8 @@ export default function Dashboard() {
       )}
 
       <AIChatPanel />
-    </div>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }
