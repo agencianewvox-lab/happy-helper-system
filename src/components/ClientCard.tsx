@@ -148,6 +148,11 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
             <CardTitle className={cn("truncate", compact ? "text-sm" : "text-base")}>
               <span className="mr-1.5">{catConfig.icon}</span>
               {grupo.nome}
+              {grupo.estrelas && grupo.estrelas > 0 && (
+                <span className="ml-1.5 text-sm" title={grupo.estrelas_motivo || `${grupo.estrelas} estrela(s)`}>
+                  {"⭐".repeat(grupo.estrelas)}
+                </span>
+              )}
             </CardTitle>
             <div className="flex items-center gap-1.5">
               {isPriorityMax && (

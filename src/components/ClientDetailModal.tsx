@@ -84,7 +84,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const [clientInfo, setClientInfo] = useState({
     plano: "", investimento_ads: "", data_entrada: "", data_ciclo_ads: "",
     aniversario_cliente: "", aniversario_empresa: "", acessos_cliente: "",
-    gestor_responsavel: "", briefing: "",
+    gestor_responsavel: "", briefing: "", estrelas: "", estrelas_motivo: "",
   });
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
@@ -133,7 +133,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const fetchClientInfo = useCallback(async () => {
     if (!grupo?.id) return;
     const { data } = await supabase.from("whatsapp_grupos")
-      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing")
+      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas, estrelas_motivo")
       .eq("id", grupo.id).single();
     if (data) {
       setClientInfo({
@@ -146,6 +146,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
         acessos_cliente: (data as any).acessos_cliente || "",
         gestor_responsavel: (data as any).gestor_responsavel || "",
         briefing: (data as any).briefing || "",
+        estrelas: (data as any).estrelas != null ? String((data as any).estrelas) : "",
+        estrelas_motivo: (data as any).estrelas_motivo || "",
       });
     }
   }, [grupo?.id]);
@@ -164,6 +166,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
       acessos_cliente: clientInfo.acessos_cliente || null,
       gestor_responsavel: clientInfo.gestor_responsavel || null,
       briefing: clientInfo.briefing || null,
+      estrelas: clientInfo.estrelas ? Number(clientInfo.estrelas) : null,
+      estrelas_motivo: clientInfo.estrelas_motivo || null,
     } as any).eq("id", grupo.id);
     setSavingInfo(false);
     if (!error) { setInfoSaved(true); setTimeout(() => setInfoSaved(false), 2000); }
@@ -596,6 +600,36 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                         <SelectItem value="Jader Costa">Jader Costa</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+                {/* Nível de Estrelas */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                  <span className="text-lg mt-1 shrink-0">⭐</span>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Label className="text-xs text-muted-foreground font-medium">Nível do Cliente</Label>
+                    <div className="flex gap-2 mt-1">
+                      {[1, 2, 3].map((n) => (
+                        <Button
+                          key={n}
+                          type="button"
+                          size="sm"
+                          variant={clientInfo.estrelas === String(n) ? "default" : "outline"}
+                          className={cn("h-8 px-3 text-sm gap-1", clientInfo.estrelas === String(n) && "bg-amber-500 hover:bg-amber-600 text-white border-amber-500")}
+                          onClick={() => setClientInfo(prev => ({ ...prev, estrelas: prev.estrelas === String(n) ? "" : String(n) }))}
+                        >
+                          {"⭐".repeat(n)}
+                        </Button>
+                      ))}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-medium">Motivo</Label>
+                      <Textarea
+                        value={clientInfo.estrelas_motivo}
+                        onChange={(e) => setClientInfo(prev => ({ ...prev, estrelas_motivo: e.target.value }))}
+                        placeholder="Explique o motivo da classificação..."
+                        className="mt-1 text-sm bg-background/50 min-h-[50px]"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">

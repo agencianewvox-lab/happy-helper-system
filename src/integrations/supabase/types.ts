@@ -375,6 +375,8 @@ export type Database = {
           created_at: string
           data_ciclo_ads: string | null
           data_entrada: string | null
+          estrelas: number | null
+          estrelas_motivo: string | null
           gestor_responsavel: string | null
           group_id: string
           id: string
@@ -392,6 +394,8 @@ export type Database = {
           created_at?: string
           data_ciclo_ads?: string | null
           data_entrada?: string | null
+          estrelas?: number | null
+          estrelas_motivo?: string | null
           gestor_responsavel?: string | null
           group_id: string
           id?: string
@@ -409,6 +413,8 @@ export type Database = {
           created_at?: string
           data_ciclo_ads?: string | null
           data_entrada?: string | null
+          estrelas?: number | null
+          estrelas_motivo?: string | null
           gestor_responsavel?: string | null
           group_id?: string
           id?: string

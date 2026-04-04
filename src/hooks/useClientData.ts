@@ -163,6 +163,8 @@ export function useClientData() {
           investimento_ads: g.investimento_ads ?? null,
           data_ciclo_ads: g.data_ciclo_ads ?? null,
           gestor_responsavel: g.gestor_responsavel ?? null,
+          estrelas: g.estrelas ?? null,
+          estrelas_motivo: g.estrelas_motivo ?? null,
         };
       });
 
