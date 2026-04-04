@@ -61,29 +61,23 @@ function playSirenSound() {
     const ctx = new AudioContext();
     const now = ctx.currentTime;
 
-    // Two-tone siren effect (~2 seconds)
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    // Soft corporate double-tone notification
+    const notes = [440, 554.37]; // A4 → C#5 (pleasant major third)
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const start = now + i * 0.25;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.12, start + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.55);
+    });
 
-    osc.type = "sine";
-    // Oscillate between two frequencies to create siren effect
-    osc.frequency.setValueAtTime(600, now);
-    osc.frequency.linearRampToValueAtTime(900, now + 0.5);
-    osc.frequency.linearRampToValueAtTime(600, now + 1.0);
-    osc.frequency.linearRampToValueAtTime(900, now + 1.5);
-    osc.frequency.linearRampToValueAtTime(600, now + 2.0);
-
-    // Gentle volume envelope
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.12, now + 0.1);
-    gain.gain.setValueAtTime(0.12, now + 1.8);
-    gain.gain.linearRampToValueAtTime(0, now + 2.0);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 2.1);
-
-    setTimeout(() => ctx.close(), 2500);
+    setTimeout(() => ctx.close(), 2000);
   } catch { /* silent */ }
 }
