@@ -76,7 +76,7 @@ function trendLabel(trend?: string) {
   return { icon: Minus, color: "text-muted-foreground", text: "Estável" };
 }
 
-export function ClientDetailModal({ grupo, open, onClose }: Props) {
+export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props) {
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [conversas, setConversas] = useState<Conversa[]>([]);
