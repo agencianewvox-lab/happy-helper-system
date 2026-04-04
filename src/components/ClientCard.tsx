@@ -15,6 +15,7 @@ interface ClientCardProps {
   grupo: Grupo;
   onClick: (grupo: Grupo) => void;
   compact?: boolean;
+  npsPrediction?: NpsPrediction;
 }
 
 const categoriaConfig: Record<string, { color: string; icon: string }> = {
