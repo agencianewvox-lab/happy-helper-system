@@ -5,10 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Loader2, DollarSign, Eye, MousePointerClick,
-  TrendingUp, Target, BarChart3, RefreshCw, Search, X
+  TrendingUp, Target, BarChart3, RefreshCw, Search, X, CalendarIcon
 } from "lucide-react";
 import {
   Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Line, ComposedChart,
@@ -82,6 +86,9 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [datePreset, setDatePreset] = useState("last_30d");
+  const [customSince, setCustomSince] = useState<Date | undefined>(undefined);
+  const [customUntil, setCustomUntil] = useState<Date | undefined>(undefined);
+  const [useCustomRange, setUseCustomRange] = useState(false);
 
   // Fetch saved ad_account_id
   useEffect(() => {
@@ -157,9 +164,14 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("meta-ads", {
-        body: { ad_account_id: savedAccountId, date_preset: datePreset },
-      });
+      const body: any = { ad_account_id: savedAccountId };
+      if (useCustomRange && customSince && customUntil) {
+        body.since = format(customSince, "yyyy-MM-dd");
+        body.until = format(customUntil, "yyyy-MM-dd");
+      } else {
+        body.date_preset = datePreset;
+      }
+      const { data, error: fnError } = await supabase.functions.invoke("meta-ads", { body });
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
       setSummary(data.summary);
@@ -170,7 +182,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [savedAccountId, datePreset]);
+  }, [savedAccountId, datePreset, useCustomRange, customSince, customUntil]);
 
   useEffect(() => {
     if (savedAccountId) fetchAds();
@@ -278,16 +290,64 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
         <>
           {/* Period selector + refresh */}
           <div className="flex items-center gap-2 flex-wrap">
-            {["last_7d", "last_14d", "last_30d", "this_month", "last_month"].map((p) => (
+            {["today", "last_7d", "last_14d", "last_30d", "this_month", "last_month"].map((p) => (
               <Badge
                 key={p}
-                variant={datePreset === p ? "default" : "outline"}
+                variant={!useCustomRange && datePreset === p ? "default" : "outline"}
                 className="cursor-pointer text-[10px]"
-                onClick={() => setDatePreset(p)}
+                onClick={() => { setUseCustomRange(false); setDatePreset(p); }}
               >
-                {p === "last_7d" ? "7 dias" : p === "last_14d" ? "14 dias" : p === "last_30d" ? "30 dias" : p === "this_month" ? "Este mês" : "Mês passado"}
+                {p === "today" ? "Hoje" : p === "last_7d" ? "7 dias" : p === "last_14d" ? "14 dias" : p === "last_30d" ? "30 dias" : p === "this_month" ? "Este mês" : "Mês passado"}
               </Badge>
             ))}
+
+            {/* Custom date range */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Badge
+                  variant={useCustomRange ? "default" : "outline"}
+                  className="cursor-pointer text-[10px] gap-1"
+                >
+                  <CalendarIcon className="w-3 h-3" />
+                  {useCustomRange && customSince && customUntil
+                    ? `${format(customSince, "dd/MM", { locale: ptBR })} - ${format(customUntil, "dd/MM", { locale: ptBR })}`
+                    : "Período"}
+                </Badge>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3 space-y-3" align="start">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">De:</Label>
+                  <Calendar
+                    mode="single"
+                    selected={customSince}
+                    onSelect={setCustomSince}
+                    locale={ptBR}
+                    disabled={(date) => date > new Date()}
+                    className="rounded-md border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Até:</Label>
+                  <Calendar
+                    mode="single"
+                    selected={customUntil}
+                    onSelect={setCustomUntil}
+                    locale={ptBR}
+                    disabled={(date) => date > new Date() || (customSince ? date < customSince : false)}
+                    className="rounded-md border"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full text-xs"
+                  disabled={!customSince || !customUntil}
+                  onClick={() => { setUseCustomRange(true); }}
+                >
+                  Aplicar período
+                </Button>
+              </PopoverContent>
+            </Popover>
+
             <Button size="sm" variant="ghost" className="h-6 w-6 p-0 ml-auto" onClick={fetchAds} disabled={loading}>
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
             </Button>

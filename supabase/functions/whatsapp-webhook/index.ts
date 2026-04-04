@@ -100,11 +100,17 @@ function shouldRespondToMessage(text: string): boolean {
 const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
-async function fetchMetaAdsForAccount(accountId: string, token: string): Promise<any | null> {
+async function fetchMetaAdsForAccount(accountId: string, token: string, datePreset?: string, since?: string, until?: string): Promise<any | null> {
   try {
     const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
     const fields = "spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,reach,frequency";
-    const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
+    let dateFilter = "";
+    if (since && until) {
+      dateFilter = `&time_range={"since":"${since}","until":"${until}"}`;
+    } else {
+      dateFilter = `&date_preset=${datePreset || "last_30d"}`;
+    }
+    const url = `${META_BASE}/${actId}/insights?fields=${fields}${dateFilter}&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.error || !data.data?.length) return null;
@@ -283,13 +289,19 @@ async function handleAlissonAIReply(
       groupMsgsMap.set(groupIds[i], conversasResults[i].data || []);
     }
 
-    // Fetch ads data
+    // Fetch ads data (30d + today)
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
     const adsDataMap = new Map<string, any>();
+    const adsTodayMap = new Map<string, any>();
+    const todayStr = new Date().toISOString().slice(0, 10);
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
-        if (adsData) adsDataMap.set(g.group_id, adsData);
+        const [ads30d, adsToday] = await Promise.all([
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStr, todayStr),
+        ]);
+        if (ads30d) adsDataMap.set(g.group_id, ads30d);
+        if (adsToday) adsTodayMap.set(g.group_id, adsToday);
       });
       await Promise.all(adsPromises);
     }
@@ -352,6 +364,7 @@ async function handleAlissonAIReply(
 
       const groupPending = pendingByGroup.get(gid) || [];
       const ads = adsDataMap.get(gid);
+      const adsToday = adsTodayMap.get(gid);
 
       let line = `### ${g.nome}`;
       line += `\n  Group ID: ${gid}`;
@@ -374,10 +387,13 @@ async function handleAlissonAIReply(
           line += `\n    - "${p.term}" (desde ${p.created_at})${p.due_date ? ` prazo: ${p.due_date}` : ""}`;
         }
       }
+      if (adsToday) {
+        line += `\n  📊 META ADS (HOJE ${todayStr}): Gasto R$${adsToday.spend.toFixed(2)}, ${adsToday.impressions} impressões, ${adsToday.clicks} cliques, CTR ${adsToday.ctr.toFixed(2)}%, Leads ${adsToday.leads}${adsToday.cpa ? `, CPA R$${adsToday.cpa.toFixed(2)}` : ""}, Alcance ${adsToday.reach}`;
+      }
       if (ads) {
         line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
-      } else if (g.ad_account_id) {
-        line += `\n  📊 META ADS: Conta vinculada mas sem dados nos últimos 30 dias`;
+      } else if (g.ad_account_id && !adsToday) {
+        line += `\n  📊 META ADS: Conta vinculada mas sem dados`;
       }
 
       // Last 10 messages
@@ -836,13 +852,19 @@ async function handleTeamCoachReply(
       pendingByGroup.get(p.group_id)!.push(p);
     }
 
-    // Ads data
+    // Ads data (30d + today)
     const adsDataMap = new Map<string, any>();
+    const adsTodayMapTeam = new Map<string, any>();
+    const todayStrTeam = new Date().toISOString().slice(0, 10);
     const groupsWithAds = allGroups.filter((g: any) => g.ad_account_id);
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
-        if (adsData) adsDataMap.set(g.group_id, adsData);
+        const [ads30d, adsToday] = await Promise.all([
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStrTeam, todayStrTeam),
+        ]);
+        if (ads30d) adsDataMap.set(g.group_id, ads30d);
+        if (adsToday) adsTodayMapTeam.set(g.group_id, adsToday);
       });
       await Promise.all(adsPromises);
     }
@@ -879,6 +901,7 @@ async function handleTeamCoachReply(
       const daysInactive = lastMsg ? Math.floor((Date.now() - new Date(lastMsg.recebido_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
       const groupPending = pendingByGroup.get(gid) || [];
       const ads = adsDataMap.get(gid);
+      const adsToday = adsTodayMapTeam.get(gid);
 
       let line = `### ${g.nome}`;
       line += `\n  Responsável: ${g.gestor_responsavel || "N/A"} | Plano: ${g.plano || "N/A"} | Investimento: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
@@ -888,6 +911,9 @@ async function handleTeamCoachReply(
       if (daysInactive !== null) line += ` | Última atividade: ${daysInactive === 0 ? "hoje" : `${daysInactive}d atrás`}`;
       if (groupPending.length > 0) {
         line += `\n  ⚠️ ${groupPending.length} pendência(s): ${groupPending.slice(0, 3).map((p: any) => `"${p.term}"`).join(", ")}`;
+      }
+      if (adsToday) {
+        line += `\n  📊 Ads HOJE: R$${adsToday.spend.toFixed(2)} gasto, ${adsToday.clicks} cliques, ${adsToday.leads} leads`;
       }
       if (ads) {
         line += `\n  📊 Ads 30d: R$${ads.spend.toFixed(0)} gasto, ${ads.leads} leads, ${ads.cpa ? `CPA R$${ads.cpa.toFixed(2)}` : ""}, CTR ${ads.ctr.toFixed(2)}%`;

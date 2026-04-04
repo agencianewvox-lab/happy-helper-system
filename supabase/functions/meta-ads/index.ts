@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, ad_account_id, date_preset } = body;
+    const { action, ad_account_id, date_preset, since, until } = body;
 
     // Action: list all ad accounts available to this token
     if (action === "list_accounts") {
@@ -52,11 +52,19 @@ Deno.serve(async (req) => {
     }
 
     const accountId = ad_account_id.startsWith("act_") ? ad_account_id : `act_${ad_account_id}`;
-    const preset = date_preset || "last_30d";
+
+    // Build date filter: custom range takes priority over preset
+    let dateFilter = "";
+    if (since && until) {
+      dateFilter = `&time_range={"since":"${since}","until":"${until}"}`;
+    } else {
+      const preset = date_preset || "last_30d";
+      dateFilter = `&date_preset=${preset}`;
+    }
 
     // Fetch account-level insights
     const fields = "spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,reach,frequency";
-    const insightsUrl = `${META_BASE}/${accountId}/insights?fields=${fields}&date_preset=${preset}&access_token=${token}`;
+    const insightsUrl = `${META_BASE}/${accountId}/insights?fields=${fields}${dateFilter}&access_token=${token}`;
 
     const insightsRes = await fetch(insightsUrl);
     const insightsData = await insightsRes.json();
@@ -70,13 +78,13 @@ Deno.serve(async (req) => {
 
     // Fetch campaign-level breakdown
     const campaignFields = "campaign_name,spend,impressions,clicks,ctr,actions,cost_per_action_type";
-    const campaignUrl = `${META_BASE}/${accountId}/insights?fields=${campaignFields}&date_preset=${preset}&level=campaign&limit=20&access_token=${token}`;
+    const campaignUrl = `${META_BASE}/${accountId}/insights?fields=${campaignFields}${dateFilter}&level=campaign&limit=20&access_token=${token}`;
 
     const campaignRes = await fetch(campaignUrl);
     const campaignData = await campaignRes.json();
 
     // Fetch daily breakdown for chart
-    const dailyUrl = `${META_BASE}/${accountId}/insights?fields=spend,impressions,clicks,actions&date_preset=${preset}&time_increment=1&access_token=${token}`;
+    const dailyUrl = `${META_BASE}/${accountId}/insights?fields=spend,impressions,clicks,actions${dateFilter}&time_increment=1&access_token=${token}`;
     const dailyRes = await fetch(dailyUrl);
     const dailyData = await dailyRes.json();
 
