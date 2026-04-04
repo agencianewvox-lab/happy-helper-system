@@ -237,17 +237,19 @@ export default function Performance() {
             </div>
             <div className="flex items-center gap-3">
               {/* Gestor Selector */}
-              <Select value={selectedGestor} onValueChange={setSelectedGestor}>
-                <SelectTrigger className="w-[200px] text-xs">
-                  <SelectValue placeholder="Selecionar responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos (Geral)</SelectItem>
-                  {gestores.map((g) => (
-                    <SelectItem key={g} value={g}>{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isAdmin && (
+                <Select value={selectedGestor} onValueChange={setSelectedGestor}>
+                  <SelectTrigger className="w-[200px] text-xs">
+                    <SelectValue placeholder="Selecionar responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos (Geral)</SelectItem>
+                    {gestores.map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Period Selector */}
               <div className="flex items-center gap-1">
