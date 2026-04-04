@@ -901,6 +901,7 @@ async function handleTeamCoachReply(
       const daysInactive = lastMsg ? Math.floor((Date.now() - new Date(lastMsg.recebido_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
       const groupPending = pendingByGroup.get(gid) || [];
       const ads = adsDataMap.get(gid);
+      const adsToday = adsTodayMapTeam.get(gid);
 
       let line = `### ${g.nome}`;
       line += `\n  Responsável: ${g.gestor_responsavel || "N/A"} | Plano: ${g.plano || "N/A"} | Investimento: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
@@ -910,6 +911,9 @@ async function handleTeamCoachReply(
       if (daysInactive !== null) line += ` | Última atividade: ${daysInactive === 0 ? "hoje" : `${daysInactive}d atrás`}`;
       if (groupPending.length > 0) {
         line += `\n  ⚠️ ${groupPending.length} pendência(s): ${groupPending.slice(0, 3).map((p: any) => `"${p.term}"`).join(", ")}`;
+      }
+      if (adsToday) {
+        line += `\n  📊 Ads HOJE: R$${adsToday.spend.toFixed(2)} gasto, ${adsToday.clicks} cliques, ${adsToday.leads} leads`;
       }
       if (ads) {
         line += `\n  📊 Ads 30d: R$${ads.spend.toFixed(0)} gasto, ${ads.leads} leads, ${ads.cpa ? `CPA R$${ads.cpa.toFixed(2)}` : ""}, CTR ${ads.ctr.toFixed(2)}%`;
