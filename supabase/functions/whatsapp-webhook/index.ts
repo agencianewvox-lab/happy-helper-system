@@ -978,8 +978,12 @@ Deno.serve(async (req) => {
       const isAlisson = isKnownPhone(earlyPhone, ALISSON_PHONES);
       console.log("isGroup:", isGroup, "| earlyPhone:", earlyPhone, "| isAlisson:", isAlisson, "| isAllowedGroup:", isGroup && isAllowedGroup(remoteJid));
 
-      // Allow Alisson's messages through even from non-whitelisted groups/DMs
-      if (!isAlisson && (!isGroup || !isAllowedGroup(remoteJid))) {
+      // Check if it's a team member (for coach replies in DMs)
+      const teamWebhook = !isGroup ? findTeamWebhookByName(data.pushName || "") : null;
+      const isTeamMember = !!teamWebhook;
+
+      // Allow Alisson's messages and team member DMs through even from non-whitelisted groups/DMs
+      if (!isAlisson && !isTeamMember && (!isGroup || !isAllowedGroup(remoteJid))) {
         return new Response(
           JSON.stringify({ success: true, skipped: true, reason: "group_not_allowed" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
