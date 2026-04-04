@@ -4,29 +4,24 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Area, AreaChart, Cell, PieChart, Pie,
 } from "recharts";
 import {
   MessageSquare, Timer, CheckCircle, TrendingUp, Users, ArrowUpDown,
-  Trophy, Medal, Award, Heart,
+  Trophy, Medal, Award, Heart, ListChecks, AlertTriangle, Activity, Star,
 } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
-import { useNpsPredictions } from "@/hooks/useNpsPredictions";
+import { usePerformanceData, type GestorMetrics } from "@/hooks/usePerformanceData";
 import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 
-type Period = "today" | "week" | "month";
+type Period = "today" | "week" | "month" | "quarter";
 
-interface Collaborator {
-  name: string;
-  role: string;
-  total_responses: number;
-  avg_frt_minutes: number | null;
-  resolutions: number;
-  daily_volumes: Record<string, number>;
-}
-
-interface PerformanceData {
+interface TeamPerfData {
   period: string;
   global: {
     total_entrada: number;
@@ -35,7 +30,7 @@ interface PerformanceData {
     total_resolutions: number;
     total_conversations: number;
   };
-  collaborators: Collaborator[];
+  collaborators: { name: string; role: string; total_responses: number; avg_frt_minutes: number | null; resolutions: number; daily_volumes: Record<string, number> }[];
   daily_volumes: { date: string; entrada: number; saida: number; total: number }[];
   sentiment_evolution: { date: string; score: number }[];
 }
@@ -56,38 +51,73 @@ function formatDate(dateStr: string): string {
 const rankIcons = [Trophy, Medal, Award];
 const rankColors = ["text-amber-400", "text-zinc-400", "text-orange-600"];
 
+const SCORE_LABELS: Record<string, string> = {
+  nps: "NPS Preditivo",
+  frt: "Tempo de Resposta",
+  tasks: "Tarefas Executadas",
+  resolutions: "Pendências Resolvidas",
+  sentiment: "Sentimento",
+  inactivity: "Atividade dos Grupos",
+};
+
+const SCORE_ICONS: Record<string, any> = {
+  nps: Heart,
+  frt: Timer,
+  tasks: ListChecks,
+  resolutions: CheckCircle,
+  sentiment: Activity,
+  inactivity: AlertTriangle,
+};
+
+function getScoreColor(score: number): string {
+  if (score >= 8) return "text-emerald-500";
+  if (score >= 6) return "text-amber-500";
+  if (score >= 4) return "text-orange-500";
+  return "text-red-500";
+}
+
+function getScoreBg(score: number): string {
+  if (score >= 8) return "bg-emerald-500/10 border-emerald-500/20";
+  if (score >= 6) return "bg-amber-500/10 border-amber-500/20";
+  if (score >= 4) return "bg-orange-500/10 border-orange-500/20";
+  return "bg-red-500/10 border-red-500/20";
+}
+
+const getNpsBarColor = (score: number) => {
+  if (score >= 9) return "#10b981";
+  if (score >= 7) return "#f59e0b";
+  return "#ef4444";
+};
+
+const tooltipStyle = {
+  backgroundColor: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: "8px",
+  fontSize: "12px",
+};
+
 export default function Performance() {
   const [period, setPeriod] = useState<Period>("week");
-  const [data, setData] = useState<PerformanceData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [gruposMap, setGruposMap] = useState<Record<string, { nome: string; gestor_responsavel: string | null; estrelas_dificuldade: number | null; estrelas_financeiro: number | null; estrelas_temperamento: number | null }>>({});
+  const [selectedGestor, setSelectedGestor] = useState<string>("all");
+  const [teamData, setTeamData] = useState<TeamPerfData | null>(null);
+  const [teamLoading, setTeamLoading] = useState(true);
+  const { isAdmin } = useProfile();
 
-  const { predictions, npsGlobal, promotores, neutros, detratores, loading: npsLoading } = useNpsPredictions();
+  const {
+    loading: dataLoading,
+    gestores,
+    gruposMap,
+    computeGestorMetrics,
+    getClientNpsData,
+    getClientTasksData,
+    getClientPendingData,
+    gestorRanking,
+  } = usePerformanceData(period);
 
-  // Helper: calculate client weight from stars (higher difficulty + financial importance = heavier weight)
-  function clientWeight(groupId: string): number {
-    const g = gruposMap[groupId];
-    if (!g) return 1;
-    const dif = g.estrelas_dificuldade || 1;
-    const fin = g.estrelas_financeiro || 1;
-    // Weight formula: difficulty (40%) + financial (60%), scaled 1-3 → weight 1-3
-    return dif * 0.4 + fin * 0.6;
-  }
-
-  // Fetch grupos for name/gestor/stars mapping
+  // Fetch team-performance edge function data
   useEffect(() => {
-    supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento").then(({ data }) => {
-      if (data) {
-        const map: Record<string, { nome: string; gestor_responsavel: string | null; estrelas_dificuldade: number | null; estrelas_financeiro: number | null; estrelas_temperamento: number | null }> = {};
-        for (const g of data) map[g.group_id] = { nome: g.nome, gestor_responsavel: g.gestor_responsavel, estrelas_dificuldade: g.estrelas_dificuldade, estrelas_financeiro: g.estrelas_financeiro, estrelas_temperamento: g.estrelas_temperamento };
-        setGruposMap(map);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
+    async function fetchTeamData() {
+      setTeamLoading(true);
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/team-performance?period=${period}`;
         const resp = await fetch(url, {
@@ -97,121 +127,76 @@ export default function Performance() {
           },
         });
         if (!resp.ok) throw new Error("Erro ao buscar dados");
-        const json = await resp.json();
-        setData(json);
+        setTeamData(await resp.json());
       } catch (err) {
-        console.error("Performance fetch error:", err);
+        console.error("Team performance fetch error:", err);
       } finally {
-        setLoading(false);
+        setTeamLoading(false);
       }
     }
-    fetchData();
+    fetchTeamData();
   }, [period]);
+
+  const gestorName = selectedGestor === "all" ? null : selectedGestor;
+  const metrics = useMemo(() => computeGestorMetrics(gestorName), [computeGestorMetrics, gestorName]);
+  const clientNpsData = useMemo(() => getClientNpsData(gestorName), [getClientNpsData, gestorName]);
+  const clientTasksData = useMemo(() => getClientTasksData(gestorName), [getClientTasksData, gestorName]);
+  const clientPendingData = useMemo(() => getClientPendingData(gestorName), [getClientPendingData, gestorName]);
+
+  // Filter team data by gestor
+  const filteredCollaborators = useMemo(() => {
+    if (!teamData) return [];
+    if (!gestorName) return teamData.collaborators;
+    return teamData.collaborators.filter(c => c.name === gestorName);
+  }, [teamData, gestorName]);
+
+  // FRT for selected gestor
+  const gestorFrt = useMemo(() => {
+    const collab = filteredCollaborators.find(c => c.name === gestorName);
+    return collab?.avg_frt_minutes ?? teamData?.global.avg_frt_minutes ?? null;
+  }, [filteredCollaborators, gestorName, teamData]);
+
+  // Update FRT score in metrics
+  const enhancedMetrics = useMemo((): GestorMetrics => {
+    const frt = gestorFrt;
+    let frtScore = 5;
+    if (frt != null) {
+      if (frt <= 15) frtScore = 10;
+      else if (frt <= 30) frtScore = 8;
+      else if (frt <= 60) frtScore = 6;
+      else if (frt <= 120) frtScore = 4;
+      else if (frt <= 240) frtScore = 2;
+      else frtScore = 1;
+    }
+    const scores = { ...metrics.scores, frt: frtScore };
+    const overall = Number(((scores.nps + scores.frt + scores.tasks + scores.resolutions + scores.sentiment + scores.inactivity) / 6).toFixed(1));
+    return { ...metrics, frtAvg: frt ?? 0, scores: { ...scores, overall } };
+  }, [metrics, gestorFrt]);
+
+  const sentimentData = useMemo(() => {
+    if (!teamData) return [];
+    return teamData.sentiment_evolution.map((d) => ({
+      ...d,
+      date: formatDate(d.date),
+    }));
+  }, [teamData]);
+
+  const chartData = useMemo(() => {
+    if (!teamData) return [];
+    return teamData.daily_volumes.map((d) => ({
+      ...d,
+      date: formatDate(d.date),
+    }));
+  }, [teamData]);
 
   const periodLabels: Record<Period, string> = {
     today: "Hoje",
-    week: "Últimos 7 dias",
-    month: "Mês Atual",
+    week: "7 dias",
+    month: "Mês",
+    quarter: "Trimestre",
   };
 
-  const chartData = useMemo(() => {
-    if (!data) return [];
-    return data.daily_volumes.map((d) => ({
-      ...d,
-      date: formatDate(d.date),
-    }));
-  }, [data]);
-
-  const sentimentData = useMemo(() => {
-    if (!data) return [];
-    return data.sentiment_evolution.map((d) => ({
-      ...d,
-      date: formatDate(d.date),
-    }));
-  }, [data]);
-
-  // NPS per client chart data
-  const npsClientData = useMemo(() => {
-    return predictions
-      .filter(p => p.confianca >= 20)
-      .map(p => ({
-        name: gruposMap[p.group_id]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 18) || p.group_id.substring(0, 12),
-        score: Number(p.nps_score.toFixed(1)),
-        categoria: p.nps_categoria,
-        gestor: gruposMap[p.group_id]?.gestor_responsavel || "Sem gestor",
-      }))
-      .sort((a, b) => b.score - a.score);
-  }, [predictions, gruposMap]);
-
-  // NPS ranking by gestor (weighted by client difficulty + financial importance)
-  const npsGestorRanking = useMemo(() => {
-    const gestorMap = new Map<string, { weightedSum: number; totalWeight: number; promotores: number; neutros: number; detratores: number; count: number; avgComplexity: number; complexitySum: number }>();
-    for (const p of predictions) {
-      if (p.confianca < 20) continue;
-      const gestor = gruposMap[p.group_id]?.gestor_responsavel || "Sem gestor";
-      const w = clientWeight(p.group_id);
-      const entry = gestorMap.get(gestor) || { weightedSum: 0, totalWeight: 0, promotores: 0, neutros: 0, detratores: 0, count: 0, avgComplexity: 0, complexitySum: 0 };
-      entry.weightedSum += p.nps_score * w;
-      entry.totalWeight += w;
-      entry.complexitySum += w;
-      entry.count++;
-      if (p.nps_categoria === "promotor") entry.promotores++;
-      else if (p.nps_categoria === "neutro") entry.neutros++;
-      else entry.detratores++;
-      gestorMap.set(gestor, entry);
-    }
-    return Array.from(gestorMap.entries())
-      .map(([name, d]) => ({
-        name,
-        avg: d.totalWeight > 0 ? Number((d.weightedSum / d.totalWeight).toFixed(1)) : 0,
-        total: d.count,
-        promotores: d.promotores,
-        neutros: d.neutros,
-        detratores: d.detratores,
-        nps: d.count > 0 ? Math.round(((d.promotores - d.detratores) / d.count) * 100) : 0,
-        avgComplexity: d.count > 0 ? Number((d.complexitySum / d.count).toFixed(1)) : 0,
-      }))
-      .sort((a, b) => b.nps - a.nps);
-  }, [predictions, gruposMap]);
-
-  // Pie chart data for NPS distribution
-  const npsPieData = useMemo(() => [
-    { name: "Promotores", value: promotores, fill: "#10b981" },
-    { name: "Neutros", value: neutros, fill: "#f59e0b" },
-    { name: "Detratores", value: detratores, fill: "#ef4444" },
-  ], [promotores, neutros, detratores]);
-
-  const getNpsBarColor = (score: number) => {
-    if (score >= 9) return "#10b981";
-    if (score >= 7) return "#f59e0b";
-    return "#ef4444";
-  };
-  // FRT ranking balanced by client complexity
-  const frtRanking = useMemo(() => {
-    if (!data) return [];
-    // Calculate average complexity weight per collaborator (match by name = gestor_responsavel)
-    const gestorWeights = new Map<string, { totalWeight: number; count: number }>();
-    for (const [, g] of Object.entries(gruposMap)) {
-      if (!g.gestor_responsavel) continue;
-      const w = (g.estrelas_dificuldade || 1) * 0.4 + (g.estrelas_financeiro || 1) * 0.6;
-      const entry = gestorWeights.get(g.gestor_responsavel) || { totalWeight: 0, count: 0 };
-      entry.totalWeight += w;
-      entry.count++;
-      gestorWeights.set(g.gestor_responsavel, entry);
-    }
-
-    return [...data.collaborators]
-      .filter((c) => c.avg_frt_minutes != null && c.total_responses > 0)
-      .map((c) => {
-        const gw = gestorWeights.get(c.name);
-        // avgComplexity 1-3; normalize so complexity 1 = factor 1, complexity 3 = factor 0.6 (30% bonus)
-        const avgComplexity = gw && gw.count > 0 ? gw.totalWeight / gw.count : 1;
-        const complexityFactor = 1 - ((avgComplexity - 1) / 2) * 0.4; // 1→1, 3→0.6
-        const adjustedFrt = Math.round((c.avg_frt_minutes || 0) * complexityFactor);
-        return { ...c, adjustedFrt, avgComplexity: Number(avgComplexity.toFixed(1)), clientCount: gw?.count || 0 };
-      })
-      .sort((a, b) => a.adjustedFrt - b.adjustedFrt);
-  }, [data, gruposMap]);
+  const loading = dataLoading || teamLoading;
 
   if (loading) {
     return (
@@ -229,216 +214,433 @@ export default function Performance() {
       {/* Header */}
       <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <img src={newvoxLogo} alt="New Vox" className="w-8 h-8 rounded object-cover" />
               <div>
                 <h1 className="text-lg font-bold tracking-tight">Central de Performance</h1>
-                <p className="text-xs text-muted-foreground">
-                  Métricas de equipe e evolução operacional
-                </p>
+                <p className="text-xs text-muted-foreground">Métricas detalhadas por responsável</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {(["today", "week", "month"] as Period[]).map((p) => (
-                <Button
-                  key={p}
-                  variant={period === p ? "default" : "outline"}
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => setPeriod(p)}
-                >
-                  {periodLabels[p]}
-                </Button>
-              ))}
+            <div className="flex items-center gap-3">
+              {/* Gestor Selector */}
+              <Select value={selectedGestor} onValueChange={setSelectedGestor}>
+                <SelectTrigger className="w-[200px] text-xs">
+                  <SelectValue placeholder="Selecionar responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos (Geral)</SelectItem>
+                  {gestores.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Period Selector */}
+              <div className="flex items-center gap-1">
+                {(["today", "week", "month", "quarter"] as Period[]).map((p) => (
+                  <Button
+                    key={p}
+                    variant={period === p ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setPeriod(p)}
+                  >
+                    {periodLabels[p]}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-8">
-        {/* Global KPI Cards */}
-        {data && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {[
-              { label: "Mensagens Recebidas", value: data.global.total_entrada, icon: MessageSquare, color: "text-blue-500" },
-              { label: "Mensagens Enviadas", value: data.global.total_saida, icon: MessageSquare, color: "text-emerald-500" },
-              { label: "FRT Médio Global", value: formatFrt(data.global.avg_frt_minutes), icon: Timer, color: "text-amber-500" },
-              { label: "Pendências Resolvidas", value: data.global.total_resolutions, icon: CheckCircle, color: "text-emerald-500" },
-              { label: "Total Interações", value: data.global.total_conversations, icon: TrendingUp, color: "text-primary" },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <Card key={label} className="bg-card/60 border-border/30">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <Icon className={cn("w-8 h-8", color)} />
-                  <div>
-                    <p className="text-2xl font-black">{value}</p>
-                    <p className="text-[11px] text-muted-foreground">{label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+        {/* ═══════════ SCORECARD (Notas 1-10) ═══════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Star className="w-5 h-5 text-amber-400" />
+            <h2 className="text-sm font-semibold">
+              Scorecard — {enhancedMetrics.name}
+            </h2>
+            <Badge variant="outline" className={cn("text-xs font-bold", getScoreColor(enhancedMetrics.scores.overall))}>
+              Nota Geral: {enhancedMetrics.scores.overall}
+            </Badge>
           </div>
-        )}
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Volume Chart */}
-          <Card className="bg-card/60 border-border/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Volume Diário de Mensagens</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} />
-                  <Area type="monotone" dataKey="entrada" name="Entrada" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
-                  <Area type="monotone" dataKey="saida" name="Saída" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Sentiment Evolution */}
-          <Card className="bg-card/60 border-border/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Evolução do Sentimento Geral</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={sentimentData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis domain={[-100, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                    }}
-                    formatter={(value: number) => [`${value}`, "Score"]}
-                  />
-                  <Line type="monotone" dataKey="score" name="Sentimento" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {(Object.keys(SCORE_LABELS) as Array<keyof typeof SCORE_LABELS>).map((key) => {
+              const score = enhancedMetrics.scores[key as keyof typeof enhancedMetrics.scores] as number;
+              const Icon = SCORE_ICONS[key];
+              return (
+                <Card key={key} className={cn("border transition-colors", getScoreBg(score))}>
+                  <CardContent className="p-4 flex flex-col items-center text-center">
+                    <Icon className={cn("w-5 h-5 mb-1", getScoreColor(score))} />
+                    <p className={cn("text-3xl font-black", getScoreColor(score))}>{score}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{SCORE_LABELS[key]}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Collaborator Section */}
+        {/* ═══════════ KPIs RÁPIDOS ═══════════ */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          {[
+            { label: "NPS Médio", value: enhancedMetrics.npsAvg.toFixed(1), icon: Heart, color: "text-primary" },
+            { label: "FRT Médio", value: formatFrt(enhancedMetrics.frtAvg || null), icon: Timer, color: "text-amber-500" },
+            { label: "Tarefas Concluídas", value: `${enhancedMetrics.tasksCompleted}/${enhancedMetrics.tasksTotal}`, icon: ListChecks, color: "text-blue-500" },
+            { label: "Pendências Resolvidas", value: `${enhancedMetrics.pendingResolved}/${enhancedMetrics.pendingTotal}`, icon: CheckCircle, color: "text-emerald-500" },
+            { label: "Clientes", value: enhancedMetrics.clients.length, icon: Users, color: "text-violet-500" },
+            { label: "Grupos Ativos", value: `${enhancedMetrics.totalGroups - enhancedMetrics.inactiveGroups}/${enhancedMetrics.totalGroups}`, icon: Activity, color: "text-cyan-500" },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <Card key={label} className="bg-card/60 border-border/30">
+              <CardContent className="p-4 flex items-center gap-3">
+                <Icon className={cn("w-7 h-7 shrink-0", color)} />
+                <div>
+                  <p className="text-xl font-black">{value}</p>
+                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* ═══════════ EVOLUÇÃO NPS PREDITIVO ═══════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Ranking by Response Volume */}
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Users className="w-4 h-4" /> Ranking de Volume de Respostas
+                <Heart className="w-4 h-4 text-primary" /> Evolução NPS Preditivo (Geral)
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {data && (
-                <ResponsiveContainer width="100%" height={Math.max(200, data.collaborators.length * 45)}>
-                  <BarChart
-                    data={data.collaborators.filter((c) => c.total_responses > 0)}
-                    layout="vertical"
-                    margin={{ left: 80 }}
-                  >
+            <CardContent className="h-[300px]">
+              {enhancedMetrics.npsEvolution.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={enhancedMetrics.npsEvolution.map(e => ({ ...e, date: formatDate(e.date) }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      width={75}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                      }}
-                    />
-                    <Bar dataKey="total_responses" name="Respostas" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                  </BarChart>
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Line type="monotone" dataKey="score" name="NPS Médio" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3 }} />
+                  </LineChart>
                 </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de evolução NPS no período.</p>
               )}
             </CardContent>
           </Card>
 
-          {/* FRT Ranking Table */}
+          {/* NPS por Cliente */}
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <ArrowUpDown className="w-4 h-4" /> Ranking de Tempo de Resposta (FRT)
-              </CardTitle>
+              <CardTitle className="text-sm font-semibold">NPS Preditivo por Cliente</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {frtRanking.map((c, idx) => {
-                  const RankIcon = rankIcons[idx] || null;
-                  const rankColor = rankColors[idx] || "text-muted-foreground";
-                  return (
-                    <div
-                      key={c.name}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-lg border transition-colors",
-                        idx === 0
-                          ? "bg-amber-500/5 border-amber-500/20"
-                          : "bg-card/40 border-border/20"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-black text-muted-foreground w-6 text-center">
-                          {RankIcon ? <RankIcon className={cn("w-5 h-5", rankColor)} /> : `${idx + 1}º`}
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold">{c.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{c.role} • {c.clientCount} clientes • peso {c.avgComplexity}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 text-right">
-                        <div>
-                          <p className="text-sm font-bold">{formatFrt(c.adjustedFrt)}</p>
-                          <p className="text-[10px] text-muted-foreground">FRT Ajust.</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] text-muted-foreground">{formatFrt(c.avg_frt_minutes)}</p>
-                          <p className="text-[10px] text-muted-foreground">FRT Real</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold">{c.total_responses}</p>
-                          <p className="text-[10px] text-muted-foreground">Respostas</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {frtRanking.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    Sem dados de FRT no período selecionado.
-                  </p>
-                )}
-              </div>
+            <CardContent className="h-[300px]">
+              {clientNpsData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={clientNpsData} margin={{ bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={60} />
+                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "NPS"]} />
+                    <Bar dataKey="score" name="NPS" radius={[4, 4, 0, 0]}>
+                      {clientNpsData.map((entry: any, idx: number) => (
+                        <Cell key={idx} fill={getNpsBarColor(entry.score)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de NPS.</p>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Individual Collaborator Cards */}
+        {/* ═══════════ EVOLUÇÃO SENTIMENTO + VOLUME ═══════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="w-4 h-4" /> Evolução do Sentimento
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-[280px]">
+              {sentimentData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={sentimentData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis domain={[-100, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}`, "Score"]} />
+                    <Line type="monotone" dataKey="score" name="Sentimento" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de sentimento.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Volume Diário de Mensagens</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[280px]">
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Area type="monotone" dataKey="entrada" name="Entrada" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
+                    <Area type="monotone" dataKey="saida" name="Saída" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de volume.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ═══════════ TAREFAS + PENDÊNCIAS ═══════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Tarefas por Cliente */}
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <ListChecks className="w-4 h-4 text-blue-500" /> Tarefas por Cliente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              {clientTasksData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={clientTasksData} margin={{ bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={60} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar dataKey="completed" name="Concluídas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" name="Total" fill="#3b82f6" radius={[4, 4, 0, 0]} opacity={0.4} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de tarefas no período.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Pendências por Cliente */}
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-500" /> Pendências Resolvidas por Cliente
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              {clientPendingData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={clientPendingData} margin={{ bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={60} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar dataKey="resolved" name="Resolvidas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" name="Total" fill="#ef4444" radius={[4, 4, 0, 0]} opacity={0.3} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de pendências no período.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ═══════════ EVOLUÇÃO TAREFAS + PENDÊNCIAS (Timeline) ═══════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Evolução de Tarefas</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[250px]">
+              {enhancedMetrics.tasksEvolution.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={enhancedMetrics.tasksEvolution.map(e => ({ ...e, date: formatDate(e.date) }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar dataKey="completed" name="Concluídas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" name="Criadas" fill="#3b82f6" radius={[4, 4, 0, 0]} opacity={0.4} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Sem evolução de tarefas.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Evolução de Pendências</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[250px]">
+              {enhancedMetrics.pendingEvolution.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={enhancedMetrics.pendingEvolution.map(e => ({ ...e, date: formatDate(e.date) }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar dataKey="resolved" name="Resolvidas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" name="Total" fill="#ef4444" radius={[4, 4, 0, 0]} opacity={0.3} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Sem evolução de pendências.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ═══════════ FRT RANKING ═══════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <ArrowUpDown className="w-4 h-4" /> Ranking de FRT
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {filteredCollaborators
+                  .filter(c => c.avg_frt_minutes != null && c.total_responses > 0)
+                  .sort((a, b) => (a.avg_frt_minutes || 999) - (b.avg_frt_minutes || 999))
+                  .map((c, idx) => {
+                    const RankIcon = rankIcons[idx] || null;
+                    const rankColor = rankColors[idx] || "text-muted-foreground";
+                    return (
+                      <div key={c.name} className={cn("flex items-center justify-between p-3 rounded-lg border", idx === 0 ? "bg-amber-500/5 border-amber-500/20" : "bg-card/40 border-border/20")}>
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 text-center">
+                            {RankIcon ? <RankIcon className={cn("w-5 h-5", rankColor)} /> : <span className="text-sm font-black text-muted-foreground">{idx + 1}º</span>}
+                          </span>
+                          <div>
+                            <p className="text-sm font-semibold">{c.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{c.role} • {c.total_responses} respostas</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold">{formatFrt(c.avg_frt_minutes)}</p>
+                          <p className="text-[10px] text-muted-foreground">FRT</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {filteredCollaborators.filter(c => c.avg_frt_minutes != null).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">Sem dados de FRT.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Volume Ranking */}
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Users className="w-4 h-4" /> Ranking de Volume
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {filteredCollaborators.length > 0 ? (
+                <ResponsiveContainer width="100%" height={Math.max(200, filteredCollaborators.length * 45)}>
+                  <BarChart data={filteredCollaborators.filter(c => c.total_responses > 0)} layout="vertical" margin={{ left: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={75} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="total_responses" name="Respostas" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-6">Sem dados de volume.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ═══════════ RANKING GERAL DOS GESTORES (Scorecard comparativo) ═══════════ */}
+        {selectedGestor === "all" && gestorRanking.length > 0 && (
+          <Card className="bg-card/60 border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-400" /> Ranking Geral por Responsável
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/30">
+                      <th className="text-left py-2 px-2 text-muted-foreground font-medium">#</th>
+                      <th className="text-left py-2 px-2 text-muted-foreground font-medium">Responsável</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">FRT</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">Tarefas</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">Pendências</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">Sentimento</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">Atividade</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">GERAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gestorRanking.map((g, idx) => {
+                      const RankIcon = rankIcons[idx] || null;
+                      const rankColor = rankColors[idx] || "text-muted-foreground";
+                      return (
+                        <tr key={g.name} className={cn("border-b border-border/10", idx === 0 && "bg-amber-500/5")}>
+                          <td className="py-3 px-2">
+                            {RankIcon ? <RankIcon className={cn("w-4 h-4", rankColor)} /> : <span className="font-bold text-muted-foreground">{idx + 1}º</span>}
+                          </td>
+                          <td className="py-3 px-2">
+                            <p className="font-semibold">{g.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{g.clients.length} clientes</p>
+                          </td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.nps))}>{g.scores.nps}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.frt))}>{g.scores.frt}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.tasks))}>{g.scores.tasks}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.resolutions))}>{g.scores.resolutions}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.sentiment))}>{g.scores.sentiment}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.inactivity))}>{g.scores.inactivity}</td>
+                          <td className="py-3 px-2 text-center">
+                            <Badge className={cn("text-xs font-bold", getScoreBg(g.scores.overall), getScoreColor(g.scores.overall))}>
+                              {g.scores.overall}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ═══════════ KPIs INDIVIDUAIS ═══════════ */}
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground mb-3">KPIs Individuais</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {data?.collaborators.map((c) => (
+            {filteredCollaborators.map((c) => (
               <Card key={c.name} className="bg-card/60 border-border/30">
                 <CardHeader className="pb-1 p-4">
                   <CardTitle className="text-sm">{c.name}</CardTitle>
@@ -465,126 +667,6 @@ export default function Performance() {
               </Card>
             ))}
           </div>
-        </div>
-
-        {/* NPS Preditivo Section */}
-        <div className="space-y-6">
-          <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-            <Heart className="w-4 h-4 text-primary" /> NPS Preditivo
-          </h2>
-
-          {/* NPS Global KPI + Pie */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="bg-card/60 border-border/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">NPS Global da Agência</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center py-6">
-                <p className={cn("text-5xl font-black", npsGlobal > 50 ? "text-emerald-500" : npsGlobal >= 0 ? "text-amber-500" : "text-red-500")}>
-                  {npsGlobal > 0 ? "+" : ""}{npsGlobal}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">Score NPS</p>
-                <div className="flex items-center gap-4 mt-4 text-xs">
-                  <span className="text-emerald-500 font-semibold">{promotores} promotores</span>
-                  <span className="text-amber-500 font-semibold">{neutros} neutros</span>
-                  <span className="text-red-500 font-semibold">{detratores} detratores</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/60 border-border/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Distribuição NPS</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={npsPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: ${value}`} labelLine={false} fontSize={11}>
-                      {npsPieData.map((entry, idx) => (
-                        <Cell key={idx} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* NPS Ranking by Gestor */}
-            <Card className="bg-card/60 border-border/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-amber-400" /> Ranking NPS por Responsável
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {npsGestorRanking.map((g, idx) => {
-                    const RankIcon = rankIcons[idx] || null;
-                    const rankColor = rankColors[idx] || "text-muted-foreground";
-                    return (
-                      <div key={g.name} className={cn("flex items-center justify-between p-3 rounded-lg border transition-colors", idx === 0 ? "bg-amber-500/5 border-amber-500/20" : "bg-card/40 border-border/20")}>
-                        <div className="flex items-center gap-3">
-                          <span className="w-6 text-center">
-                            {RankIcon ? <RankIcon className={cn("w-5 h-5", rankColor)} /> : <span className="text-sm font-black text-muted-foreground">{idx + 1}º</span>}
-                          </span>
-                          <div>
-                            <p className="text-sm font-semibold">{g.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{g.total} clientes • peso {g.avgComplexity}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 text-right">
-                          <div>
-                            <p className={cn("text-sm font-bold", g.nps > 50 ? "text-emerald-500" : g.nps >= 0 ? "text-amber-500" : "text-red-500")}>
-                              {g.nps > 0 ? "+" : ""}{g.nps}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">NPS</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold">{g.avg}</p>
-                            <p className="text-[10px] text-muted-foreground">Média</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {npsGestorRanking.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-6">Sem dados de NPS disponíveis.</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* NPS per Client Bar Chart */}
-          <Card className="bg-card/60 border-border/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">NPS Preditivo por Cliente</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[400px]">
-              {npsClientData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={npsClientData} margin={{ bottom: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={80} />
-                    <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
-                      formatter={(value: number, _: string, props: any) => [`${value} (${props.payload.categoria})`, "NPS"]}
-                      labelFormatter={(label: string) => `${label} — ${npsClientData.find(c => c.name === label)?.gestor || ""}`}
-                    />
-                    <Bar dataKey="score" name="NPS Score" radius={[4, 4, 0, 0]}>
-                      {npsClientData.map((entry, idx) => (
-                        <Cell key={idx} fill={getNpsBarColor(entry.score)} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de NPS preditivo ainda.</p>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </main>
     </div>
