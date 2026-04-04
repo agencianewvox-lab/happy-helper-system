@@ -290,16 +290,64 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
         <>
           {/* Period selector + refresh */}
           <div className="flex items-center gap-2 flex-wrap">
-            {["last_7d", "last_14d", "last_30d", "this_month", "last_month"].map((p) => (
+            {["today", "last_7d", "last_14d", "last_30d", "this_month", "last_month"].map((p) => (
               <Badge
                 key={p}
-                variant={datePreset === p ? "default" : "outline"}
+                variant={!useCustomRange && datePreset === p ? "default" : "outline"}
                 className="cursor-pointer text-[10px]"
-                onClick={() => setDatePreset(p)}
+                onClick={() => { setUseCustomRange(false); setDatePreset(p); }}
               >
-                {p === "last_7d" ? "7 dias" : p === "last_14d" ? "14 dias" : p === "last_30d" ? "30 dias" : p === "this_month" ? "Este mês" : "Mês passado"}
+                {p === "today" ? "Hoje" : p === "last_7d" ? "7 dias" : p === "last_14d" ? "14 dias" : p === "last_30d" ? "30 dias" : p === "this_month" ? "Este mês" : "Mês passado"}
               </Badge>
             ))}
+
+            {/* Custom date range */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Badge
+                  variant={useCustomRange ? "default" : "outline"}
+                  className="cursor-pointer text-[10px] gap-1"
+                >
+                  <CalendarIcon className="w-3 h-3" />
+                  {useCustomRange && customSince && customUntil
+                    ? `${format(customSince, "dd/MM", { locale: ptBR })} - ${format(customUntil, "dd/MM", { locale: ptBR })}`
+                    : "Período"}
+                </Badge>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3 space-y-3" align="start">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">De:</Label>
+                  <Calendar
+                    mode="single"
+                    selected={customSince}
+                    onSelect={setCustomSince}
+                    locale={ptBR}
+                    disabled={(date) => date > new Date()}
+                    className="rounded-md border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Até:</Label>
+                  <Calendar
+                    mode="single"
+                    selected={customUntil}
+                    onSelect={setCustomUntil}
+                    locale={ptBR}
+                    disabled={(date) => date > new Date() || (customSince ? date < customSince : false)}
+                    className="rounded-md border"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full text-xs"
+                  disabled={!customSince || !customUntil}
+                  onClick={() => { setUseCustomRange(true); }}
+                >
+                  Aplicar período
+                </Button>
+              </PopoverContent>
+            </Popover>
+
             <Button size="sm" variant="ghost" className="h-6 w-6 p-0 ml-auto" onClick={fetchAds} disabled={loading}>
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
             </Button>
