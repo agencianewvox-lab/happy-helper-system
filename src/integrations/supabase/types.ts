@@ -196,6 +196,30 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_feedback_log: {
+        Row: {
+          created_at: string
+          feedback_date: string
+          feedback_message: string
+          id: string
+          member_name: string
+        }
+        Insert: {
+          created_at?: string
+          feedback_date?: string
+          feedback_message: string
+          id?: string
+          member_name: string
+        }
+        Update: {
+          created_at?: string
+          feedback_date?: string
+          feedback_message?: string
+          id?: string
+          member_name?: string
+        }
+        Relationships: []
+      }
       nps_prediction_history: {
         Row: {
           group_id: string
