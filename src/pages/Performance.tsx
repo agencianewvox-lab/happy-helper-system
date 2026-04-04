@@ -506,7 +506,7 @@ export default function Performance() {
                           </span>
                           <div>
                             <p className="text-sm font-semibold">{g.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{g.total} clientes</p>
+                            <p className="text-[10px] text-muted-foreground">{g.total} clientes • peso {g.avgComplexity}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4 text-right">
