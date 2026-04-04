@@ -43,7 +43,15 @@ async function fetchMetaAdsForAccount(accountId: string, token: string): Promise
   }
 }
 
-function detectComplexQuery(messages: any[]): boolean {
+function detectSchedulingIntent(messages: any[]): boolean {
+  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUser) return false;
+  const text = lastUser.content.toLowerCase();
+  const keywords = ["agendar", "agenda", "marcar reunião", "marcar uma reunião", "reunião com", "compromisso", "disponibilidade", "horário livre", "agende", "marca"];
+  return keywords.some(k => text.includes(k));
+}
+
+
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
