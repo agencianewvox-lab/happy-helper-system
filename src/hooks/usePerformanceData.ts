@@ -74,7 +74,7 @@ export function usePerformanceData(period: string) {
     setLoading(true);
     try {
       const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes] = await Promise.all([
-        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento"),
+        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, data_entrada, investimento_ads, plano"),
         supabase.from("nps_prediction_history").select("*").gte("recorded_at", startISO).order("recorded_at"),
         supabase.from("tasks").select("*").gte("created_at", startISO),
         supabase.from("pending_demand_resolutions").select("*").gte("created_at", startISO),
