@@ -61,11 +61,9 @@ export default function PesquisaNps() {
   const surveyType: SurveyType =
     surveyTypeParam === "clinica" ? "clinica" : "operacao";
 
-  const [groupName, setGroupName] = useState("");
   const [step, setStep] = useState(0);
   const [score, setScore] = useState<number | null>(null);
   const [comment, setComment] = useState("");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [qualityRating, setQualityRating] = useState("");
   const [communicationRating, setCommunicationRating] = useState("");
