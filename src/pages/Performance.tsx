@@ -5,13 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, Area, AreaChart,
+  ResponsiveContainer, Legend, Area, AreaChart, Cell, PieChart, Pie,
 } from "recharts";
 import {
   MessageSquare, Timer, CheckCircle, TrendingUp, Users, ArrowUpDown,
-  Trophy, Medal, Award,
+  Trophy, Medal, Award, Heart,
 } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
+import { useNpsPredictions } from "@/hooks/useNpsPredictions";
+import { supabase } from "@/integrations/supabase/client";
 
 type Period = "today" | "week" | "month";
 
