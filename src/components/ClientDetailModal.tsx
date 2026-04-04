@@ -146,8 +146,9 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
         acessos_cliente: (data as any).acessos_cliente || "",
         gestor_responsavel: (data as any).gestor_responsavel || "",
         briefing: (data as any).briefing || "",
-        estrelas: (data as any).estrelas != null ? String((data as any).estrelas) : "",
-        estrelas_motivo: (data as any).estrelas_motivo || "",
+        estrelas_dificuldade: (data as any).estrelas_dificuldade != null ? String((data as any).estrelas_dificuldade) : "",
+        estrelas_financeiro: (data as any).estrelas_financeiro != null ? String((data as any).estrelas_financeiro) : "",
+        estrelas_temperamento: (data as any).estrelas_temperamento != null ? String((data as any).estrelas_temperamento) : "",
       });
     }
   }, [grupo?.id]);
