@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { MetaAdsTab } from "@/components/MetaAdsTab";
 import { NpsDetailPanel } from "@/components/NpsDetailPanel";
+import { NpsSurveyTab } from "@/components/NpsSurveyTab";
 
 interface Conversa {
   id: string;
@@ -250,6 +251,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
             <TabsTrigger value="conversas" className="flex-1">Conversas ({conversas.length})</TabsTrigger>
             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
             <TabsTrigger value="meta-ads" className="flex-1 gap-1"><Megaphone className="w-3 h-3" /> Ads</TabsTrigger>
+            <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
           </TabsList>
 
           <TabsContent value="indicadores" className="space-y-4 mt-4">
@@ -696,6 +698,10 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
 
           <TabsContent value="meta-ads" className="mt-4">
             <MetaAdsTab grupoId={grupo.group_id} grupoDbId={grupo.id} />
+          </TabsContent>
+
+          <TabsContent value="nps-real" className="mt-4">
+            <NpsSurveyTab groupId={grupo.group_id} />
           </TabsContent>
         </Tabs>
       </DialogContent>
