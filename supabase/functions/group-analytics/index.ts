@@ -435,6 +435,12 @@ function hasUrgency(text: string): boolean {
   return URGENCY_KEYWORDS.some(kw => lower.includes(kw));
 }
 
+function hasRequestOrQuestion(text: string): boolean {
+  const lower = text.toLowerCase();
+  if (lower.includes("?")) return true;
+  return REQUEST_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 interface CandidateMessage {
   mensagem: string;
   nome_contato: string;
