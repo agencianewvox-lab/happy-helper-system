@@ -364,6 +364,7 @@ async function handleAlissonAIReply(
 
       const groupPending = pendingByGroup.get(gid) || [];
       const ads = adsDataMap.get(gid);
+      const adsToday = adsTodayMap.get(gid);
 
       let line = `### ${g.nome}`;
       line += `\n  Group ID: ${gid}`;
@@ -386,10 +387,13 @@ async function handleAlissonAIReply(
           line += `\n    - "${p.term}" (desde ${p.created_at})${p.due_date ? ` prazo: ${p.due_date}` : ""}`;
         }
       }
+      if (adsToday) {
+        line += `\n  📊 META ADS (HOJE ${todayStr}): Gasto R$${adsToday.spend.toFixed(2)}, ${adsToday.impressions} impressões, ${adsToday.clicks} cliques, CTR ${adsToday.ctr.toFixed(2)}%, Leads ${adsToday.leads}${adsToday.cpa ? `, CPA R$${adsToday.cpa.toFixed(2)}` : ""}, Alcance ${adsToday.reach}`;
+      }
       if (ads) {
         line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
-      } else if (g.ad_account_id) {
-        line += `\n  📊 META ADS: Conta vinculada mas sem dados nos últimos 30 dias`;
+      } else if (g.ad_account_id && !adsToday) {
+        line += `\n  📊 META ADS: Conta vinculada mas sem dados`;
       }
 
       // Last 10 messages
