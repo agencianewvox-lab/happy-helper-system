@@ -268,6 +268,36 @@ export type Database = {
         }
         Relationships: []
       }
+      nps_surveys: {
+        Row: {
+          comment: string | null
+          created_at: string
+          group_id: string
+          id: string
+          respondent_email: string | null
+          respondent_name: string | null
+          score: number
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
+          score: number
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
+          score?: number
+        }
+        Relationships: []
+      }
       pending_demand_resolutions: {
         Row: {
           created_at: string
