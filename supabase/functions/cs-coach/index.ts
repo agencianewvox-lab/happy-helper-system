@@ -405,13 +405,10 @@ Regras:
 
       if (!mensagem) continue;
 
-      // --- STEP 5: Send via webhook ---
+      // --- STEP 5: Send via webhook (GET with query param) ---
       try {
-        const sendResp = await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: mensagem }),
-        });
+        const encodedMsg = encodeURIComponent(mensagem);
+        const sendResp = await fetch(`${webhookUrl}?message=${encodedMsg}`);
         console.log(`Sent to ${opp.destinatario}: ${sendResp.status}`);
       } catch (e) {
         console.error(`Failed to send to ${opp.destinatario}:`, e);
