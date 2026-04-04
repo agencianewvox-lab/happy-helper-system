@@ -111,17 +111,42 @@ const AGENT_TOOLS = [
     type: "function",
     function: {
       name: "criar_pendencia",
-      description: "Cria uma pendência/tarefa para um colaborador responsável em um cliente específico. Use quando Alisson pedir para designar, criar ou adicionar uma pendência, tarefa ou ação para alguém da equipe.",
+      description: "Cria uma pendência para um colaborador responsável em um cliente específico. Use somente quando Alisson pedir para criar, adicionar ou designar uma nova pendência.",
       parameters: {
         type: "object",
         properties: {
           group_name: { type: "string", description: "Nome do grupo/cliente (parcial ou completo)" },
-          term: { type: "string", description: "Descrição da pendência/tarefa" },
+          term: { type: "string", description: "Descrição da pendência" },
           responsible: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge)" },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
-          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da pendência" },
+          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da pendência" }
         },
         required: ["group_name", "term", "responsible", "priority"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remover_pendencias",
+      description: "Remove pendências existentes do quadro. Use quando Alisson pedir para remover, apagar, excluir, limpar ou tirar pendências do quadro de uma ou mais pessoas.",
+      parameters: {
+        type: "object",
+        properties: {
+          responsibles: {
+            type: "array",
+            description: "Lista de responsáveis cujas pendências devem ser removidas",
+            items: { type: "string" }
+          },
+          status: {
+            type: "string",
+            enum: ["pendente", "fazendo", "feito", "todos"],
+            description: "Coluna alvo do quadro; use 'pendente' para 'a fazer' e 'todos' quando não especificado"
+          },
+          group_name: { type: "string", description: "Cliente/grupo específico (opcional)", nullable: true }
+        },
+        required: ["responsibles", "status"],
         additionalProperties: false,
       },
     },
@@ -139,9 +164,34 @@ const AGENT_TOOLS = [
           assigned_to: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge, Priscilla Borges, Joel, Thais, Daniella, Victor Botto, Jiza Reis)" },
           group_name: { type: "string", description: "Nome do cliente associado (opcional)", nullable: true },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
-          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" },
+          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" }
         },
         required: ["title", "assigned_to", "priority"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remover_tarefas",
+      description: "Remove tarefas existentes do quadro de tarefas. Use quando Alisson pedir para remover, apagar, excluir, limpar ou tirar tarefas de uma ou mais pessoas.",
+      parameters: {
+        type: "object",
+        properties: {
+          responsibles: {
+            type: "array",
+            description: "Lista de responsáveis cujas tarefas devem ser removidas",
+            items: { type: "string" }
+          },
+          status: {
+            type: "string",
+            enum: ["pendente", "fazendo", "feito", "todos"],
+            description: "Coluna alvo do quadro; use 'pendente' para 'a fazer' e 'todos' quando não especificado"
+          },
+          group_name: { type: "string", description: "Cliente/grupo específico (opcional)", nullable: true }
+        },
+        required: ["responsibles", "status"],
         additionalProperties: false,
       },
     },
@@ -154,7 +204,7 @@ const AGENT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          question: { type: "string", description: "A pergunta a ser enviada para o Alisson" },
+          question: { type: "string", description: "A pergunta a ser enviada para o Alisson" }
         },
         required: ["question"],
         additionalProperties: false,
