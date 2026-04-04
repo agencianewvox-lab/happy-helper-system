@@ -282,6 +282,56 @@ Deno.serve(async (req) => {
       }
     }
 
+    // NPS REAL REMINDER: Check if 3+ months since last survey response, create task & coach nudge
+    const npsLastByGroup = new Map<string, string>();
+    for (const s of (npsSurveys || [])) {
+      if (!npsLastByGroup.has(s.group_id)) {
+        npsLastByGroup.set(s.group_id, s.created_at);
+      }
+    }
+
+    for (const grupo of grupos) {
+      const responsavel = grupo.gestor_responsavel;
+      if (!responsavel) continue;
+
+      const lastSurvey = npsLastByGroup.get(grupo.group_id);
+      if (!lastSurvey) continue; // Only remind after first survey exists
+
+      const monthsSinceSurvey = (now.getTime() - new Date(lastSurvey).getTime()) / (1000 * 60 * 60 * 24 * 30);
+      if (monthsSinceSurvey >= 3) {
+        // Check if task already exists for this cycle
+        const { data: existingTask } = await supabase
+          .from("tasks")
+          .select("id")
+          .eq("group_id", grupo.group_id)
+          .ilike("title", "%pesquisa NPS%")
+          .eq("status", "pendente")
+          .limit(1);
+
+        if (!existingTask || existingTask.length === 0) {
+          // Create task for the manager
+          const surveyType = (grupo.categoria || "").toLowerCase().includes("clínica") ? "clinica" : "operacao";
+          await supabase.from("tasks").insert({
+            title: `Enviar pesquisa NPS Real - ${grupo.nome}`,
+            description: `Já se passaram ${Math.floor(monthsSinceSurvey)} meses desde a última pesquisa NPS. Envie o link de pesquisa (${surveyType}) ao cliente.`,
+            assigned_to: responsavel,
+            group_id: grupo.group_id,
+            priority: "alta",
+            status: "pendente",
+          });
+
+          // Also add coach opportunity
+          opportunities.push({
+            tipo: "padrao_detectado",
+            destinatario: responsavel,
+            group_id: grupo.group_id,
+            group_name: grupo.nome,
+            context: `Pesquisa NPS Real do cliente "${grupo.nome}" está pendente há ${Math.floor(monthsSinceSurvey)} meses. Hora de reenviar o link para coletar feedback atualizado.`,
+          });
+        }
+      }
+    }
+
     // TYPE 3: Pendências esquecidas (4h+)
     if (tiposAtivos.includes("pendencia_esquecida")) {
       for (const pend of (pendencias || [])) {

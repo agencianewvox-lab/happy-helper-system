@@ -91,6 +91,7 @@ export function usePerformanceData(period: string) {
       if (tasksRes.data) setTasks(tasksRes.data);
       if (pendingRes.data) setPendingDemands(pendingRes.data);
       if (npsPredRes.data) setNpsPredictions(npsPredRes.data);
+      if (npsSurveysRes.data) setNpsSurveys(npsSurveysRes.data as any[]);
     } catch (err) {
       console.error("Performance data fetch error:", err);
     } finally {
