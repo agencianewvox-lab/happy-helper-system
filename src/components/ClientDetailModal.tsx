@@ -701,7 +701,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
           </TabsContent>
 
           <TabsContent value="nps-real" className="mt-4">
-            <NpsSurveyTab groupId={grupo.group_id} />
+            <NpsSurveyTab groupId={grupo.group_id} categoria={grupo.categoria} />
           </TabsContent>
         </Tabs>
       </DialogContent>
