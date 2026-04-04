@@ -143,14 +143,18 @@ export default function Performance() {
       .sort((a, b) => b.score - a.score);
   }, [predictions, gruposMap]);
 
-  // NPS ranking by gestor
+  // NPS ranking by gestor (weighted by client difficulty + financial importance)
   const npsGestorRanking = useMemo(() => {
-    const gestorMap = new Map<string, { scores: number[]; promotores: number; neutros: number; detratores: number }>();
+    const gestorMap = new Map<string, { weightedSum: number; totalWeight: number; promotores: number; neutros: number; detratores: number; count: number; avgComplexity: number; complexitySum: number }>();
     for (const p of predictions) {
       if (p.confianca < 20) continue;
       const gestor = gruposMap[p.group_id]?.gestor_responsavel || "Sem gestor";
-      const entry = gestorMap.get(gestor) || { scores: [], promotores: 0, neutros: 0, detratores: 0 };
-      entry.scores.push(p.nps_score);
+      const w = clientWeight(p.group_id);
+      const entry = gestorMap.get(gestor) || { weightedSum: 0, totalWeight: 0, promotores: 0, neutros: 0, detratores: 0, count: 0, avgComplexity: 0, complexitySum: 0 };
+      entry.weightedSum += p.nps_score * w;
+      entry.totalWeight += w;
+      entry.complexitySum += w;
+      entry.count++;
       if (p.nps_categoria === "promotor") entry.promotores++;
       else if (p.nps_categoria === "neutro") entry.neutros++;
       else entry.detratores++;
@@ -159,12 +163,13 @@ export default function Performance() {
     return Array.from(gestorMap.entries())
       .map(([name, d]) => ({
         name,
-        avg: Number((d.scores.reduce((a, b) => a + b, 0) / d.scores.length).toFixed(1)),
-        total: d.scores.length,
+        avg: d.totalWeight > 0 ? Number((d.weightedSum / d.totalWeight).toFixed(1)) : 0,
+        total: d.count,
         promotores: d.promotores,
         neutros: d.neutros,
         detratores: d.detratores,
-        nps: d.scores.length > 0 ? Math.round(((d.promotores - d.detratores) / d.scores.length) * 100) : 0,
+        nps: d.count > 0 ? Math.round(((d.promotores - d.detratores) / d.count) * 100) : 0,
+        avgComplexity: d.count > 0 ? Number((d.complexitySum / d.count).toFixed(1)) : 0,
       }))
       .sort((a, b) => b.nps - a.nps);
   }, [predictions, gruposMap]);
