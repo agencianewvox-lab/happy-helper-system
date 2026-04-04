@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { CoachPanel } from "@/components/CoachPanel";
 import { useNpsPredictions } from "@/hooks/useNpsPredictions";
+import { BirthdayAlerts } from "@/components/BirthdayAlerts";
 
 export default function Dashboard() {
   const navigate = useNavigate();
