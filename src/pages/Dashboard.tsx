@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
+  const { predictionsMap, npsGlobal } = useNpsPredictions();
 
   const roleGrupos = useMemo(() => {
     if (profileLoading) return [];
