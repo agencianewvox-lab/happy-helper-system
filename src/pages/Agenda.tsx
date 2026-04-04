@@ -89,13 +89,54 @@ export default function Agenda() {
   }, []);
 
   const loadEvents = async () => {
-    const { data, error } = await supabase
-      .from("calendar_events")
-      .select("*")
-      .order("start_time", { ascending: true });
-    if (!error && data) {
-      setEvents(data as unknown as CalendarEvent[]);
+    const [eventsRes, gruposRes] = await Promise.all([
+      supabase.from("calendar_events").select("*").order("start_time", { ascending: true }),
+      supabase.from("whatsapp_grupos").select("nome, aniversario_cliente, aniversario_empresa, gestor_responsavel"),
+    ]);
+
+    const dbEvents = (eventsRes.data || []) as unknown as CalendarEvent[];
+
+    // Generate birthday virtual events for the current year
+    const currentYear = new Date().getFullYear();
+    const birthdayEvents: CalendarEvent[] = [];
+    for (const g of gruposRes.data || []) {
+      if (g.aniversario_cliente) {
+        const d = parseISO(g.aniversario_cliente);
+        const thisYear = new Date(currentYear, d.getMonth(), d.getDate());
+        birthdayEvents.push({
+          id: `bday-cli-${g.nome}`,
+          title: `🎂 Aniver. ${g.nome}`,
+          description: `Enviar parabéns ao cliente ${g.nome}`,
+          start_time: format(thisYear, "yyyy-MM-dd'T'09:00:00"),
+          end_time: format(thisYear, "yyyy-MM-dd'T'09:30:00"),
+          event_type: "aniversario_cliente",
+          created_by: "Sistema",
+          participants: g.gestor_responsavel ? [g.gestor_responsavel] : [],
+          group_id: null,
+          location: null,
+          color: "#ec4899",
+        });
+      }
+      if (g.aniversario_empresa) {
+        const d = parseISO(g.aniversario_empresa);
+        const thisYear = new Date(currentYear, d.getMonth(), d.getDate());
+        birthdayEvents.push({
+          id: `bday-emp-${g.nome}`,
+          title: `🏢 Aniver. Empresa ${g.nome}`,
+          description: `Enviar parabéns pela data de aniversário da empresa ${g.nome}`,
+          start_time: format(thisYear, "yyyy-MM-dd'T'09:00:00"),
+          end_time: format(thisYear, "yyyy-MM-dd'T'09:30:00"),
+          event_type: "aniversario_empresa",
+          created_by: "Sistema",
+          participants: g.gestor_responsavel ? [g.gestor_responsavel] : [],
+          group_id: null,
+          location: null,
+          color: "#06b6d4",
+        });
+      }
     }
+
+    setEvents([...dbEvents, ...birthdayEvents]);
     setLoading(false);
   };
 
