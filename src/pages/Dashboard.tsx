@@ -15,6 +15,7 @@ import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { CoachPanel } from "@/components/CoachPanel";
+import { useNpsPredictions } from "@/hooks/useNpsPredictions";
 
 export default function Dashboard() {
   const navigate = useNavigate();
