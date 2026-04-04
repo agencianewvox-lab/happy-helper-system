@@ -79,8 +79,6 @@ export default function PesquisaNps() {
   const [error, setError] = useState("");
 
   const isClinica = surveyType === "clinica";
-
-  const isClinica = surveyType === "clinica";
   const showReferrals = score !== null && score >= 9;
 
   // Total steps: 0=info+score, 1=motivo, 2=quality, 3=communication, 4=results, 5=manager, 6=improvement, 7=referrals(conditional)
