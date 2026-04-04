@@ -38,6 +38,8 @@ const EVENT_TYPES = [
   { value: "lembrete", label: "Lembrete", color: "#f59e0b" },
   { value: "pessoal", label: "Pessoal", color: "#10b981" },
   { value: "cliente", label: "Reunião com Cliente", color: "#ef4444" },
+  { value: "aniversario_cliente", label: "🎂 Aniversário Cliente", color: "#ec4899" },
+  { value: "aniversario_empresa", label: "🏢 Aniversário Empresa", color: "#06b6d4" },
 ];
 
 const TEAM_MEMBERS = [
