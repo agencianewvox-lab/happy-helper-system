@@ -290,7 +290,7 @@ export default function Dashboard() {
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {metricFilteredGrupos.map((g) => (
-            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} />
+            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} npsPrediction={predictionsMap.get(g.group_id)} />
           ))}
           {metricFilteredGrupos.length === 0 && (
             <p className="col-span-full text-center text-muted-foreground py-12">
