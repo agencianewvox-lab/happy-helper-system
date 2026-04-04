@@ -202,6 +202,13 @@ export default function Dashboard() {
               >
                 <ListTodo className="w-4 h-4" />
               </a>
+              <a
+                href="/agenda"
+                className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title="Agenda"
+              >
+                <CalendarDays className="w-4 h-4" />
+              </a>
               {isAdmin && (
                 <a
                   href="/nps"
