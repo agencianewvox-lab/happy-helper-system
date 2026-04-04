@@ -59,6 +59,20 @@ const DEMAND_KEYWORDS = [
   "quanto tempo", "demora", "atrasado", "atraso",
 ];
 
+// Keywords that indicate a client REQUEST (even polite ones)
+const REQUEST_KEYWORDS = [
+  "poderia", "pode me", "pode enviar", "pode mandar", "pode reenviar",
+  "reenviar", "reenvie", "reenvia", "me enviar", "me mandar",
+  "preciso", "precisava", "gostaria", "necessito",
+  "tem como", "teria como", "seria possível", "seria possivel",
+  "por favor", "por gentileza", "solicito", "solicitar",
+  "caso tenha", "se possível", "se possivel",
+  "me passar", "me informar", "me envie", "me mande",
+  "quando vai", "quando será", "quando sera", "quando posso",
+  "ainda não recebi", "ainda nao recebi", "não recebi", "nao recebi",
+  "não chegou", "nao chegou",
+];
+
 const TEAM_MEMBERS = [
   "jader", "murillo", "murilo", "priscilla", "priscila", "alisson", "joel", "thais", "daniella", "victor botto", "netto", "netto monge", "jiza",
 ];
