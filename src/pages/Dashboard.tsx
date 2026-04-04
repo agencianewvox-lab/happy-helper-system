@@ -303,6 +303,7 @@ export default function Dashboard() {
         grupo={selectedGrupo}
         open={!!selectedGrupo}
         onClose={() => setSelectedGrupo(null)}
+        npsPrediction={selectedGrupo ? predictionsMap.get(selectedGrupo.group_id) : undefined}
       />
 
       {tvMode && (
