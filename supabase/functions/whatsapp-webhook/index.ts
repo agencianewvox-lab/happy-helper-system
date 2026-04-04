@@ -111,17 +111,42 @@ const AGENT_TOOLS = [
     type: "function",
     function: {
       name: "criar_pendencia",
-      description: "Cria uma pendência/tarefa para um colaborador responsável em um cliente específico. Use quando Alisson pedir para designar, criar ou adicionar uma pendência, tarefa ou ação para alguém da equipe.",
+      description: "Cria uma pendência para um colaborador responsável em um cliente específico. Use somente quando Alisson pedir para criar, adicionar ou designar uma nova pendência.",
       parameters: {
         type: "object",
         properties: {
           group_name: { type: "string", description: "Nome do grupo/cliente (parcial ou completo)" },
-          term: { type: "string", description: "Descrição da pendência/tarefa" },
+          term: { type: "string", description: "Descrição da pendência" },
           responsible: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge)" },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
-          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da pendência" },
+          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da pendência" }
         },
         required: ["group_name", "term", "responsible", "priority"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remover_pendencias",
+      description: "Remove pendências existentes do quadro. Use quando Alisson pedir para remover, apagar, excluir, limpar ou tirar pendências do quadro de uma ou mais pessoas.",
+      parameters: {
+        type: "object",
+        properties: {
+          responsibles: {
+            type: "array",
+            description: "Lista de responsáveis cujas pendências devem ser removidas",
+            items: { type: "string" }
+          },
+          status: {
+            type: "string",
+            enum: ["pendente", "fazendo", "feito", "todos"],
+            description: "Coluna alvo do quadro; use 'pendente' para 'a fazer' e 'todos' quando não especificado"
+          },
+          group_name: { type: "string", description: "Cliente/grupo específico (opcional)", nullable: true }
+        },
+        required: ["responsibles", "status"],
         additionalProperties: false,
       },
     },
@@ -139,9 +164,34 @@ const AGENT_TOOLS = [
           assigned_to: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge, Priscilla Borges, Joel, Thais, Daniella, Victor Botto, Jiza Reis)" },
           group_name: { type: "string", description: "Nome do cliente associado (opcional)", nullable: true },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
-          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" },
+          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" }
         },
         required: ["title", "assigned_to", "priority"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remover_tarefas",
+      description: "Remove tarefas existentes do quadro de tarefas. Use quando Alisson pedir para remover, apagar, excluir, limpar ou tirar tarefas de uma ou mais pessoas.",
+      parameters: {
+        type: "object",
+        properties: {
+          responsibles: {
+            type: "array",
+            description: "Lista de responsáveis cujas tarefas devem ser removidas",
+            items: { type: "string" }
+          },
+          status: {
+            type: "string",
+            enum: ["pendente", "fazendo", "feito", "todos"],
+            description: "Coluna alvo do quadro; use 'pendente' para 'a fazer' e 'todos' quando não especificado"
+          },
+          group_name: { type: "string", description: "Cliente/grupo específico (opcional)", nullable: true }
+        },
+        required: ["responsibles", "status"],
         additionalProperties: false,
       },
     },
@@ -154,7 +204,7 @@ const AGENT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          question: { type: "string", description: "A pergunta a ser enviada para o Alisson" },
+          question: { type: "string", description: "A pergunta a ser enviada para o Alisson" }
         },
         required: ["question"],
         additionalProperties: false,
@@ -380,6 +430,8 @@ REGRAS:
 - NUNCA invente dados. Se não tem, diga
 - Quando sugerir ações, diga QUEM da equipe deve fazer (use nomes)
 - Benchmarks: FRT ideal <30min, bom até 60, ruim >120. Churn <30 tranquilo, >60 ação necessária
+- Se Alisson der um COMANDO operacional explícito (ex: remover, excluir, apagar, limpar, criar, pausar), você DEVE executar a ação correspondente pela ferramenta correta em vez de reinterpretar como sugestão
+- Se Alisson pedir para remover algo do quadro, use remover_pendencias ou remover_tarefas; NÃO crie novos itens para simular a remoção
 - Se Alisson falar algo sem contexto claro, tente inferir ou pergunte usando a ferramenta
 - Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
 
@@ -432,7 +484,6 @@ ${contextLines.join("\n\n")}`;
       console.log(`Tool call: ${fnName}`, JSON.stringify(args));
 
       if (fnName === "criar_pendencia") {
-        // Find the group by name match
         const matchedGroup = grupos.find((g: any) =>
           g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
           args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
@@ -452,10 +503,53 @@ ${contextLines.join("\n\n")}`;
             toolResults.push(`❌ Erro ao criar pendência: ${insertErr.message}`);
           } else {
             toolResults.push(`✅ Pendência criada: "${args.term}" para ${args.responsible} no cliente ${matchedGroup.nome}${args.due_date ? ` (prazo: ${args.due_date})` : ""}`);
-            console.log("Pendência criada com sucesso para", matchedGroup.nome);
           }
         } else {
-          toolResults.push(`❌ Cliente "${args.group_name}" não encontrado. Clientes disponíveis: ${grupos.slice(0, 10).map((g: any) => g.nome).join(", ")}`);
+          toolResults.push(`❌ Cliente "${args.group_name}" não encontrado.`);
+        }
+      }
+
+      if (fnName === "remover_pendencias") {
+        const responsibles = Array.isArray(args.responsibles) ? args.responsibles.filter(Boolean) : [];
+        const normalizedStatus = args.status === "todos" ? null : (args.status || "pendente");
+        let groupIds: string[] | null = null;
+
+        if (args.group_name) {
+          groupIds = grupos
+            .filter((g: any) =>
+              g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+              args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+            )
+            .map((g: any) => g.group_id);
+        }
+
+        const { data: existing, error: fetchErr } = await supabase
+          .from("pending_demand_resolutions")
+          .select("id, term, group_id, status, resolved");
+
+        if (fetchErr) {
+          toolResults.push(`❌ Erro ao buscar pendências: ${fetchErr.message}`);
+        } else {
+          const idsToDelete = (existing || [])
+            .filter((item: any) => {
+              const term = (item.term || "").toLowerCase();
+              const responsibleMatch = responsibles.length === 0 || responsibles.some((name: string) => term.includes(name.toLowerCase()));
+              const statusMatch = !normalizedStatus || item.status === normalizedStatus;
+              const groupMatch = !groupIds || groupIds.includes(item.group_id);
+              return responsibleMatch && statusMatch && groupMatch;
+            })
+            .map((item: any) => item.id);
+
+          if (idsToDelete.length === 0) {
+            toolResults.push(`⚠️ Nenhuma pendência encontrada para remover.`);
+          } else {
+            const { error: deleteErr } = await supabase.from("pending_demand_resolutions").delete().in("id", idsToDelete);
+            if (deleteErr) {
+              toolResults.push(`❌ Erro ao remover pendências: ${deleteErr.message}`);
+            } else {
+              toolResults.push(`✅ ${idsToDelete.length} pendência(s) removida(s) do quadro${responsibles.length ? ` de ${responsibles.join(", ")}` : ""}.`);
+            }
+          }
         }
       }
 
@@ -488,15 +582,58 @@ ${contextLines.join("\n\n")}`;
         }
       }
 
+      if (fnName === "remover_tarefas") {
+        const responsibles = Array.isArray(args.responsibles) ? args.responsibles.filter(Boolean) : [];
+        const normalizedStatus = args.status === "todos" ? null : (args.status || "pendente");
+        let groupIds: string[] | null = null;
+
+        if (args.group_name) {
+          groupIds = grupos
+            .filter((g: any) =>
+              g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+              args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+            )
+            .map((g: any) => g.group_id);
+        }
+
+        const { data: existing, error: fetchErr } = await supabase
+          .from("tasks")
+          .select("id, assigned_to, status, group_id");
+
+        if (fetchErr) {
+          toolResults.push(`❌ Erro ao buscar tarefas: ${fetchErr.message}`);
+        } else {
+          const idsToDelete = (existing || [])
+            .filter((item: any) => {
+              const assigned = (item.assigned_to || "").toLowerCase();
+              const responsibleMatch = responsibles.length === 0 || responsibles.some((name: string) => assigned.includes(name.toLowerCase()));
+              const statusMatch = !normalizedStatus || item.status === normalizedStatus;
+              const groupMatch = !groupIds || groupIds.includes(item.group_id);
+              return responsibleMatch && statusMatch && groupMatch;
+            })
+            .map((item: any) => item.id);
+
+          if (idsToDelete.length === 0) {
+            toolResults.push(`⚠️ Nenhuma tarefa encontrada para remover.`);
+          } else {
+            const { error: deleteErr } = await supabase.from("tasks").delete().in("id", idsToDelete);
+            if (deleteErr) {
+              toolResults.push(`❌ Erro ao remover tarefas: ${deleteErr.message}`);
+            } else {
+              toolResults.push(`✅ ${idsToDelete.length} tarefa(s) removida(s) do quadro${responsibles.length ? ` de ${responsibles.join(", ")}` : ""}.`);
+            }
+          }
+        }
+      }
+
       if (fnName === "perguntar_detalhes") {
-        // The question IS the reply — send it directly
         aiReply = args.question;
         console.log("AI asking follow-up question:", args.question);
       }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "criar_tarefa"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
