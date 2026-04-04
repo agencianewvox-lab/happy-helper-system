@@ -211,8 +211,6 @@ export default function Dashboard() {
                   <Heart className="w-4 h-4" />
                 </a>
               )}
-                <ListTodo className="w-4 h-4" />
-              </a>
               <CoachPanel />
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
