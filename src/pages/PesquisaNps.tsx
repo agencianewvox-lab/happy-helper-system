@@ -90,7 +90,7 @@ export default function PesquisaNps() {
   const canAdvance = () => {
     switch (step) {
       case 0:
-        return score !== null && name.trim().length > 0;
+        return score !== null;
       case 1:
         return comment.trim().length > 0;
       case 2:
