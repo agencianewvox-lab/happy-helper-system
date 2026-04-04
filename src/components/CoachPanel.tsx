@@ -12,11 +12,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Send, Clock, User, MessageSquare, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 
 const ALL_TYPES = Object.keys(COACH_TYPE_LABELS);
 
 export function CoachPanel() {
   const [open, setOpen] = useState(false);
+  const { isAdmin, loading: profileLoading } = useProfile();
+
+  // Only render for admin users
+  if (profileLoading || !isAdmin) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
