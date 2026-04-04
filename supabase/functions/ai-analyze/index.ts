@@ -161,12 +161,20 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("resolved", false);
 
-    const [pendingResResult, ...conversasResults] = await Promise.all([
+    const npsSurveysPromise = supabase
+      .from("nps_surveys")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    const [pendingResResult, npsSurveysResult, ...conversasResults] = await Promise.all([
       pendingResPromise,
+      npsSurveysPromise,
       ...conversasPromises,
     ]);
 
     const pendingResolutions = pendingResResult.data || [];
+    const allNpsSurveys = npsSurveysResult.data || [];
 
     // Build per-group message map
     const groupMsgsMap = new Map<string, any[]>();
