@@ -175,7 +175,7 @@ export default function Performance() {
       else frtScore = 1;
     }
     const scores = { ...metrics.scores, frt: frtScore };
-    const overall = Number(((scores.nps + scores.frt + scores.tasks + scores.resolutions + scores.sentiment + scores.inactivity) / 6).toFixed(1));
+    const overall = Number(((scores.nps + scores.npsReal + scores.frt + scores.tasks + scores.resolutions + scores.sentiment + scores.inactivity) / 7).toFixed(1));
     return { ...metrics, frtAvg: frt ?? 0, scores: { ...scores, overall } };
   }, [metrics, gestorFrt]);
 
