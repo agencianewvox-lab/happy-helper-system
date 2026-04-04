@@ -73,6 +73,54 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_events: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          end_time: string
+          event_type: string
+          group_id: string | null
+          id: string
+          location: string | null
+          participants: string[] | null
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_time: string
+          event_type?: string
+          group_id?: string | null
+          id?: string
+          location?: string | null
+          participants?: string[] | null
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_time?: string
+          event_type?: string
+          group_id?: string | null
+          id?: string
+          location?: string | null
+          participants?: string[] | null
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       coach_config: {
         Row: {
           ativo: boolean | null
