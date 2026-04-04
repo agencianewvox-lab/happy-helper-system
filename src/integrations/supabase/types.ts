@@ -73,6 +73,81 @@ export type Database = {
         }
         Relationships: []
       }
+      coach_config: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          horario_fim: string | null
+          horario_inicio: string | null
+          id: string
+          intervalo_minimo_minutos: number | null
+          max_mensagens_dia_por_pessoa: number | null
+          tipos_ativos: string[] | null
+          tom: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string
+          intervalo_minimo_minutos?: number | null
+          max_mensagens_dia_por_pessoa?: number | null
+          tipos_ativos?: string[] | null
+          tom?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string
+          intervalo_minimo_minutos?: number | null
+          max_mensagens_dia_por_pessoa?: number | null
+          tipos_ativos?: string[] | null
+          tom?: string | null
+        }
+        Relationships: []
+      }
+      coach_messages: {
+        Row: {
+          created_at: string | null
+          destinatario_nome: string
+          destinatario_telefone: string | null
+          enviada: boolean | null
+          enviada_em: string | null
+          group_id: string | null
+          id: string
+          mensagem: string
+          resultado: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string | null
+          destinatario_nome: string
+          destinatario_telefone?: string | null
+          enviada?: boolean | null
+          enviada_em?: string | null
+          group_id?: string | null
+          id?: string
+          mensagem: string
+          resultado?: string | null
+          tipo: string
+        }
+        Update: {
+          created_at?: string | null
+          destinatario_nome?: string
+          destinatario_telefone?: string | null
+          enviada?: boolean | null
+          enviada_em?: string | null
+          group_id?: string | null
+          id?: string
+          mensagem?: string
+          resultado?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
       pending_demand_resolutions: {
         Row: {
           created_at: string
