@@ -129,6 +129,26 @@ const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "criar_tarefa",
+      description: "Cria uma tarefa geral (não vinculada necessariamente a um cliente) para um membro da equipe. Use para tarefas do dia a dia, comandos operacionais, ou qualquer ação que não seja uma pendência de cliente específico.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título curto da tarefa" },
+          description: { type: "string", description: "Descrição detalhada (opcional)", nullable: true },
+          assigned_to: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge, Priscilla Borges, Joel, Thais, Daniella, Victor Botto, Jiza Reis)" },
+          group_name: { type: "string", description: "Nome do cliente associado (opcional)", nullable: true },
+          due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
+          priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" },
+        },
+        required: ["title", "assigned_to", "priority"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "perguntar_detalhes",
       description: "Envia uma pergunta de volta ao Alisson via WhatsApp para obter mais detalhes antes de executar uma ação. Use quando faltarem informações essenciais para completar uma tarefa.",
       parameters: {
@@ -340,9 +360,11 @@ SUAS CAPACIDADES COMO AGENTE:
 
 2. RESUMO/ANÁLISE — De qualquer grupo individual, comparação entre grupos, panorama geral da operação, diagnóstico de problemas, tendências.
 
-3. CRIAR PENDÊNCIAS — Quando Alisson pedir para designar tarefas, use a ferramenta "criar_pendencia" para registrar no sistema. Sempre confirme os detalhes na resposta.
+3. CRIAR PENDÊNCIAS — Quando Alisson pedir para designar pendências de CLIENTE, use "criar_pendencia". Sempre confirme os detalhes na resposta.
 
-4. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
+4. CRIAR TAREFAS — Para tarefas gerais do dia a dia (não necessariamente vinculadas a cliente), use "criar_tarefa". Exemplos: "pede pro Victor fazer um banner", "fala pro Joel organizar reunião". Pode ou não vincular a um cliente.
+
+5. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
 
 5. ANÁLISE DE EQUIPE — Performance individual dos gestores, volume de respostas, FRT por responsável.
 
@@ -437,6 +459,35 @@ ${contextLines.join("\n\n")}`;
         }
       }
 
+      if (fnName === "criar_tarefa") {
+        let matchedGroupId: string | null = null;
+        if (args.group_name) {
+          const matchedGroup = grupos.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+          );
+          matchedGroupId = matchedGroup?.group_id || null;
+        }
+
+        const { error: insertErr } = await supabase.from("tasks").insert({
+          title: args.title,
+          description: args.description || null,
+          assigned_to: args.assigned_to,
+          group_id: matchedGroupId,
+          priority: args.priority || "normal",
+          due_date: args.due_date || null,
+          created_by: "Alisson Lima (via WhatsApp)",
+          status: "pendente",
+        });
+
+        if (insertErr) {
+          console.error("Error creating task:", insertErr);
+          toolResults.push(`❌ Erro ao criar tarefa: ${insertErr.message}`);
+        } else {
+          toolResults.push(`✅ Tarefa criada: "${args.title}" para ${args.assigned_to}${args.group_name ? ` (cliente: ${args.group_name})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}`);
+        }
+      }
+
       if (fnName === "perguntar_detalhes") {
         // The question IS the reply — send it directly
         aiReply = args.question;
@@ -445,7 +496,7 @@ ${contextLines.join("\n\n")}`;
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => tc.function?.name === "criar_pendencia")) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "criar_tarefa"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
