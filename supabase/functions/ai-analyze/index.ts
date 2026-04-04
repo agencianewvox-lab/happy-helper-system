@@ -202,6 +202,13 @@ Deno.serve(async (req) => {
       pendingByGroup.get(p.group_id)!.push(p);
     }
 
+    // NPS surveys grouped by group_id
+    const npsByGroup = new Map<string, any[]>();
+    for (const s of allNpsSurveys) {
+      if (!npsByGroup.has(s.group_id)) npsByGroup.set(s.group_id, []);
+      npsByGroup.get(s.group_id)!.push(s);
+    }
+
     // Build enriched context for each group
     const contextLines: string[] = [];
     let totalMsgs = 0;
