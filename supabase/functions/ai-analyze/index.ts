@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { messages, type, gestorFilter } = await req.json();
+    const { messages, type, gestorFilter, groupId } = await req.json();
 
     // Fetch groups (filtered by gestor if provided)
     let gruposQuery = supabase.from("whatsapp_grupos").select("*").order("nome");
