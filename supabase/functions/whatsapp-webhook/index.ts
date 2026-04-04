@@ -457,6 +457,35 @@ ${contextLines.join("\n\n")}`;
         }
       }
 
+      if (fnName === "criar_tarefa") {
+        let matchedGroupId: string | null = null;
+        if (args.group_name) {
+          const matchedGroup = grupos.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+          );
+          matchedGroupId = matchedGroup?.group_id || null;
+        }
+
+        const { error: insertErr } = await supabase.from("tasks").insert({
+          title: args.title,
+          description: args.description || null,
+          assigned_to: args.assigned_to,
+          group_id: matchedGroupId,
+          priority: args.priority || "normal",
+          due_date: args.due_date || null,
+          created_by: "Alisson Lima (via WhatsApp)",
+          status: "pendente",
+        });
+
+        if (insertErr) {
+          console.error("Error creating task:", insertErr);
+          toolResults.push(`❌ Erro ao criar tarefa: ${insertErr.message}`);
+        } else {
+          toolResults.push(`✅ Tarefa criada: "${args.title}" para ${args.assigned_to}${args.group_name ? ` (cliente: ${args.group_name})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}`);
+        }
+      }
+
       if (fnName === "perguntar_detalhes") {
         // The question IS the reply — send it directly
         aiReply = args.question;
