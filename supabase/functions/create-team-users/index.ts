@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
     { email: "mads.gestao@gmail.com", password: "14253117nv", full_name: "Murillo", role: "gestor" },
     { email: "adolfo_cassitas@hotmail.com", password: "14253117nv", full_name: "Netto", role: "gestor" },
     { email: "jadercostaads@gmail.com", password: "14253117nv", full_name: "Jader", role: "gestor" },
+    { email: "priscilaborges_1158@outlook.com", password: "14253117nv", full_name: "Priscilla", role: "admin" },
   ];
 
   // Also ensure existing admin user has a profile
