@@ -98,49 +98,24 @@ export function NpsSurveyTab({ groupId, categoria }: Props) {
   return (
     <div className="space-y-4">
       <div className="bg-muted/30 rounded-lg p-4 space-y-3 border border-border/30">
-        <h3 className="text-sm font-semibold">Links da Pesquisa NPS</h3>
+        <h3 className="text-sm font-semibold">
+          Link da Pesquisa NPS — {isClinica ? "Clínicas" : "Operação"}
+        </h3>
         <p className="text-xs text-muted-foreground">
-          Os links abaixo sempre usam a URL pública do app, sem exigir login do Lovable Cloud.
+          Envie este link ao cliente para coletar a avaliação NPS.
         </p>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Building2 className="w-3.5 h-3.5" />
-            Clientes Operação
-          </div>
-          <div className="flex gap-2">
-            <code className="flex-1 text-xs bg-background rounded px-3 py-2 truncate border border-border/50">
-              {operacaoUrl}
-            </code>
-            <Button variant="outline" size="sm" onClick={() => copyLink(operacaoUrl, "Operação")} className="gap-1.5 shrink-0">
-              <Copy className="w-3.5 h-3.5" />
-            </Button>
-            <Button variant="outline" size="sm" asChild className="shrink-0">
-              <a href={operacaoUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Stethoscope className="w-3.5 h-3.5" />
-            Clínicas Odontológicas
-          </div>
-          <div className="flex gap-2">
-            <code className="flex-1 text-xs bg-background rounded px-3 py-2 truncate border border-border/50">
-              {clinicaUrl}
-            </code>
-            <Button variant="outline" size="sm" onClick={() => copyLink(clinicaUrl, "Clínica")} className="gap-1.5 shrink-0">
-              <Copy className="w-3.5 h-3.5" />
-            </Button>
-            <Button variant="outline" size="sm" asChild className="shrink-0">
-              <a href={clinicaUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </Button>
-          </div>
+        <div className="flex gap-2">
+          <code className="flex-1 text-xs bg-background rounded px-3 py-2 truncate border border-border/50">
+            {surveyUrl}
+          </code>
+          <Button variant="outline" size="sm" onClick={() => copyLink(surveyUrl, isClinica ? "Clínica" : "Operação")} className="gap-1.5 shrink-0">
+            <Copy className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="outline" size="sm" asChild className="shrink-0">
+            <a href={surveyUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </Button>
         </div>
       </div>
 
