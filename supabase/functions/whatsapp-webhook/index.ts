@@ -725,8 +725,19 @@ ${contextLines.join("\n\n")}`;
   }
 }
 
+// Map team member names to their gestor_responsavel filter value
+// null means "all clients" (owner-level access)
+const TEAM_GESTOR_MAP: Record<string, string | null> = {
+  "Murillo": "Murilo Araújo",
+  "Murilo": "Murilo Araújo",
+  "Netto": "Netto Monge",
+  "Jader": "Jader Costa",
+  "Priscilla": null, // sócia — acesso total
+  "Priscila": null,
+};
+
 /**
- * Handle team member replies to coach messages
+ * Handle team member replies to coach messages — full context-aware agent
  */
 async function handleTeamCoachReply(
   messageText: string,
@@ -752,12 +763,14 @@ async function handleTeamCoachReply(
         await supabase.from("coach_messages").update({ resultado: "feito" }).eq("id", lastMsg.id);
         console.log(`Marked coach message ${lastMsg.id} as 'feito' for ${teamWebhook.name}`);
       }
-      return; // Don't reply to thumbs up
+      return;
     }
 
-    // Generate AI response using Vox persona
+    if (!shouldRespondToMessage(messageText)) return;
+
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     const openaiKey = Deno.env.get("openai");
+    const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
     const aiUrl = lovableKey
       ? "https://ai.gateway.lovable.dev/v1/chat/completions"
       : "https://api.openai.com/v1/chat/completions";
@@ -765,22 +778,156 @@ async function handleTeamCoachReply(
     if (!aiKey) return;
 
     const firstName = teamWebhook.name.split(" ")[0];
+    const gestorFilter = TEAM_GESTOR_MAP[teamWebhook.name] ?? TEAM_GESTOR_MAP[firstName] ?? undefined;
 
-    // Get recent coach messages for context
-    const { data: recentCoach } = await supabase
+    // --- Fetch groups (filtered by role) ---
+    let gruposQuery = supabase.from("whatsapp_grupos").select("*").order("nome");
+    if (gestorFilter !== null && gestorFilter !== undefined) {
+      gruposQuery = gruposQuery.eq("gestor_responsavel", gestorFilter);
+    }
+    const { data: grupos } = await gruposQuery;
+    const allGroups = grupos || [];
+
+    // --- Fetch recent messages, pending, ads in parallel ---
+    const groupIds = allGroups.map((g: any) => g.group_id);
+
+    const conversasPromises = groupIds.map((gid: string) =>
+      supabase
+        .from("whatsapp_conversas")
+        .select("group_id, nome_contato, mensagem, recebido_em, direcao")
+        .eq("group_id", gid)
+        .order("recebido_em", { ascending: false })
+        .limit(30)
+    );
+
+    const pendingPromise = supabase
+      .from("pending_demand_resolutions")
+      .select("*")
+      .eq("resolved", false);
+
+    const recentCoachPromise = supabase
       .from("coach_messages")
-      .select("mensagem, tipo, created_at")
+      .select("mensagem, tipo, created_at, destinatario_nome")
       .eq("destinatario_nome", teamWebhook.name)
       .eq("enviada", true)
       .order("created_at", { ascending: false })
-      .limit(5);
+      .limit(10);
 
-    const coachContext = (recentCoach || [])
+    const [pendingResult, coachResult, ...conversasResults] = await Promise.all([
+      pendingPromise,
+      recentCoachPromise,
+      ...conversasPromises,
+    ]);
+
+    const pendingResolutions = pendingResult.data || [];
+    const recentCoach = coachResult.data || [];
+
+    const groupMsgsMap = new Map<string, any[]>();
+    for (let i = 0; i < groupIds.length; i++) {
+      groupMsgsMap.set(groupIds[i], conversasResults[i].data || []);
+    }
+
+    // Pending by group (filter to relevant groups)
+    const pendingByGroup = new Map<string, any[]>();
+    const groupIdSet = new Set(groupIds);
+    for (const p of pendingResolutions) {
+      if (!groupIdSet.has(p.group_id)) continue;
+      if (!pendingByGroup.has(p.group_id)) pendingByGroup.set(p.group_id, []);
+      pendingByGroup.get(p.group_id)!.push(p);
+    }
+
+    // Ads data
+    const adsDataMap = new Map<string, any>();
+    const groupsWithAds = allGroups.filter((g: any) => g.ad_account_id);
+    if (META_TOKEN && groupsWithAds.length > 0) {
+      const adsPromises = groupsWithAds.map(async (g: any) => {
+        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
+        if (adsData) adsDataMap.set(g.group_id, adsData);
+      });
+      await Promise.all(adsPromises);
+    }
+
+    // --- Build enriched context ---
+    const contextLines: string[] = [];
+    for (const g of allGroups) {
+      const gid = g.group_id;
+      const msgs = groupMsgsMap.get(gid) || [];
+      const clientMsgs = msgs.filter((m: any) => m.direcao === "entrada");
+      const teamMsgs = msgs.filter((m: any) => m.direcao === "saida");
+
+      let mesesCliente = "";
+      if (g.data_entrada) {
+        const months = Math.floor((Date.now() - new Date(g.data_entrada).getTime()) / (1000 * 60 * 60 * 24 * 30));
+        mesesCliente = `${months} meses`;
+      }
+
+      const frtSamples: number[] = [];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].direcao === "entrada") {
+          for (let j = i - 1; j >= 0; j--) {
+            if (msgs[j].direcao === "saida") {
+              const diff = (new Date(msgs[j].recebido_em).getTime() - new Date(msgs[i].recebido_em).getTime()) / 60000;
+              if (diff > 0 && diff < 1440) frtSamples.push(diff);
+              break;
+            }
+          }
+        }
+      }
+      const frtMin = frtSamples.length ? Math.round(frtSamples.reduce((a, b) => a + b, 0) / frtSamples.length) : null;
+
+      const lastMsg = msgs[0];
+      const daysInactive = lastMsg ? Math.floor((Date.now() - new Date(lastMsg.recebido_em).getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const groupPending = pendingByGroup.get(gid) || [];
+      const ads = adsDataMap.get(gid);
+
+      let line = `### ${g.nome}`;
+      line += `\n  Responsável: ${g.gestor_responsavel || "N/A"} | Plano: ${g.plano || "N/A"} | Investimento: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
+      if (g.data_entrada) line += ` | Cliente há ${mesesCliente}`;
+      line += `\n  Msgs recentes: ${msgs.length} (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
+      if (frtMin !== null) line += ` | FRT: ${frtMin}min`;
+      if (daysInactive !== null) line += ` | Última atividade: ${daysInactive === 0 ? "hoje" : `${daysInactive}d atrás`}`;
+      if (groupPending.length > 0) {
+        line += `\n  ⚠️ ${groupPending.length} pendência(s): ${groupPending.slice(0, 3).map((p: any) => `"${p.term}"`).join(", ")}`;
+      }
+      if (ads) {
+        line += `\n  📊 Ads 30d: R$${ads.spend.toFixed(0)} gasto, ${ads.leads} leads, ${ads.cpa ? `CPA R$${ads.cpa.toFixed(2)}` : ""}, CTR ${ads.ctr.toFixed(2)}%`;
+      }
+
+      const last5 = msgs.slice(0, 5).reverse();
+      if (last5.length > 0) {
+        line += `\n  Últimas msgs:`;
+        for (const m of last5) {
+          const dir = m.direcao === "entrada" ? "👤" : "👨‍💼";
+          line += `\n    ${dir} ${m.nome_contato || "?"}: ${(m.mensagem || "").slice(0, 80)}`;
+        }
+      }
+      contextLines.push(line);
+    }
+
+    const coachContext = recentCoach
       .map((m: any) => `[Coach → ${firstName}]: ${m.mensagem}`)
       .reverse()
       .join("\n");
 
-    const systemPrompt = `Você é a Vox, coach de CS da agência New Vox. Você está conversando com ${firstName} da equipe via WhatsApp. Tom: colega de trabalho gente boa, profissional, humanizada. Respostas curtas (máx 200 caracteres). Use emojis com moderação. Nunca seja robótica. Contexto das últimas cutucadas enviadas:\n${coachContext || "Nenhuma cutucada recente."}`;
+    const accessScope = gestorFilter === null || gestorFilter === undefined
+      ? "todos os clientes da agência (acesso total como sócia/proprietária)"
+      : `seus clientes como gestor(a) (${allGroups.length} clientes)`;
+
+    const systemPrompt = `Você é a Vox, analista sênior de CS da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp.
+
+REGRAS:
+- Tom: colega de trabalho gente boa, profissional, direto
+- Respostas concisas (máx 500 caracteres) mas completas
+- Use emojis com moderação
+- Responda em português brasileiro natural
+- ${firstName} tem acesso a ${accessScope}
+- Responda APENAS sobre os clientes listados abaixo. Se perguntar sobre algo fora do escopo, diga que não tem acesso a esses dados.
+
+CONTEXTO DOS CLIENTES:
+${contextLines.join("\n\n") || "Nenhum cliente encontrado."}
+
+CUTUCADAS RECENTES ENVIADAS:
+${coachContext || "Nenhuma cutucada recente."}`;
 
     const aiResp = await fetch(aiUrl, {
       method: "POST",
@@ -794,7 +941,7 @@ async function handleTeamCoachReply(
           { role: "system", content: systemPrompt },
           { role: "user", content: messageText },
         ],
-        max_tokens: 150,
+        max_tokens: 400,
       }),
     });
 
