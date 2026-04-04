@@ -68,6 +68,22 @@ export default function Agenda() {
 
   useEffect(() => {
     loadEvents();
+
+    // Realtime subscription for live updates
+    const channel = supabase
+      .channel("calendar-events-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "calendar_events" },
+        () => {
+          loadEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadEvents = async () => {
