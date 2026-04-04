@@ -271,30 +271,75 @@ export type Database = {
       nps_surveys: {
         Row: {
           comment: string | null
+          communication_rating: string | null
           created_at: string
           group_id: string
           id: string
+          improvement_comment: string | null
+          manager_rating: string | null
+          quality_rating: string | null
+          referral_1_company: string | null
+          referral_1_contact: string | null
+          referral_1_name: string | null
+          referral_2_company: string | null
+          referral_2_contact: string | null
+          referral_2_name: string | null
+          referral_3_company: string | null
+          referral_3_contact: string | null
+          referral_3_name: string | null
           respondent_email: string | null
           respondent_name: string | null
+          results_rating: string | null
           score: number
+          survey_type: string
         }
         Insert: {
           comment?: string | null
+          communication_rating?: string | null
           created_at?: string
           group_id: string
           id?: string
+          improvement_comment?: string | null
+          manager_rating?: string | null
+          quality_rating?: string | null
+          referral_1_company?: string | null
+          referral_1_contact?: string | null
+          referral_1_name?: string | null
+          referral_2_company?: string | null
+          referral_2_contact?: string | null
+          referral_2_name?: string | null
+          referral_3_company?: string | null
+          referral_3_contact?: string | null
+          referral_3_name?: string | null
           respondent_email?: string | null
           respondent_name?: string | null
+          results_rating?: string | null
           score: number
+          survey_type?: string
         }
         Update: {
           comment?: string | null
+          communication_rating?: string | null
           created_at?: string
           group_id?: string
           id?: string
+          improvement_comment?: string | null
+          manager_rating?: string | null
+          quality_rating?: string | null
+          referral_1_company?: string | null
+          referral_1_contact?: string | null
+          referral_1_name?: string | null
+          referral_2_company?: string | null
+          referral_2_contact?: string | null
+          referral_2_name?: string | null
+          referral_3_company?: string | null
+          referral_3_contact?: string | null
+          referral_3_name?: string | null
           respondent_email?: string | null
           respondent_name?: string | null
+          results_rating?: string | null
           score?: number
+          survey_type?: string
         }
         Relationships: []
       }
