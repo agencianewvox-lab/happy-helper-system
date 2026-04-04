@@ -518,6 +518,113 @@ export default function Performance() {
           </Card>
         </div>
 
+        {/* ═══════════ LTV (Lifetime Value) ═══════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-emerald-500" />
+            <h2 className="text-sm font-semibold">LTV — Lifetime Value</h2>
+            <Badge variant="outline" className="text-xs">
+              LTV Total: R$ {ltvStats.totalLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              LTV Médio: R$ {ltvStats.avgLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              Tempo Médio: {ltvStats.avgMonths.toFixed(0)} meses
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LTV Evolution */}
+            <Card className="bg-card/60 border-border/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-500" /> Evolução do LTV Acumulado
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                {ltvEvolution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={ltvEvolution}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, "LTV Acumulado"]} />
+                      <Area type="monotone" dataKey="value" name="LTV" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2.5} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-12">Sem dados de LTV. Preencha a data de entrada e investimento dos clientes.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* LTV por Cliente */}
+            <Card className="bg-card/60 border-border/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-emerald-500" /> LTV por Cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                {clientLtvData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={clientLtvData.slice(0, 15)} margin={{ bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={60} />
+                      <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, "LTV"]} />
+                      <Bar dataKey="ltv" name="LTV" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-12">Sem dados de LTV.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* LTV per Gestor ranking (when viewing all) */}
+          {selectedGestor === "all" && gestores.length > 0 && (
+            <div className="mt-4">
+              <Card className="bg-card/60 border-border/30">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-400" /> LTV por Responsável
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {gestores.map((g, idx) => {
+                      const stats = getLtvStats(g);
+                      const RankIcon = rankIcons[idx] || null;
+                      const rankColor = rankColors[idx] || "text-muted-foreground";
+                      return (
+                        <div key={g} className={cn("flex items-center justify-between p-3 rounded-lg border", idx === 0 ? "bg-emerald-500/5 border-emerald-500/20" : "bg-card/40 border-border/20")}>
+                          <div className="flex items-center gap-3">
+                            <span className="w-6 text-center">
+                              {RankIcon ? <RankIcon className={cn("w-5 h-5", rankColor)} /> : <span className="text-sm font-black text-muted-foreground">{idx + 1}º</span>}
+                            </span>
+                            <div>
+                              <p className="text-sm font-semibold">{g}</p>
+                              <p className="text-[10px] text-muted-foreground">{stats.clientCount} clientes • Tempo médio: {stats.avgMonths.toFixed(0)} meses</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-emerald-500">R$ {stats.totalLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                            <p className="text-[10px] text-muted-foreground">LTV Total</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                    .sort(() => 0)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+
         {/* ═══════════ FRT RANKING ═══════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="bg-card/60 border-border/30">
