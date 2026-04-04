@@ -706,7 +706,8 @@ export default function Performance() {
                     <tr className="border-b border-border/30">
                       <th className="text-left py-2 px-2 text-muted-foreground font-medium">#</th>
                       <th className="text-left py-2 px-2 text-muted-foreground font-medium">Responsável</th>
-                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS Pred.</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS Real</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">FRT</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">Tarefas</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">Pendências</th>
