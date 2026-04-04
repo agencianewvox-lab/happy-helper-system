@@ -249,6 +249,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
           <TabsContent value="indicadores" className="space-y-4 mt-4">
             {a ? (
               <>
+                {/* NPS Preditivo */}
+                <NpsDetailPanel prediction={npsPrediction} />
                 <div className="grid grid-cols-2 gap-3">
                   {/* FRT */}
                   <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
