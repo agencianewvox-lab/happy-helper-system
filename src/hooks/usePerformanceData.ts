@@ -77,12 +77,13 @@ export function usePerformanceData(period: string) {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes] = await Promise.all([
+      const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes, npsSurveysRes] = await Promise.all([
         supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, data_entrada, investimento_ads, plano"),
         supabase.from("nps_prediction_history").select("*").gte("recorded_at", startISO).order("recorded_at"),
         supabase.from("tasks").select("*").gte("created_at", startISO),
         supabase.from("pending_demand_resolutions").select("*").gte("created_at", startISO),
         supabase.from("nps_predictions").select("*"),
+        supabase.from("nps_surveys").select("*").order("created_at", { ascending: false }),
       ]);
 
       if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
