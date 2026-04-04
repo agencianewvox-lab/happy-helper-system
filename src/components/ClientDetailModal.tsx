@@ -698,6 +698,10 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
           <TabsContent value="meta-ads" className="mt-4">
             <MetaAdsTab grupoId={grupo.group_id} grupoDbId={grupo.id} />
           </TabsContent>
+
+          <TabsContent value="nps-real" className="mt-4">
+            <NpsSurveyTab groupId={grupo.group_id} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
