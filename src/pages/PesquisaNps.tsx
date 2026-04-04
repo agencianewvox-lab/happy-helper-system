@@ -238,13 +238,10 @@ export default function PesquisaNps() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
       <div className="bg-card/80 backdrop-blur border border-border/30 rounded-2xl p-6 sm:p-8 max-w-lg w-full space-y-5">
         {/* Header */}
-        <div className="text-center space-y-1">
+        <div className="text-center">
           <p className="text-xs font-medium text-primary uppercase tracking-wider">
             {questionLabel}
           </p>
-          {groupName && (
-            <p className="text-muted-foreground text-sm">{groupName}</p>
-          )}
         </div>
 
         {/* Progress bar */}
