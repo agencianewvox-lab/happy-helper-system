@@ -101,7 +101,14 @@ export default function Performance() {
   const [selectedGestor, setSelectedGestor] = useState<string>("all");
   const [teamData, setTeamData] = useState<TeamPerfData | null>(null);
   const [teamLoading, setTeamLoading] = useState(true);
-  const { isAdmin } = useProfile();
+  const { isAdmin, gestorFilter } = useProfile();
+
+  // For non-admin users, force their own gestor view
+  useEffect(() => {
+    if (!isAdmin && gestorFilter) {
+      setSelectedGestor(gestorFilter);
+    }
+  }, [isAdmin, gestorFilter]);
 
   const {
     loading: dataLoading,
@@ -230,17 +237,19 @@ export default function Performance() {
             </div>
             <div className="flex items-center gap-3">
               {/* Gestor Selector */}
-              <Select value={selectedGestor} onValueChange={setSelectedGestor}>
-                <SelectTrigger className="w-[200px] text-xs">
-                  <SelectValue placeholder="Selecionar responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos (Geral)</SelectItem>
-                  {gestores.map((g) => (
-                    <SelectItem key={g} value={g}>{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isAdmin && (
+                <Select value={selectedGestor} onValueChange={setSelectedGestor}>
+                  <SelectTrigger className="w-[200px] text-xs">
+                    <SelectValue placeholder="Selecionar responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos (Geral)</SelectItem>
+                    {gestores.map((g) => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Period Selector */}
               <div className="flex items-center gap-1">
@@ -626,6 +635,7 @@ export default function Performance() {
         </div>
 
         {/* ═══════════ FRT RANKING ═══════════ */}
+        {isAdmin && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
@@ -690,6 +700,7 @@ export default function Performance() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* ═══════════ RANKING GERAL DOS GESTORES (Scorecard comparativo) ═══════════ */}
         {selectedGestor === "all" && gestorRanking.length > 0 && (
