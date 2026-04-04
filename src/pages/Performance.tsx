@@ -404,13 +404,17 @@ export default function Performance() {
                         </span>
                         <div>
                           <p className="text-sm font-semibold">{c.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{c.role}</p>
+                          <p className="text-[10px] text-muted-foreground">{c.role} • {c.clientCount} clientes • peso {c.avgComplexity}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-right">
                         <div>
-                          <p className="text-sm font-bold">{formatFrt(c.avg_frt_minutes)}</p>
-                          <p className="text-[10px] text-muted-foreground">FRT</p>
+                          <p className="text-sm font-bold">{formatFrt(c.adjustedFrt)}</p>
+                          <p className="text-[10px] text-muted-foreground">FRT Ajust.</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">{formatFrt(c.avg_frt_minutes)}</p>
+                          <p className="text-[10px] text-muted-foreground">FRT Real</p>
                         </div>
                         <div>
                           <p className="text-sm font-bold">{c.total_responses}</p>
