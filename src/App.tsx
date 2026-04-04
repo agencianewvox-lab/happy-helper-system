@@ -15,6 +15,7 @@ import Agenda from "./pages/Agenda";
 import PesquisaNps from "./pages/PesquisaNps";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
 
 const queryClient = new QueryClient();
 
