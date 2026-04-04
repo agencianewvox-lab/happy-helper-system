@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.calculate-nps-predictions]
 verify_jwt = false
+
+[functions.daily-feedback]
+verify_jwt = false
