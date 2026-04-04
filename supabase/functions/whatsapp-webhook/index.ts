@@ -10,6 +10,29 @@ const corsHeaders = {
 const ALISSON_PHONES = ["64992565779", "5564992565779"];
 const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
 
+// Team member webhook map for coach replies
+const TEAM_WEBHOOK_MAP: Record<string, string> = {
+  "Murillo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
+  "Murilo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
+  "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
+  "Priscila": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
+  "Netto": "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
+  "Jader": "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
+};
+
+// Team member phone numbers for identification
+const TEAM_PHONES: Record<string, string[]> = {};
+
+function findTeamWebhookByName(pushName: string): { name: string; url: string } | null {
+  const normalized = (pushName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  for (const [key, url] of Object.entries(TEAM_WEBHOOK_MAP)) {
+    if (normalized.includes(key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
+      return { name: key, url };
+    }
+  }
+  return null;
+}
+
 function digitsOnly(value: string | null | undefined): string {
   return (value || "").replace(/\D/g, "");
 }
@@ -702,6 +725,97 @@ ${contextLines.join("\n\n")}`;
   }
 }
 
+/**
+ * Handle team member replies to coach messages
+ */
+async function handleTeamCoachReply(
+  messageText: string,
+  pushName: string,
+  teamWebhook: { name: string; url: string },
+  supabase: any
+) {
+  try {
+    // Check for 👍 reaction - mark last coach message as "feito"
+    const trimmed = messageText.trim();
+    if (trimmed === "👍" || trimmed === "👍🏻" || trimmed === "👍🏼" || trimmed === "👍🏽" || trimmed === "👍🏾" || trimmed === "👍🏿") {
+      const { data: lastMsg } = await supabase
+        .from("coach_messages")
+        .select("id")
+        .eq("destinatario_nome", teamWebhook.name)
+        .eq("enviada", true)
+        .is("resultado", null)
+        .order("enviada_em", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastMsg) {
+        await supabase.from("coach_messages").update({ resultado: "feito" }).eq("id", lastMsg.id);
+        console.log(`Marked coach message ${lastMsg.id} as 'feito' for ${teamWebhook.name}`);
+      }
+      return; // Don't reply to thumbs up
+    }
+
+    // Generate AI response using Vox persona
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    const openaiKey = Deno.env.get("openai");
+    const aiUrl = lovableKey
+      ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
+    const aiKey = lovableKey || openaiKey;
+    if (!aiKey) return;
+
+    const firstName = teamWebhook.name.split(" ")[0];
+
+    // Get recent coach messages for context
+    const { data: recentCoach } = await supabase
+      .from("coach_messages")
+      .select("mensagem, tipo, created_at")
+      .eq("destinatario_nome", teamWebhook.name)
+      .eq("enviada", true)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const coachContext = (recentCoach || [])
+      .map((m: any) => `[Coach → ${firstName}]: ${m.mensagem}`)
+      .reverse()
+      .join("\n");
+
+    const systemPrompt = `Você é a Vox, coach de CS da agência New Vox. Você está conversando com ${firstName} da equipe via WhatsApp. Tom: colega de trabalho gente boa, profissional, humanizada. Respostas curtas (máx 200 caracteres). Use emojis com moderação. Nunca seja robótica. Contexto das últimas cutucadas enviadas:\n${coachContext || "Nenhuma cutucada recente."}`;
+
+    const aiResp = await fetch(aiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${aiKey}`,
+      },
+      body: JSON.stringify({
+        model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: messageText },
+        ],
+        max_tokens: 150,
+      }),
+    });
+
+    if (!aiResp.ok) {
+      console.error("AI error for team reply:", await aiResp.text());
+      return;
+    }
+
+    const aiData = await aiResp.json();
+    const reply = aiData.choices?.[0]?.message?.content?.trim();
+    if (!reply) return;
+
+    // Send reply via webhook (GET)
+    const encodedReply = encodeURIComponent(reply);
+    const sendResp = await fetch(`${teamWebhook.url}?message=${encodedReply}`);
+    console.log(`Coach reply to ${firstName}: ${sendResp.status}`);
+  } catch (err) {
+    console.error("Error in team coach reply:", err);
+  }
+}
+
 // Nomes do time New Vox — mensagens desses contatos são "saida"
 const TEAM_MEMBERS = [
   "jader", "jader costa",
@@ -864,8 +978,12 @@ Deno.serve(async (req) => {
       const isAlisson = isKnownPhone(earlyPhone, ALISSON_PHONES);
       console.log("isGroup:", isGroup, "| earlyPhone:", earlyPhone, "| isAlisson:", isAlisson, "| isAllowedGroup:", isGroup && isAllowedGroup(remoteJid));
 
-      // Allow Alisson's messages through even from non-whitelisted groups/DMs
-      if (!isAlisson && (!isGroup || !isAllowedGroup(remoteJid))) {
+      // Check if it's a team member (for coach replies in DMs)
+      const teamWebhook = !isGroup ? findTeamWebhookByName(data.pushName || "") : null;
+      const isTeamMember = !!teamWebhook;
+
+      // Allow Alisson's messages and team member DMs through even from non-whitelisted groups/DMs
+      if (!isAlisson && !isTeamMember && (!isGroup || !isAllowedGroup(remoteJid))) {
         return new Response(
           JSON.stringify({ success: true, skipped: true, reason: "group_not_allowed" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -951,11 +1069,19 @@ Deno.serve(async (req) => {
       }
 
       // ===== ALISSON AI AUTO-REPLY =====
-      console.log("Phone:", phone, "| isAlisson:", isAlisson, "| Message:", messageText?.substring(0, 50));
+      console.log("Phone:", phone, "| isAlisson:", isAlisson, "| isTeamMember:", isTeamMember, "| Message:", messageText?.substring(0, 50));
       if (isAlisson && messageText && shouldRespondToMessage(messageText)) {
         console.log("Alisson message detected, triggering AI reply...");
         handleAlissonAIReply(messageText, groupId, supabase).catch((err) =>
           console.error("Alisson AI reply error:", err)
+        );
+      }
+
+      // ===== TEAM MEMBER COACH REPLY =====
+      if (!isAlisson && isTeamMember && teamWebhook && messageText && !isGroup) {
+        console.log(`Team member ${teamWebhook.name} replied: ${messageText.substring(0, 50)}`);
+        handleTeamCoachReply(messageText, data.pushName || "", teamWebhook, supabase).catch((err) =>
+          console.error("Team coach reply error:", err)
         );
       }
 
