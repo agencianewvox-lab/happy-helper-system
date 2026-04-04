@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
       { data: conversasRecentes },
       { data: pendencias },
       { data: mensagensHoje },
+      { data: npsSurveys },
     ] = await Promise.all([
       supabase.from("whatsapp_grupos").select("*"),
       supabase.from("whatsapp_conversas")
@@ -113,6 +114,9 @@ Deno.serve(async (req) => {
       supabase.from("coach_messages")
         .select("*")
         .gte("created_at", new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()),
+      supabase.from("nps_surveys")
+        .select("group_id, created_at")
+        .order("created_at", { ascending: false }),
     ]);
 
     if (!grupos || grupos.length === 0) {
@@ -273,6 +277,56 @@ Deno.serve(async (req) => {
             group_id: grupo.group_id,
             group_name: grupo.nome,
             context: `Cliente "${grupo.nome}" é novo (${Math.round(diasCliente)} dias) e teve apenas ${groupConvs.length} mensagens. Primeiros 30 dias são críticos para retenção.`,
+          });
+        }
+      }
+    }
+
+    // NPS REAL REMINDER: Check if 3+ months since last survey response, create task & coach nudge
+    const npsLastByGroup = new Map<string, string>();
+    for (const s of (npsSurveys || [])) {
+      if (!npsLastByGroup.has(s.group_id)) {
+        npsLastByGroup.set(s.group_id, s.created_at);
+      }
+    }
+
+    for (const grupo of grupos) {
+      const responsavel = grupo.gestor_responsavel;
+      if (!responsavel) continue;
+
+      const lastSurvey = npsLastByGroup.get(grupo.group_id);
+      if (!lastSurvey) continue; // Only remind after first survey exists
+
+      const monthsSinceSurvey = (now.getTime() - new Date(lastSurvey).getTime()) / (1000 * 60 * 60 * 24 * 30);
+      if (monthsSinceSurvey >= 3) {
+        // Check if task already exists for this cycle
+        const { data: existingTask } = await supabase
+          .from("tasks")
+          .select("id")
+          .eq("group_id", grupo.group_id)
+          .ilike("title", "%pesquisa NPS%")
+          .eq("status", "pendente")
+          .limit(1);
+
+        if (!existingTask || existingTask.length === 0) {
+          // Create task for the manager
+          const surveyType = (grupo.categoria || "").toLowerCase().includes("clínica") ? "clinica" : "operacao";
+          await supabase.from("tasks").insert({
+            title: `Enviar pesquisa NPS Real - ${grupo.nome}`,
+            description: `Já se passaram ${Math.floor(monthsSinceSurvey)} meses desde a última pesquisa NPS. Envie o link de pesquisa (${surveyType}) ao cliente.`,
+            assigned_to: responsavel,
+            group_id: grupo.group_id,
+            priority: "alta",
+            status: "pendente",
+          });
+
+          // Also add coach opportunity
+          opportunities.push({
+            tipo: "padrao_detectado",
+            destinatario: responsavel,
+            group_id: grupo.group_id,
+            group_name: grupo.nome,
+            context: `Pesquisa NPS Real do cliente "${grupo.nome}" está pendente há ${Math.floor(monthsSinceSurvey)} meses. Hora de reenviar o link para coletar feedback atualizado.`,
           });
         }
       }

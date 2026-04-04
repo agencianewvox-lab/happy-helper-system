@@ -175,7 +175,7 @@ export default function Performance() {
       else frtScore = 1;
     }
     const scores = { ...metrics.scores, frt: frtScore };
-    const overall = Number(((scores.nps + scores.frt + scores.tasks + scores.resolutions + scores.sentiment + scores.inactivity) / 6).toFixed(1));
+    const overall = Number(((scores.nps + scores.npsReal + scores.frt + scores.tasks + scores.resolutions + scores.sentiment + scores.inactivity) / 7).toFixed(1));
     return { ...metrics, frtAvg: frt ?? 0, scores: { ...scores, overall } };
   }, [metrics, gestorFrt]);
 
@@ -706,7 +706,8 @@ export default function Performance() {
                     <tr className="border-b border-border/30">
                       <th className="text-left py-2 px-2 text-muted-foreground font-medium">#</th>
                       <th className="text-left py-2 px-2 text-muted-foreground font-medium">Responsável</th>
-                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS Pred.</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS Real</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">FRT</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">Tarefas</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">Pendências</th>
@@ -729,6 +730,7 @@ export default function Performance() {
                             <p className="text-[10px] text-muted-foreground">{g.clients.length} clientes</p>
                           </td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.nps))}>{g.scores.nps}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.npsReal))}>{g.scores.npsReal}</td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.frt))}>{g.scores.frt}</td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.tasks))}>{g.scores.tasks}</td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.resolutions))}>{g.scores.resolutions}</td>

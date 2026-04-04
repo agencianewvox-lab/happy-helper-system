@@ -101,6 +101,8 @@ SUAS CAPACIDADES:
 
 10. PERGUNTAS SOBRE DADOS — Responda de forma direta e numérica. Se não tiver o dado, diga claramente. NUNCA invente números.
 
+11. ANÁLISE DE NPS REAL — Analise os feedbacks reais coletados por pesquisa NPS direta. Compare com o NPS preditivo, identifique discrepâncias, destaque feedbacks críticos e indicações recebidas. Use esses dados para calibrar todas as outras análises e recomendações.
+
 REGRAS GERAIS:
 
 - NUNCA inventar dados. Se não tem, diga que não tem.
@@ -159,12 +161,20 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("resolved", false);
 
-    const [pendingResResult, ...conversasResults] = await Promise.all([
+    const npsSurveysPromise = supabase
+      .from("nps_surveys")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    const [pendingResResult, npsSurveysResult, ...conversasResults] = await Promise.all([
       pendingResPromise,
+      npsSurveysPromise,
       ...conversasPromises,
     ]);
 
     const pendingResolutions = pendingResResult.data || [];
+    const allNpsSurveys = npsSurveysResult.data || [];
 
     // Build per-group message map
     const groupMsgsMap = new Map<string, any[]>();
@@ -190,6 +200,13 @@ Deno.serve(async (req) => {
     for (const p of pendingResolutions) {
       if (!pendingByGroup.has(p.group_id)) pendingByGroup.set(p.group_id, []);
       pendingByGroup.get(p.group_id)!.push(p);
+    }
+
+    // NPS surveys grouped by group_id
+    const npsByGroup = new Map<string, any[]>();
+    for (const s of allNpsSurveys) {
+      if (!npsByGroup.has(s.group_id)) npsByGroup.set(s.group_id, []);
+      npsByGroup.get(s.group_id)!.push(s);
     }
 
     // Build enriched context for each group
@@ -284,6 +301,26 @@ Deno.serve(async (req) => {
         line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
       } else if (g.ad_account_id) {
         line += `\n  📊 META ADS: Conta vinculada mas sem dados nos últimos 30 dias`;
+      }
+
+      // NPS Real surveys
+      const groupSurveys = npsByGroup.get(gid) || [];
+      if (groupSurveys.length > 0) {
+        const avgNpsReal = (groupSurveys.reduce((s: number, sv: any) => s + sv.score, 0) / groupSurveys.length).toFixed(1);
+        const lastSurveyDate = groupSurveys[0].created_at?.substring(0, 10) || "N/A";
+        line += `\n  📋 NPS REAL: Média ${avgNpsReal}/10 (${groupSurveys.length} respostas, última em ${lastSurveyDate})`;
+        // Include last 3 comments
+        const withComments = groupSurveys.filter((sv: any) => sv.comment).slice(0, 3);
+        for (const sv of withComments) {
+          line += `\n    Nota ${sv.score}: "${(sv.comment || "").slice(0, 100)}"`;
+          if (sv.quality_rating) line += ` | Qualidade: ${sv.quality_rating}`;
+          if (sv.results_rating) line += ` | Resultados: ${sv.results_rating}`;
+        }
+        // Referrals
+        const withReferrals = groupSurveys.filter((sv: any) => sv.referral_1_name);
+        if (withReferrals.length > 0) {
+          line += `\n    💡 ${withReferrals.length} resposta(s) com indicações de novos clientes`;
+        }
       }
 
       // Last 10 messages for conversational context
