@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
 
     // Fetch campaign-level breakdown
     const campaignFields = "campaign_name,spend,impressions,clicks,ctr,actions,cost_per_action_type";
-    const campaignUrl = `${META_BASE}/${accountId}/insights?fields=${campaignFields}&date_preset=${preset}&level=campaign&limit=20&access_token=${token}`;
+    const campaignUrl = `${META_BASE}/${accountId}/insights?fields=${campaignFields}${dateFilter}&level=campaign&limit=20&access_token=${token}`;
 
     const campaignRes = await fetch(campaignUrl);
     const campaignData = await campaignRes.json();
