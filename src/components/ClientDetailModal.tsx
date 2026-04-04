@@ -39,6 +39,7 @@ interface Props {
   grupo: Grupo | null;
   open: boolean;
   onClose: () => void;
+  npsPrediction?: NpsPrediction;
 }
 
 function formatFrt(minutes: number | null | undefined): string {
