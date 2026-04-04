@@ -202,6 +202,17 @@ export default function Dashboard() {
               >
                 <ListTodo className="w-4 h-4" />
               </a>
+              {isAdmin && (
+                <a
+                  href="/nps"
+                  className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  title="NPS Preditivo"
+                >
+                  <Heart className="w-4 h-4" />
+                </a>
+              )}
+                <ListTodo className="w-4 h-4" />
+              </a>
               <CoachPanel />
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
