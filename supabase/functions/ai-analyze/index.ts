@@ -303,6 +303,26 @@ Deno.serve(async (req) => {
         line += `\n  📊 META ADS: Conta vinculada mas sem dados nos últimos 30 dias`;
       }
 
+      // NPS Real surveys
+      const groupSurveys = npsByGroup.get(gid) || [];
+      if (groupSurveys.length > 0) {
+        const avgNpsReal = (groupSurveys.reduce((s: number, sv: any) => s + sv.score, 0) / groupSurveys.length).toFixed(1);
+        const lastSurveyDate = groupSurveys[0].created_at?.substring(0, 10) || "N/A";
+        line += `\n  📋 NPS REAL: Média ${avgNpsReal}/10 (${groupSurveys.length} respostas, última em ${lastSurveyDate})`;
+        // Include last 3 comments
+        const withComments = groupSurveys.filter((sv: any) => sv.comment).slice(0, 3);
+        for (const sv of withComments) {
+          line += `\n    Nota ${sv.score}: "${(sv.comment || "").slice(0, 100)}"`;
+          if (sv.quality_rating) line += ` | Qualidade: ${sv.quality_rating}`;
+          if (sv.results_rating) line += ` | Resultados: ${sv.results_rating}`;
+        }
+        // Referrals
+        const withReferrals = groupSurveys.filter((sv: any) => sv.referral_1_name);
+        if (withReferrals.length > 0) {
+          line += `\n    💡 ${withReferrals.length} resposta(s) com indicações de novos clientes`;
+        }
+      }
+
       // Last 10 messages for conversational context
       const last10 = msgs.slice(0, 10).reverse();
       if (last10.length > 0) {
