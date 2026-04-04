@@ -138,15 +138,26 @@ export default function PesquisaNps() {
       comment: comment.trim() || null,
       respondent_name: name.trim(),
       respondent_email: email.trim() || null,
+      survey_type: surveyType,
+      quality_rating: qualityRating || null,
+      communication_rating: communicationRating || null,
+      results_rating: resultsRating || null,
+      manager_rating: managerRating || null,
+      improvement_comment: improvementComment.trim() || null,
+      referral_1_name: referrals[0]?.name.trim() || null,
+      referral_1_company: referrals[0]?.company.trim() || null,
+      referral_1_contact: referrals[0]?.contact.trim() || null,
+      referral_2_name: referrals[1]?.name.trim() || null,
+      referral_2_company: referrals[1]?.company.trim() || null,
+      referral_2_contact: referrals[1]?.contact.trim() || null,
+      referral_3_name: referrals[2]?.name.trim() || null,
+      referral_3_company: referrals[2]?.company.trim() || null,
+      referral_3_contact: referrals[2]?.contact.trim() || null,
     };
 
     const { error: insertError } = await supabase
       .from("nps_surveys")
       .insert(insertPayload as any);
-        referral_3_name: referrals[2]?.name.trim() || null,
-        referral_3_company: referrals[2]?.company.trim() || null,
-        referral_3_contact: referrals[2]?.contact.trim() || null,
-      } as any);
 
     if (insertError) {
       setError("Erro ao enviar resposta. Tente novamente.");
