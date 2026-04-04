@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
     const campaignData = await campaignRes.json();
 
     // Fetch daily breakdown for chart
-    const dailyUrl = `${META_BASE}/${accountId}/insights?fields=spend,impressions,clicks,actions&date_preset=${preset}&time_increment=1&access_token=${token}`;
+    const dailyUrl = `${META_BASE}/${accountId}/insights?fields=spend,impressions,clicks,actions${dateFilter}&time_increment=1&access_token=${token}`;
     const dailyRes = await fetch(dailyUrl);
     const dailyData = await dailyRes.json();
 
