@@ -730,6 +730,7 @@ export default function Performance() {
                             <p className="text-[10px] text-muted-foreground">{g.clients.length} clientes</p>
                           </td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.nps))}>{g.scores.nps}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.npsReal))}>{g.scores.npsReal}</td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.frt))}>{g.scores.frt}</td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.tasks))}>{g.scores.tasks}</td>
                           <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.resolutions))}>{g.scores.resolutions}</td>
