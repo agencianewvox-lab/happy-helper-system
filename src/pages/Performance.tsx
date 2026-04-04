@@ -111,6 +111,9 @@ export default function Performance() {
     getClientNpsData,
     getClientTasksData,
     getClientPendingData,
+    getClientLtvData,
+    getLtvEvolution,
+    getLtvStats,
     gestorRanking,
   } = usePerformanceData(period);
 
