@@ -61,12 +61,9 @@ export default function PesquisaNps() {
   const surveyType: SurveyType =
     surveyTypeParam === "clinica" ? "clinica" : "operacao";
 
-  const [groupName, setGroupName] = useState("");
   const [step, setStep] = useState(0);
   const [score, setScore] = useState<number | null>(null);
   const [comment, setComment] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [qualityRating, setQualityRating] = useState("");
   const [communicationRating, setCommunicationRating] = useState("");
   const [resultsRating, setResultsRating] = useState("");
@@ -81,18 +78,6 @@ export default function PesquisaNps() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!groupId) return;
-    supabase
-      .from("whatsapp_grupos")
-      .select("nome")
-      .eq("group_id", groupId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setGroupName(data.nome);
-      });
-  }, [groupId]);
-
   const isClinica = surveyType === "clinica";
   const showReferrals = score !== null && score >= 9;
 
@@ -102,7 +87,7 @@ export default function PesquisaNps() {
   const canAdvance = () => {
     switch (step) {
       case 0:
-        return score !== null && name.trim().length > 0;
+        return score !== null;
       case 1:
         return comment.trim().length > 0;
       case 2:
@@ -136,8 +121,8 @@ export default function PesquisaNps() {
       group_id: groupId,
       score,
       comment: comment.trim() || null,
-      respondent_name: name.trim(),
-      respondent_email: email.trim() || null,
+      respondent_name: null,
+      respondent_email: null,
       survey_type: surveyType,
       quality_rating: qualityRating || null,
       communication_rating: communicationRating || null,
@@ -250,13 +235,10 @@ export default function PesquisaNps() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
       <div className="bg-card/80 backdrop-blur border border-border/30 rounded-2xl p-6 sm:p-8 max-w-lg w-full space-y-5">
         {/* Header */}
-        <div className="text-center space-y-1">
+        <div className="text-center">
           <p className="text-xs font-medium text-primary uppercase tracking-wider">
             {questionLabel}
           </p>
-          {groupName && (
-            <p className="text-muted-foreground text-sm">{groupName}</p>
-          )}
         </div>
 
         {/* Progress bar */}
@@ -308,33 +290,6 @@ export default function PesquisaNps() {
               )}
             </div>
 
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="name" className="text-xs">
-                  Seu nome *
-                </Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Digite seu nome"
-                  maxLength={100}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs">
-                  E-mail (opcional)
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
-                  maxLength={255}
-                />
-              </div>
-            </div>
           </div>
         )}
 
