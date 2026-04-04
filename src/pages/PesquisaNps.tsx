@@ -79,17 +79,7 @@ export default function PesquisaNps() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!groupId) return;
-    supabase
-      .from("whatsapp_grupos")
-      .select("nome")
-      .eq("group_id", groupId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setGroupName(data.nome);
-      });
-  }, [groupId]);
+  const isClinica = surveyType === "clinica";
 
   const isClinica = surveyType === "clinica";
   const showReferrals = score !== null && score >= 9;
