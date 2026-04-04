@@ -482,7 +482,6 @@ ${contextLines.join("\n\n")}`;
       console.log(`Tool call: ${fnName}`, JSON.stringify(args));
 
       if (fnName === "criar_pendencia") {
-        // Find the group by name match
         const matchedGroup = grupos.find((g: any) =>
           g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
           args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
@@ -502,10 +501,53 @@ ${contextLines.join("\n\n")}`;
             toolResults.push(`❌ Erro ao criar pendência: ${insertErr.message}`);
           } else {
             toolResults.push(`✅ Pendência criada: "${args.term}" para ${args.responsible} no cliente ${matchedGroup.nome}${args.due_date ? ` (prazo: ${args.due_date})` : ""}`);
-            console.log("Pendência criada com sucesso para", matchedGroup.nome);
           }
         } else {
-          toolResults.push(`❌ Cliente "${args.group_name}" não encontrado. Clientes disponíveis: ${grupos.slice(0, 10).map((g: any) => g.nome).join(", ")}`);
+          toolResults.push(`❌ Cliente "${args.group_name}" não encontrado.`);
+        }
+      }
+
+      if (fnName === "remover_pendencias") {
+        const responsibles = Array.isArray(args.responsibles) ? args.responsibles.filter(Boolean) : [];
+        const normalizedStatus = args.status === "todos" ? null : (args.status || "pendente");
+        let groupIds: string[] | null = null;
+
+        if (args.group_name) {
+          groupIds = grupos
+            .filter((g: any) =>
+              g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+              args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+            )
+            .map((g: any) => g.group_id);
+        }
+
+        const { data: existing, error: fetchErr } = await supabase
+          .from("pending_demand_resolutions")
+          .select("id, term, group_id, status, resolved");
+
+        if (fetchErr) {
+          toolResults.push(`❌ Erro ao buscar pendências: ${fetchErr.message}`);
+        } else {
+          const idsToDelete = (existing || [])
+            .filter((item: any) => {
+              const term = (item.term || "").toLowerCase();
+              const responsibleMatch = responsibles.length === 0 || responsibles.some((name: string) => term.includes(name.toLowerCase()));
+              const statusMatch = !normalizedStatus || item.status === normalizedStatus;
+              const groupMatch = !groupIds || groupIds.includes(item.group_id);
+              return responsibleMatch && statusMatch && groupMatch;
+            })
+            .map((item: any) => item.id);
+
+          if (idsToDelete.length === 0) {
+            toolResults.push(`⚠️ Nenhuma pendência encontrada para remover.`);
+          } else {
+            const { error: deleteErr } = await supabase.from("pending_demand_resolutions").delete().in("id", idsToDelete);
+            if (deleteErr) {
+              toolResults.push(`❌ Erro ao remover pendências: ${deleteErr.message}`);
+            } else {
+              toolResults.push(`✅ ${idsToDelete.length} pendência(s) removida(s) do quadro${responsibles.length ? ` de ${responsibles.join(", ")}` : ""}.`);
+            }
+          }
         }
       }
 
@@ -538,15 +580,58 @@ ${contextLines.join("\n\n")}`;
         }
       }
 
+      if (fnName === "remover_tarefas") {
+        const responsibles = Array.isArray(args.responsibles) ? args.responsibles.filter(Boolean) : [];
+        const normalizedStatus = args.status === "todos" ? null : (args.status || "pendente");
+        let groupIds: string[] | null = null;
+
+        if (args.group_name) {
+          groupIds = grupos
+            .filter((g: any) =>
+              g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+              args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+            )
+            .map((g: any) => g.group_id);
+        }
+
+        const { data: existing, error: fetchErr } = await supabase
+          .from("tasks")
+          .select("id, assigned_to, status, group_id");
+
+        if (fetchErr) {
+          toolResults.push(`❌ Erro ao buscar tarefas: ${fetchErr.message}`);
+        } else {
+          const idsToDelete = (existing || [])
+            .filter((item: any) => {
+              const assigned = (item.assigned_to || "").toLowerCase();
+              const responsibleMatch = responsibles.length === 0 || responsibles.some((name: string) => assigned.includes(name.toLowerCase()));
+              const statusMatch = !normalizedStatus || item.status === normalizedStatus;
+              const groupMatch = !groupIds || groupIds.includes(item.group_id);
+              return responsibleMatch && statusMatch && groupMatch;
+            })
+            .map((item: any) => item.id);
+
+          if (idsToDelete.length === 0) {
+            toolResults.push(`⚠️ Nenhuma tarefa encontrada para remover.`);
+          } else {
+            const { error: deleteErr } = await supabase.from("tasks").delete().in("id", idsToDelete);
+            if (deleteErr) {
+              toolResults.push(`❌ Erro ao remover tarefas: ${deleteErr.message}`);
+            } else {
+              toolResults.push(`✅ ${idsToDelete.length} tarefa(s) removida(s) do quadro${responsibles.length ? ` de ${responsibles.join(", ")}` : ""}.`);
+            }
+          }
+        }
+      }
+
       if (fnName === "perguntar_detalhes") {
-        // The question IS the reply — send it directly
         aiReply = args.question;
         console.log("AI asking follow-up question:", args.question);
       }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "criar_tarefa"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
