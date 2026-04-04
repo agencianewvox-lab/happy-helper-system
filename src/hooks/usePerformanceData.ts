@@ -1,0 +1,294 @@
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+export interface GestorMetrics {
+  name: string;
+  clients: string[]; // group_ids
+  npsAvg: number;
+  npsEvolution: { date: string; score: number }[];
+  frtAvg: number;
+  frtEvolution: { date: string; frt: number }[];
+  tasksCompleted: number;
+  tasksTotal: number;
+  tasksEvolution: { date: string; completed: number; total: number }[];
+  pendingResolved: number;
+  pendingTotal: number;
+  pendingEvolution: { date: string; resolved: number; total: number }[];
+  sentimentAvg: number;
+  sentimentEvolution: { date: string; score: number }[];
+  inactiveGroups: number;
+  totalGroups: number;
+  // Scores 1-10
+  scores: {
+    nps: number;
+    frt: number;
+    tasks: number;
+    resolutions: number;
+    sentiment: number;
+    inactivity: number;
+    overall: number;
+  };
+}
+
+export interface GrupoInfo {
+  group_id: string;
+  nome: string;
+  gestor_responsavel: string | null;
+  estrelas_dificuldade: number | null;
+  estrelas_financeiro: number | null;
+  estrelas_temperamento: number | null;
+}
+
+function getDateRange(period: string): { start: Date; end: Date } {
+  const end = new Date();
+  const start = new Date();
+  if (period === "today") {
+    start.setHours(0, 0, 0, 0);
+  } else if (period === "week") {
+    start.setDate(start.getDate() - 7);
+  } else if (period === "month") {
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+  } else if (period === "quarter") {
+    start.setMonth(start.getMonth() - 3);
+  }
+  return { start, end };
+}
+
+export function usePerformanceData(period: string) {
+  const [grupos, setGrupos] = useState<GrupoInfo[]>([]);
+  const [npsHistory, setNpsHistory] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [pendingDemands, setPendingDemands] = useState<any[]>([]);
+  const [npsPredictions, setNpsPredictions] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const { start, end } = useMemo(() => getDateRange(period), [period]);
+  const startISO = start.toISOString();
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes] = await Promise.all([
+        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento"),
+        supabase.from("nps_prediction_history").select("*").gte("recorded_at", startISO).order("recorded_at"),
+        supabase.from("tasks").select("*").gte("created_at", startISO),
+        supabase.from("pending_demand_resolutions").select("*").gte("created_at", startISO),
+        supabase.from("nps_predictions").select("*"),
+      ]);
+
+      if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
+      if (npsHistRes.data) setNpsHistory(npsHistRes.data);
+      if (tasksRes.data) setTasks(tasksRes.data);
+      if (pendingRes.data) setPendingDemands(pendingRes.data);
+      if (npsPredRes.data) setNpsPredictions(npsPredRes.data);
+    } catch (err) {
+      console.error("Performance data fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [startISO]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const gestores = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of grupos) {
+      if (g.gestor_responsavel) set.add(g.gestor_responsavel);
+    }
+    return Array.from(set).sort();
+  }, [grupos]);
+
+  const gruposMap = useMemo(() => {
+    const map: Record<string, GrupoInfo> = {};
+    for (const g of grupos) map[g.group_id] = g;
+    return map;
+  }, [grupos]);
+
+  // Compute per-gestor metrics
+  const computeGestorMetrics = useCallback((gestorName: string | null): GestorMetrics => {
+    const clientGrupos = gestorName
+      ? grupos.filter(g => g.gestor_responsavel === gestorName)
+      : grupos;
+    const clientIds = new Set(clientGrupos.map(g => g.group_id));
+    const name = gestorName || "Geral";
+
+    // NPS
+    const clientNps = npsPredictions.filter(p => clientIds.has(p.group_id));
+    const npsAvg = clientNps.length > 0
+      ? Number((clientNps.reduce((s: number, p: any) => s + Number(p.nps_score), 0) / clientNps.length).toFixed(1))
+      : 0;
+
+    // NPS Evolution
+    const npsHistFiltered = npsHistory.filter(h => clientIds.has(h.group_id));
+    const npsDateMap = new Map<string, { sum: number; count: number }>();
+    for (const h of npsHistFiltered) {
+      const date = h.recorded_at.substring(0, 10);
+      const entry = npsDateMap.get(date) || { sum: 0, count: 0 };
+      entry.sum += Number(h.nps_score);
+      entry.count++;
+      npsDateMap.set(date, entry);
+    }
+    const npsEvolution = Array.from(npsDateMap.entries())
+      .map(([date, d]) => ({ date, score: Number((d.sum / d.count).toFixed(1)) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Tasks
+    const clientTasks = tasks.filter(t => clientIds.has(t.group_id));
+    const tasksCompleted = clientTasks.filter(t => t.status === "concluida" || t.status === "concluída").length;
+    const tasksTotal = clientTasks.length;
+
+    // Tasks Evolution
+    const taskDateMap = new Map<string, { completed: number; total: number }>();
+    for (const t of clientTasks) {
+      const date = t.created_at.substring(0, 10);
+      const entry = taskDateMap.get(date) || { completed: 0, total: 0 };
+      entry.total++;
+      if (t.status === "concluida" || t.status === "concluída") entry.completed++;
+      taskDateMap.set(date, entry);
+    }
+    const tasksEvolution = Array.from(taskDateMap.entries())
+      .map(([date, d]) => ({ date, ...d }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Pending Demands
+    const clientPending = pendingDemands.filter(p => clientIds.has(p.group_id));
+    const pendingResolved = clientPending.filter(p => p.resolved).length;
+    const pendingTotal = clientPending.length;
+
+    // Pending Evolution
+    const pendDateMap = new Map<string, { resolved: number; total: number }>();
+    for (const p of clientPending) {
+      const date = p.created_at.substring(0, 10);
+      const entry = pendDateMap.get(date) || { resolved: 0, total: 0 };
+      entry.total++;
+      if (p.resolved) entry.resolved++;
+      pendDateMap.set(date, entry);
+    }
+    const pendingEvolution = Array.from(pendDateMap.entries())
+      .map(([date, d]) => ({ date, ...d }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Sentiment (use current NPS predictions dimension_scores as proxy)
+    const sentimentAvg = npsAvg; // simplified
+    const sentimentEvolution = npsEvolution.map(e => ({ date: e.date, score: e.score }));
+
+    // Inactivity: groups without recent messages (simplified - using grupos count)
+    const totalGroups = clientGrupos.length;
+    const inactiveGroups = 0; // would need conversation data
+
+    // FRT placeholder
+    const frtAvg = 0;
+    const frtEvolution: { date: string; frt: number }[] = [];
+
+    // Scores 1-10
+    const npsScore = Math.min(10, Math.max(1, Math.round(npsAvg)));
+    const frtScore = 5; // placeholder without FRT data
+    const tasksScore = tasksTotal > 0 ? Math.min(10, Math.max(1, Math.round((tasksCompleted / tasksTotal) * 10))) : 5;
+    const resolutionsScore = pendingTotal > 0 ? Math.min(10, Math.max(1, Math.round((pendingResolved / pendingTotal) * 10))) : 5;
+    const sentimentScore = npsScore;
+    const inactivityScore = totalGroups > 0 ? Math.min(10, Math.max(1, Math.round(((totalGroups - inactiveGroups) / totalGroups) * 10))) : 5;
+    const overall = Number(((npsScore + frtScore + tasksScore + resolutionsScore + sentimentScore + inactivityScore) / 6).toFixed(1));
+
+    return {
+      name,
+      clients: Array.from(clientIds),
+      npsAvg,
+      npsEvolution,
+      frtAvg,
+      frtEvolution,
+      tasksCompleted,
+      tasksTotal,
+      tasksEvolution,
+      pendingResolved,
+      pendingTotal,
+      pendingEvolution,
+      sentimentAvg,
+      sentimentEvolution,
+      inactiveGroups,
+      totalGroups,
+      scores: { nps: npsScore, frt: frtScore, tasks: tasksScore, resolutions: resolutionsScore, sentiment: sentimentScore, inactivity: inactivityScore, overall },
+    };
+  }, [grupos, npsPredictions, npsHistory, tasks, pendingDemands]);
+
+  // Per-client NPS data
+  const getClientNpsData = useCallback((gestorName: string | null) => {
+    const clientGrupos = gestorName
+      ? grupos.filter(g => g.gestor_responsavel === gestorName)
+      : grupos;
+    const clientIds = new Set(clientGrupos.map(g => g.group_id));
+
+    return npsPredictions
+      .filter(p => clientIds.has(p.group_id) && p.confianca >= 20)
+      .map(p => ({
+        group_id: p.group_id,
+        name: gruposMap[p.group_id]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 20) || p.group_id.substring(0, 12),
+        score: Number(Number(p.nps_score).toFixed(1)),
+        categoria: p.nps_categoria,
+      }))
+      .sort((a: any, b: any) => b.score - a.score);
+  }, [grupos, npsPredictions, gruposMap]);
+
+  // Per-client tasks
+  const getClientTasksData = useCallback((gestorName: string | null) => {
+    const clientGrupos = gestorName
+      ? grupos.filter(g => g.gestor_responsavel === gestorName)
+      : grupos;
+    const clientIds = new Set(clientGrupos.map(g => g.group_id));
+
+    const tasksByClient = new Map<string, { total: number; completed: number }>();
+    for (const t of tasks) {
+      if (!clientIds.has(t.group_id)) continue;
+      const entry = tasksByClient.get(t.group_id) || { total: 0, completed: 0 };
+      entry.total++;
+      if (t.status === "concluida" || t.status === "concluída") entry.completed++;
+      tasksByClient.set(t.group_id, entry);
+    }
+
+    return Array.from(tasksByClient.entries()).map(([gid, d]) => ({
+      name: gruposMap[gid]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 20) || gid.substring(0, 12),
+      completed: d.completed,
+      total: d.total,
+    })).sort((a, b) => b.completed - a.completed);
+  }, [grupos, tasks, gruposMap]);
+
+  // Per-client pending demands
+  const getClientPendingData = useCallback((gestorName: string | null) => {
+    const clientGrupos = gestorName
+      ? grupos.filter(g => g.gestor_responsavel === gestorName)
+      : grupos;
+    const clientIds = new Set(clientGrupos.map(g => g.group_id));
+
+    const pendByClient = new Map<string, { total: number; resolved: number }>();
+    for (const p of pendingDemands) {
+      if (!clientIds.has(p.group_id)) continue;
+      const entry = pendByClient.get(p.group_id) || { total: 0, resolved: 0 };
+      entry.total++;
+      if (p.resolved) entry.resolved++;
+      pendByClient.set(p.group_id, entry);
+    }
+
+    return Array.from(pendByClient.entries()).map(([gid, d]) => ({
+      name: gruposMap[gid]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 20) || gid.substring(0, 12),
+      resolved: d.resolved,
+      total: d.total,
+    })).sort((a, b) => b.resolved - a.resolved);
+  }, [grupos, pendingDemands, gruposMap]);
+
+  // All gestors ranking
+  const gestorRanking = useMemo(() => {
+    return gestores.map(g => computeGestorMetrics(g)).sort((a, b) => b.scores.overall - a.scores.overall);
+  }, [gestores, computeGestorMetrics]);
+
+  return {
+    loading,
+    gestores,
+    gruposMap,
+    computeGestorMetrics,
+    getClientNpsData,
+    getClientTasksData,
+    getClientPendingData,
+    gestorRanking,
+  };
+}
