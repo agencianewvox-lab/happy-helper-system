@@ -1,4 +1,4 @@
-import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle } from "lucide-react";
+import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
