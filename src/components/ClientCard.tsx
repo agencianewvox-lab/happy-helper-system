@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
 import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays, Siren, ArrowUpRight, ArrowDownRight, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { NpsScoreBadge } from "@/components/NpsScoreBadge";
 
 interface ClientCardProps {
   grupo: Grupo;
