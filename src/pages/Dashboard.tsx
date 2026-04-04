@@ -104,7 +104,8 @@ export default function Dashboard() {
 
   // Filter groups by clicked metric
   const metricFilteredGrupos = useMemo(() => {
-    let result = roleGrupos;
+    // Hide groups with 0 messages by default
+    let result = roleGrupos.filter(g => g.total_mensagens > 0);
     if (metricFilter) {
       switch (metricFilter) {
         case "total": result = roleGrupos; break;
