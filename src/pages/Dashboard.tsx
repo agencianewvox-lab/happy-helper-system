@@ -267,25 +267,25 @@ export default function Dashboard() {
             </p>
           )}
         </div>
-      </main>
+        </main>
 
-      {/* Modal */}
-      <ClientDetailModal
-        grupo={selectedGrupo}
-        open={!!selectedGrupo}
-        onClose={() => setSelectedGrupo(null)}
-        npsPrediction={selectedGrupo ? predictionsMap.get(selectedGrupo.group_id) : undefined}
-      />
-
-      {tvMode && (
-        <TVModeOverlay
-          grupos={roleAllGrupos}
-          onSelectGrupo={setSelectedGrupo}
-          onClose={() => setTvMode(false)}
+        {/* Modal */}
+        <ClientDetailModal
+          grupo={selectedGrupo}
+          open={!!selectedGrupo}
+          onClose={() => setSelectedGrupo(null)}
+          npsPrediction={selectedGrupo ? predictionsMap.get(selectedGrupo.group_id) : undefined}
         />
-      )}
 
-      <AIChatPanel />
+        {tvMode && (
+          <TVModeOverlay
+            grupos={roleAllGrupos}
+            onSelectGrupo={setSelectedGrupo}
+            onClose={() => setTvMode(false)}
+          />
+        )}
+
+        <AIChatPanel />
         </div>
       </div>
     </SidebarProvider>
