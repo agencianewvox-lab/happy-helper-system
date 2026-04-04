@@ -148,9 +148,11 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
             <CardTitle className={cn("truncate", compact ? "text-sm" : "text-base")}>
               <span className="mr-1.5">{catConfig.icon}</span>
               {grupo.nome}
-              {grupo.estrelas && grupo.estrelas > 0 && (
-                <span className="ml-1.5 text-sm" title={grupo.estrelas_motivo || `${grupo.estrelas} estrela(s)`}>
-                  {"⭐".repeat(grupo.estrelas)}
+              {(grupo.estrelas_dificuldade || grupo.estrelas_financeiro || grupo.estrelas_temperamento) && (
+                <span className="ml-1.5 text-[10px] inline-flex gap-1" title="Dificuldade | Financeiro | Temperamento">
+                  {grupo.estrelas_dificuldade ? <span>🎯{"⭐".repeat(grupo.estrelas_dificuldade)}</span> : null}
+                  {grupo.estrelas_financeiro ? <span>💰{"⭐".repeat(grupo.estrelas_financeiro)}</span> : null}
+                  {grupo.estrelas_temperamento ? <span>🧠{"⭐".repeat(grupo.estrelas_temperamento)}</span> : null}
                 </span>
               )}
             </CardTitle>
