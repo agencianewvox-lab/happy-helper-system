@@ -191,6 +191,21 @@ export function usePerformanceData(period: string) {
     const frtAvg = 0;
     const frtEvolution: { date: string; frt: number }[] = [];
 
+    // NPS Real (from nps_surveys)
+    const clientSurveys = npsSurveys.filter((s: any) => clientIds.has(s.group_id));
+    const npsRealAvg = clientSurveys.length > 0
+      ? Number((clientSurveys.reduce((s: number, sv: any) => s + sv.score, 0) / clientSurveys.length).toFixed(1))
+      : 0;
+    const npsRealCount = clientSurveys.length;
+
+    // Balanced NPS Real score with complexity factor
+    const avgComplexity = clientGrupos.length > 0
+      ? clientGrupos.reduce((s, g) => s + ((g.estrelas_dificuldade || 1) + (g.estrelas_financeiro || 1) + (g.estrelas_temperamento || 1)) / 3, 0) / clientGrupos.length
+      : 1;
+    const complexityBonus = 1 - ((avgComplexity - 1) / 2) * 0.4;
+    const rawNpsRealScore = npsRealCount > 0 ? Math.min(10, Math.max(1, Math.round(npsRealAvg))) : 5;
+    const npsRealScore = Math.min(10, Math.max(1, Math.round(rawNpsRealScore / complexityBonus)));
+
     // Scores 1-10
     const npsScore = Math.min(10, Math.max(1, Math.round(npsAvg)));
     const frtScore = 5; // placeholder without FRT data
@@ -198,13 +213,15 @@ export function usePerformanceData(period: string) {
     const resolutionsScore = pendingTotal > 0 ? Math.min(10, Math.max(1, Math.round((pendingResolved / pendingTotal) * 10))) : 5;
     const sentimentScore = npsScore;
     const inactivityScore = totalGroups > 0 ? Math.min(10, Math.max(1, Math.round(((totalGroups - inactiveGroups) / totalGroups) * 10))) : 5;
-    const overall = Number(((npsScore + frtScore + tasksScore + resolutionsScore + sentimentScore + inactivityScore) / 6).toFixed(1));
+    const overall = Number(((npsScore + npsRealScore + frtScore + tasksScore + resolutionsScore + sentimentScore + inactivityScore) / 7).toFixed(1));
 
     return {
       name,
       clients: Array.from(clientIds),
       npsAvg,
       npsEvolution,
+      npsRealAvg,
+      npsRealCount,
       frtAvg,
       frtEvolution,
       tasksCompleted,
@@ -217,9 +234,9 @@ export function usePerformanceData(period: string) {
       sentimentEvolution,
       inactiveGroups,
       totalGroups,
-      scores: { nps: npsScore, frt: frtScore, tasks: tasksScore, resolutions: resolutionsScore, sentiment: sentimentScore, inactivity: inactivityScore, overall },
+      scores: { nps: npsScore, npsReal: npsRealScore, frt: frtScore, tasks: tasksScore, resolutions: resolutionsScore, sentiment: sentimentScore, inactivity: inactivityScore, overall },
     };
-  }, [grupos, npsPredictions, npsHistory, tasks, pendingDemands]);
+  }, [grupos, npsPredictions, npsHistory, tasks, pendingDemands, npsSurveys]);
 
   // Per-client NPS data
   const getClientNpsData = useCallback((gestorName: string | null) => {
