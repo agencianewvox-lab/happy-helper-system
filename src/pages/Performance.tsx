@@ -635,6 +635,7 @@ export default function Performance() {
         </div>
 
         {/* ═══════════ FRT RANKING ═══════════ */}
+        {isAdmin && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
@@ -699,6 +700,7 @@ export default function Performance() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* ═══════════ RANKING GERAL DOS GESTORES (Scorecard comparativo) ═══════════ */}
         {selectedGestor === "all" && gestorRanking.length > 0 && (
