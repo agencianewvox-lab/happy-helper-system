@@ -101,7 +101,14 @@ export default function Performance() {
   const [selectedGestor, setSelectedGestor] = useState<string>("all");
   const [teamData, setTeamData] = useState<TeamPerfData | null>(null);
   const [teamLoading, setTeamLoading] = useState(true);
-  const { isAdmin } = useProfile();
+  const { isAdmin, gestorFilter } = useProfile();
+
+  // For non-admin users, force their own gestor view
+  useEffect(() => {
+    if (!isAdmin && gestorFilter) {
+      setSelectedGestor(gestorFilter);
+    }
+  }, [isAdmin, gestorFilter]);
 
   const {
     loading: dataLoading,
