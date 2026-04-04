@@ -34,11 +34,15 @@ interface NpsSurvey {
 
 interface Props {
   groupId: string;
+  categoria?: string | null;
 }
 
 const PUBLISHED_APP_URL = "https://happy-helper-system.lovable.app";
 
-export function NpsSurveyTab({ groupId }: Props) {
+export function NpsSurveyTab({ groupId, categoria }: Props) {
+  const isClinica = categoria?.toLowerCase() === "clínicas";
+  const surveyType = isClinica ? "clinica" : "operacao";
+
   const [surveys, setSurveys] = useState<NpsSurvey[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -51,8 +55,7 @@ export function NpsSurveyTab({ groupId }: Props) {
       : PUBLISHED_APP_URL;
   }, []);
 
-  const operacaoUrl = `${publicBaseUrl}/pesquisa-nps/${encodeURIComponent(groupId)}/operacao`;
-  const clinicaUrl = `${publicBaseUrl}/pesquisa-nps/${encodeURIComponent(groupId)}/clinica`;
+  const surveyUrl = `${publicBaseUrl}/pesquisa-nps/${encodeURIComponent(groupId)}/${surveyType}`;
 
   useEffect(() => {
     const load = async () => {
