@@ -103,3 +103,25 @@ export interface Grupo {
   data_ciclo_ads: string | null;
   gestor_responsavel: string | null;
 }
+
+export interface NpsDimensionScore {
+  nome: string;
+  score: number;
+  peso: number;
+  detalhes: string;
+}
+
+export interface NpsPrediction {
+  group_id: string;
+  nps_score: number;
+  nps_categoria: "promotor" | "neutro" | "detrator";
+  confianca: number;
+  fatores_positivos: Array<{ fator: string; dimensao: string; impacto: number }>;
+  fatores_negativos: Array<{ fator: string; dimensao: string; impacto: number }>;
+  fator_principal: string;
+  recomendacao: string;
+  tendencia: "subindo" | "estavel" | "caindo";
+  score_anterior: number | null;
+  dimension_scores: NpsDimensionScore[];
+  calculated_at: string;
+}

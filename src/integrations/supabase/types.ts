@@ -148,6 +148,78 @@ export type Database = {
         }
         Relationships: []
       }
+      nps_prediction_history: {
+        Row: {
+          group_id: string
+          id: string
+          nps_categoria: string
+          nps_score: number
+          recorded_at: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          nps_categoria: string
+          nps_score: number
+          recorded_at?: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          nps_categoria?: string
+          nps_score?: number
+          recorded_at?: string
+        }
+        Relationships: []
+      }
+      nps_predictions: {
+        Row: {
+          calculated_at: string
+          confianca: number
+          dimension_scores: Json
+          fator_principal: string | null
+          fatores_negativos: Json
+          fatores_positivos: Json
+          group_id: string
+          id: string
+          nps_categoria: string
+          nps_score: number
+          recomendacao: string | null
+          score_anterior: number | null
+          tendencia: string | null
+        }
+        Insert: {
+          calculated_at?: string
+          confianca?: number
+          dimension_scores?: Json
+          fator_principal?: string | null
+          fatores_negativos?: Json
+          fatores_positivos?: Json
+          group_id: string
+          id?: string
+          nps_categoria?: string
+          nps_score?: number
+          recomendacao?: string | null
+          score_anterior?: number | null
+          tendencia?: string | null
+        }
+        Update: {
+          calculated_at?: string
+          confianca?: number
+          dimension_scores?: Json
+          fator_principal?: string | null
+          fatores_negativos?: Json
+          fatores_positivos?: Json
+          group_id?: string
+          id?: string
+          nps_categoria?: string
+          nps_score?: number
+          recomendacao?: string | null
+          score_anterior?: number | null
+          tendencia?: string | null
+        }
+        Relationships: []
+      }
       pending_demand_resolutions: {
         Row: {
           created_at: string

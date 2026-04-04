@@ -9,12 +9,13 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain, ListTodo, Bot } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain, ListTodo, Bot, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { CoachPanel } from "@/components/CoachPanel";
+import { useNpsPredictions } from "@/hooks/useNpsPredictions";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
+  const { predictionsMap, npsGlobal } = useNpsPredictions();
 
   const roleGrupos = useMemo(() => {
     if (profileLoading) return [];
@@ -200,6 +202,15 @@ export default function Dashboard() {
               >
                 <ListTodo className="w-4 h-4" />
               </a>
+              {isAdmin && (
+                <a
+                  href="/nps"
+                  className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  title="NPS Preditivo"
+                >
+                  <Heart className="w-4 h-4" />
+                </a>
+              )}
               <CoachPanel />
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
@@ -277,7 +288,7 @@ export default function Dashboard() {
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {metricFilteredGrupos.map((g) => (
-            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} />
+            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} npsPrediction={predictionsMap.get(g.group_id)} />
           ))}
           {metricFilteredGrupos.length === 0 && (
             <p className="col-span-full text-center text-muted-foreground py-12">
@@ -292,6 +303,7 @@ export default function Dashboard() {
         grupo={selectedGrupo}
         open={!!selectedGrupo}
         onClose={() => setSelectedGrupo(null)}
+        npsPrediction={selectedGrupo ? predictionsMap.get(selectedGrupo.group_id) : undefined}
       />
 
       {tvMode && (

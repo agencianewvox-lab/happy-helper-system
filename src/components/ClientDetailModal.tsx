@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Grupo } from "@/types/client";
+import { Grupo, NpsPrediction } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -24,6 +24,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { MetaAdsTab } from "@/components/MetaAdsTab";
+import { NpsDetailPanel } from "@/components/NpsDetailPanel";
 
 interface Conversa {
   id: string;
@@ -38,6 +39,7 @@ interface Props {
   grupo: Grupo | null;
   open: boolean;
   onClose: () => void;
+  npsPrediction?: NpsPrediction;
 }
 
 function formatFrt(minutes: number | null | undefined): string {
@@ -74,7 +76,7 @@ function trendLabel(trend?: string) {
   return { icon: Minus, color: "text-muted-foreground", text: "Estável" };
 }
 
-export function ClientDetailModal({ grupo, open, onClose }: Props) {
+export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props) {
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [conversas, setConversas] = useState<Conversa[]>([]);
@@ -247,6 +249,8 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
           <TabsContent value="indicadores" className="space-y-4 mt-4">
             {a ? (
               <>
+                {/* NPS Preditivo */}
+                <NpsDetailPanel prediction={npsPrediction} />
                 <div className="grid grid-cols-2 gap-3">
                   {/* FRT */}
                   <div className="p-3 rounded-lg bg-muted/30 border border-border/30">

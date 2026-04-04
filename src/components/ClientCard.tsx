@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Grupo } from "@/types/client";
+import { Grupo, NpsPrediction } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,11 +9,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import ReactMarkdown from "react-markdown";
 import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays, Siren, ArrowUpRight, ArrowDownRight, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { NpsScoreBadge } from "@/components/NpsScoreBadge";
 
 interface ClientCardProps {
   grupo: Grupo;
   onClick: (grupo: Grupo) => void;
   compact?: boolean;
+  npsPrediction?: NpsPrediction;
 }
 
 const categoriaConfig: Record<string, { color: string; icon: string }> = {
@@ -72,7 +74,7 @@ function TrendArrow({ trend }: { trend?: string }) {
 
 const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 
-export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
+export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
@@ -269,6 +271,8 @@ export function ClientCard({ grupo, onClick, compact }: ClientCardProps) {
                   {intentConfig[a.intent].emoji} {a.intent}
                 </span>
               )}
+              {/* NPS Score */}
+              <NpsScoreBadge prediction={npsPrediction} />
             </div>
           )}
 
