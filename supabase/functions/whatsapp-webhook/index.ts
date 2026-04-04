@@ -852,13 +852,19 @@ async function handleTeamCoachReply(
       pendingByGroup.get(p.group_id)!.push(p);
     }
 
-    // Ads data
+    // Ads data (30d + today)
     const adsDataMap = new Map<string, any>();
+    const adsTodayMapTeam = new Map<string, any>();
+    const todayStrTeam = new Date().toISOString().slice(0, 10);
     const groupsWithAds = allGroups.filter((g: any) => g.ad_account_id);
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
-        if (adsData) adsDataMap.set(g.group_id, adsData);
+        const [ads30d, adsToday] = await Promise.all([
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
+          fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStrTeam, todayStrTeam),
+        ]);
+        if (ads30d) adsDataMap.set(g.group_id, ads30d);
+        if (adsToday) adsTodayMapTeam.set(g.group_id, adsToday);
       });
       await Promise.all(adsPromises);
     }
