@@ -25,6 +25,7 @@ const navItems = [
   { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false },
   { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false },
   { title: "NPS Preditivo", url: "/nps", icon: Heart, adminOnly: true },
+  { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: true },
 ];
 
 export function DashboardSidebar({ isAdmin, onSignOut }: DashboardSidebarProps) {
