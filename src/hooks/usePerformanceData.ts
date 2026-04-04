@@ -279,7 +279,7 @@ export function usePerformanceData(period: string) {
     })).sort((a, b) => b.resolved - a.resolved);
   }, [grupos, pendingDemands, gruposMap]);
 
-  // LTV calculation: months as client × investimento_ads
+  // LTV calculation: months as active client
   const getClientLtvData = useCallback((gestorName: string | null) => {
     const clientGrupos = gestorName
       ? grupos.filter(g => g.gestor_responsavel === gestorName)
@@ -287,20 +287,17 @@ export function usePerformanceData(period: string) {
 
     const now = new Date();
     return clientGrupos
-      .filter(g => g.data_entrada && g.investimento_ads)
+      .filter(g => g.data_entrada)
       .map(g => {
         const entrada = new Date(g.data_entrada!);
         const months = Math.max(1, Math.floor((now.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-        const ltv = months * (g.investimento_ads || 0);
         return {
           group_id: g.group_id,
           name: gruposMap[g.group_id]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 20) || g.group_id.substring(0, 12),
-          ltv,
           months,
-          monthlyValue: g.investimento_ads || 0,
         };
       })
-      .sort((a, b) => b.ltv - a.ltv);
+      .sort((a, b) => b.months - a.months);
   }, [grupos, gruposMap]);
 
   // LTV evolution by month (cumulative)
