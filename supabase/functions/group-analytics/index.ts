@@ -493,7 +493,7 @@ function preFilterMessages(groupId: string, msgs: any[]): CandidateMessage[] {
 }
 
 // ─── LAYER 2: AI Analysis ───
-const NEW_PENDING_PROMPT = `Você é uma analista de atendimento da agência de marketing New Vox. Sua tarefa é analisar mensagens candidatas a pendência e classificá-las com alta precisão.
+const NEW_PENDING_PROMPT = `Você é uma analista de atendimento RIGOROSA da agência de marketing New Vox. Sua tarefa é analisar mensagens candidatas a pendência e classificá-las. Seja AGRESSIVA na detecção — é preferível ter um falso positivo do que deixar passar uma pendência real.
 
 EQUIPE NEW VOX (mensagens dessas pessoas são da EQUIPE e NUNCA são pendências):
 - Jader: Gestor de tráfego
@@ -509,20 +509,24 @@ EQUIPE NEW VOX (mensagens dessas pessoas são da EQUIPE e NUNCA são pendências
 
 CATEGORIAS DE CLASSIFICAÇÃO:
 
-1. "PENDÊNCIA CONFIRMADA" (confidence: alta) — O cliente fez solicitação concreta ou pergunta direta que exige ação, e ninguém da equipe respondeu.
+1. "PENDÊNCIA CONFIRMADA" (confidence: alta) — O cliente fez QUALQUER solicitação, pedido, pergunta direta, ou requisição que exige ação da equipe, e ninguém da equipe respondeu. Inclui:
+   - Pedidos educados ("poderia me enviar...", "tem como...", "pode reenviar...")
+   - Perguntas diretas ("quando fica pronto?", "já foi feito?")
+   - Solicitações de reenvio, envio, ou compartilhamento de qualquer material
+   - Cobranças implícitas ("caso tenha sido enviado", "ainda não recebi")
 
-2. "POSSÍVEL PENDÊNCIA" (confidence: media) — Mensagem ambígua que pode ou não ser solicitação.
+2. "POSSÍVEL PENDÊNCIA" (confidence: media) — Mensagem ambígua que pode ou não ser solicitação, MAS que contém qualquer indicação de espera ou necessidade do cliente.
 
-3. "NÃO É PENDÊNCIA" — Equipe respondeu implicitamente, assunto já tratado, cliente apenas compartilhando info.
+3. "NÃO É PENDÊNCIA" — SOMENTE quando: equipe respondeu claramente, assunto já tratado, ou cliente apenas compartilhando informação sem esperar retorno.
 
 4. "RESOLVIDA" — Havia solicitação mas mensagens posteriores mostram que equipe já tratou.
 
 PRIORIDADE:
-- "urgente": afeta campanha ativa, cliente irritado, ou esperando há +8h em horário comercial
+- "urgente": afeta campanha ativa, cliente irritado, esperando há +4h em horário comercial, ou qualquer reenvio/solicitação sem resposta há +2h
 - "normal": solicitações regulares
-- "baixa": dúvidas informativas
+- "baixa": dúvidas puramente informativas
 
-REGRA DE OURO: Na dúvida, NÃO marque como pendência.
+REGRA DE OURO: NA DÚVIDA, MARQUE COMO PENDÊNCIA. É melhor a equipe verificar e descartar do que deixar um cliente sem resposta.
 
 Use a função report_pending_demands para retornar APENAS as pendências confirmadas e possíveis. Se não encontrar nenhuma, chame com array vazio.`;
 
