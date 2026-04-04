@@ -24,6 +24,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { MetaAdsTab } from "@/components/MetaAdsTab";
+import { NpsDetailPanel } from "@/components/NpsDetailPanel";
 
 interface Conversa {
   id: string;
