@@ -6,6 +6,8 @@ export interface GestorMetrics {
   clients: string[]; // group_ids
   npsAvg: number;
   npsEvolution: { date: string; score: number }[];
+  npsRealAvg: number;
+  npsRealCount: number;
   frtAvg: number;
   frtEvolution: { date: string; frt: number }[];
   tasksCompleted: number;
@@ -21,6 +23,7 @@ export interface GestorMetrics {
   // Scores 1-10
   scores: {
     nps: number;
+    npsReal: number;
     frt: number;
     tasks: number;
     resolutions: number;
