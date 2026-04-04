@@ -64,7 +64,7 @@ export default function PesquisaNps() {
   const [step, setStep] = useState(0);
   const [score, setScore] = useState<number | null>(null);
   const [comment, setComment] = useState("");
-  const [email, setEmail] = useState("");
+  const [qualityRating, setQualityRating] = useState("");
   const [qualityRating, setQualityRating] = useState("");
   const [communicationRating, setCommunicationRating] = useState("");
   const [resultsRating, setResultsRating] = useState("");
