@@ -45,6 +45,45 @@ export interface GroupAnalytics {
   priority_reason: string | null;
 }
 
+export interface CoachMessage {
+  id: string;
+  destinatario_nome: string;
+  destinatario_telefone?: string;
+  mensagem: string;
+  tipo: string;
+  group_id?: string;
+  enviada: boolean;
+  enviada_em?: string;
+  resultado?: string;
+  created_at: string;
+}
+
+export interface CoachConfig {
+  id: string;
+  ativo: boolean;
+  horario_inicio: string;
+  horario_fim: string;
+  max_mensagens_dia_por_pessoa: number;
+  intervalo_minimo_minutos: number;
+  tom: string;
+  tipos_ativos: string[];
+}
+
+export const COACH_TYPE_LABELS: Record<string, string> = {
+  grupo_parado: "Grupo parado",
+  sentimento_caindo: "Sentimento caindo",
+  pendencia_esquecida: "Pendência esquecida",
+  frt_alto: "FRT alto",
+  cliente_elogiou: "Cliente elogiou",
+  aniversario: "Aniversário/data",
+  ads_decolou: "Ads decolou",
+  ads_caiu: "Ads caiu",
+  onboarding_travou: "Onboarding travou",
+  parabens_performance: "Parabéns performance",
+  cliente_novo: "Cliente novo",
+  padrao_detectado: "Padrão detectado",
+};
+
 export interface Grupo {
   id: string;
   group_id: string;

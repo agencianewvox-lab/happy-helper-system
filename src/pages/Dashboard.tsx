@@ -9,11 +9,12 @@ import { DashboardFilters } from "@/components/DashboardFilters";
 import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain, ListTodo } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, LogOut, Moon, Flame, ShieldAlert, BarChart3, Brain, ListTodo, Bot } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { CoachPanel } from "@/components/CoachPanel";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -199,6 +200,7 @@ export default function Dashboard() {
               >
                 <ListTodo className="w-4 h-4" />
               </a>
+              <CoachPanel />
               <button onClick={signOut} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="Sair">
                 <LogOut className="w-4 h-4" />
               </button>
