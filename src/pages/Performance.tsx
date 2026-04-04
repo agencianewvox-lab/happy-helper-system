@@ -60,6 +60,20 @@ export default function Performance() {
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gruposMap, setGruposMap] = useState<Record<string, { nome: string; gestor_responsavel: string | null }>>({});
+
+  const { predictions, npsGlobal, promotores, neutros, detratores, loading: npsLoading } = useNpsPredictions();
+
+  // Fetch grupos for name/gestor mapping
+  useEffect(() => {
+    supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel").then(({ data }) => {
+      if (data) {
+        const map: Record<string, { nome: string; gestor_responsavel: string | null }> = {};
+        for (const g of data) map[g.group_id] = { nome: g.nome, gestor_responsavel: g.gestor_responsavel };
+        setGruposMap(map);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
