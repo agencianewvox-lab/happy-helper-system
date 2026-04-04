@@ -10,6 +10,7 @@ import Chat from "./pages/Chat";
 import Pendencias from "./pages/Pendencias";
 import Tarefas from "./pages/Tarefas";
 import NpsPreditivo from "./pages/NpsPreditivo";
+import Agenda from "./pages/Agenda";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -44,6 +45,7 @@ const App = () => (
           <Route path="/pendencias" element={<ProtectedRoute><Pendencias /></ProtectedRoute>} />
           <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
           <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
+          <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

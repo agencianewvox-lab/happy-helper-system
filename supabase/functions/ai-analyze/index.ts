@@ -43,6 +43,14 @@ async function fetchMetaAdsForAccount(accountId: string, token: string): Promise
   }
 }
 
+function detectSchedulingIntent(messages: any[]): boolean {
+  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUser) return false;
+  const text = lastUser.content.toLowerCase();
+  const keywords = ["agendar", "agenda", "marcar reunião", "marcar uma reunião", "reunião com", "compromisso", "disponibilidade", "horário livre", "agende", "marca"];
+  return keywords.some(k => text.includes(k));
+}
+
 function detectComplexQuery(messages: any[]): boolean {
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return false;
@@ -396,6 +404,109 @@ REGRAS:
       const content = data.choices?.[0]?.message?.content || "Sem resposta da IA.";
       return new Response(JSON.stringify({ analysis: content }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check for scheduling intent
+    const isScheduling = detectSchedulingIntent(messages);
+    if (isScheduling) {
+      const schedulingSystemPrompt = `${SYSTEM_PROMPT}
+
+CAPACIDADE ADICIONAL - AGENDAMENTO:
+Quando o usuário pedir para agendar algo, você deve extrair as informações e responder com um JSON entre as tags <SCHEDULE_EVENT> e </SCHEDULE_EVENT>.
+
+Formato:
+<SCHEDULE_EVENT>
+{
+  "title": "título do evento",
+  "description": "descrição opcional",
+  "date": "YYYY-MM-DD",
+  "start_time": "HH:MM",
+  "end_time": "HH:MM",
+  "event_type": "reuniao|compromisso|lembrete|pessoal|cliente",
+  "participants": ["Nome1", "Nome2"],
+  "location": "local opcional"
+}
+</SCHEDULE_EVENT>
+
+EQUIPE DISPONÍVEL para participantes: Alisson, Priscilla, Jader Costa, Murilo Araújo, Netto Monge, Joel, Thais, Daniella, Victor Botto, Jiza.
+
+Se o usuário não especificar todos os campos, infira o melhor possível:
+- Se não disse horário, sugira um horário comercial (09:00-10:00)
+- Se não disse data, use a data de hoje ou a próxima data útil
+- Se mencionou um cliente, use event_type "cliente"
+- Se mencionou pessoa da equipe, inclua nos participants
+- Duração padrão: 1 hora
+
+Após o JSON, escreva uma confirmação amigável do agendamento.
+Se faltarem informações críticas (como quem participará ou sobre o quê), pergunte antes de gerar o JSON.
+
+${dataContext}`;
+
+      const schedResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [{ role: "system", content: schedulingSystemPrompt }, ...messages],
+        }),
+      });
+
+      if (!schedResponse.ok) {
+        return new Response(JSON.stringify({ error: "Erro ao processar agendamento" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const schedData = await schedResponse.json();
+      let content = schedData.choices?.[0]?.message?.content || "";
+
+      // Extract and process schedule event
+      const schedMatch = content.match(/<SCHEDULE_EVENT>([\s\S]*?)<\/SCHEDULE_EVENT>/);
+      if (schedMatch) {
+        try {
+          const eventData = JSON.parse(schedMatch[1].trim());
+          const startISO = `${eventData.date}T${eventData.start_time}:00`;
+          const endISO = `${eventData.date}T${eventData.end_time}:00`;
+
+          const colorMap: Record<string, string> = {
+            reuniao: "#3b82f6", compromisso: "#8b5cf6", lembrete: "#f59e0b",
+            pessoal: "#10b981", cliente: "#ef4444"
+          };
+
+          const { error: insertError } = await supabase.from("calendar_events").insert({
+            title: eventData.title,
+            description: eventData.description || null,
+            start_time: startISO,
+            end_time: endISO,
+            event_type: eventData.event_type || "reuniao",
+            created_by: "Vox (IA)",
+            participants: eventData.participants || [],
+            location: eventData.location || null,
+            color: colorMap[eventData.event_type] || "#3b82f6",
+          });
+
+          if (insertError) {
+            console.error("Error inserting event:", insertError);
+            content = content.replace(/<SCHEDULE_EVENT>[\s\S]*?<\/SCHEDULE_EVENT>/, "");
+            content += "\n\n⚠️ Houve um erro ao salvar o evento na agenda. Tente novamente.";
+          } else {
+            content = content.replace(/<SCHEDULE_EVENT>[\s\S]*?<\/SCHEDULE_EVENT>/, "");
+            content += "\n\n✅ **Evento salvo na agenda interna!** Acesse a aba Agenda para visualizar.";
+          }
+        } catch (parseErr) {
+          console.error("Error parsing schedule event:", parseErr);
+        }
+      }
+
+      // Return as SSE stream format for consistency
+      const encoder = new TextEncoder();
+      const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+      return new Response(encoder.encode(sseData), {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
       });
     }
 
