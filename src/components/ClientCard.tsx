@@ -151,7 +151,9 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
               {(() => {
                 const vals = [grupo.estrelas_dificuldade, grupo.estrelas_financeiro, grupo.estrelas_temperamento].filter((v): v is number => v != null && v > 0);
                 if (vals.length === 0) return null;
-                const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1).replace(".", ",");
+                const rawAvg = vals.reduce((a, b) => a + b, 0) / vals.length; // 1-3
+                const scaled = (((rawAvg - 1) / 2) * 9 + 1); // map 1-3 → 1-10
+                const avg = scaled.toFixed(1).replace(".", ",");
                 return (
                   <span className="shrink-0 text-[11px] font-semibold text-amber-500" title="Média: Dificuldade | Financeiro | Temperamento">
                     {avg}⭐
