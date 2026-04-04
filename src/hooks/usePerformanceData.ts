@@ -68,6 +68,7 @@ export function usePerformanceData(period: string) {
   const [pendingDemands, setPendingDemands] = useState<any[]>([]);
   const [npsPredictions, setNpsPredictions] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
+  const [npsSurveys, setNpsSurveys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const { start, end } = useMemo(() => getDateRange(period), [period]);
