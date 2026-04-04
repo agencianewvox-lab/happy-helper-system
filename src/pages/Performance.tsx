@@ -60,16 +60,26 @@ export default function Performance() {
   const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [gruposMap, setGruposMap] = useState<Record<string, { nome: string; gestor_responsavel: string | null }>>({});
+  const [gruposMap, setGruposMap] = useState<Record<string, { nome: string; gestor_responsavel: string | null; estrelas_dificuldade: number | null; estrelas_financeiro: number | null; estrelas_temperamento: number | null }>>({});
 
   const { predictions, npsGlobal, promotores, neutros, detratores, loading: npsLoading } = useNpsPredictions();
 
-  // Fetch grupos for name/gestor mapping
+  // Helper: calculate client weight from stars (higher difficulty + financial importance = heavier weight)
+  function clientWeight(groupId: string): number {
+    const g = gruposMap[groupId];
+    if (!g) return 1;
+    const dif = g.estrelas_dificuldade || 1;
+    const fin = g.estrelas_financeiro || 1;
+    // Weight formula: difficulty (40%) + financial (60%), scaled 1-3 → weight 1-3
+    return dif * 0.4 + fin * 0.6;
+  }
+
+  // Fetch grupos for name/gestor/stars mapping
   useEffect(() => {
-    supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel").then(({ data }) => {
+    supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento").then(({ data }) => {
       if (data) {
-        const map: Record<string, { nome: string; gestor_responsavel: string | null }> = {};
-        for (const g of data) map[g.group_id] = { nome: g.nome, gestor_responsavel: g.gestor_responsavel };
+        const map: Record<string, { nome: string; gestor_responsavel: string | null; estrelas_dificuldade: number | null; estrelas_financeiro: number | null; estrelas_temperamento: number | null }> = {};
+        for (const g of data) map[g.group_id] = { nome: g.nome, gestor_responsavel: g.gestor_responsavel, estrelas_dificuldade: g.estrelas_dificuldade, estrelas_financeiro: g.estrelas_financeiro, estrelas_temperamento: g.estrelas_temperamento };
         setGruposMap(map);
       }
     });
