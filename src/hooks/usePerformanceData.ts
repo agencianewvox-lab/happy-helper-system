@@ -37,6 +37,9 @@ export interface GrupoInfo {
   estrelas_dificuldade: number | null;
   estrelas_financeiro: number | null;
   estrelas_temperamento: number | null;
+  data_entrada: string | null;
+  investimento_ads: number | null;
+  plano: string | null;
 }
 
 function getDateRange(period: string): { start: Date; end: Date } {
