@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Grupo } from "@/types/client";
+import { Grupo, NpsPrediction } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
