@@ -522,15 +522,15 @@ export default function Performance() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <DollarSign className="w-5 h-5 text-emerald-500" />
-            <h2 className="text-sm font-semibold">LTV — Lifetime Value</h2>
+            <h2 className="text-sm font-semibold">LTV — Tempo de Vida do Cliente</h2>
             <Badge variant="outline" className="text-xs">
-              LTV Total: R$ {ltvStats.totalLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              Total Meses Acumulados: {ltvStats.totalMonths}
             </Badge>
             <Badge variant="secondary" className="text-xs">
-              LTV Médio: R$ {ltvStats.avgLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              Média: {ltvStats.avgMonths.toFixed(1)} meses
             </Badge>
             <Badge variant="secondary" className="text-xs">
-              Tempo Médio: {ltvStats.avgMonths.toFixed(0)} meses
+              {ltvStats.clientCount} clientes
             </Badge>
           </div>
 
@@ -563,7 +563,7 @@ export default function Performance() {
             <Card className="bg-card/60 border-border/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-emerald-500" /> LTV por Cliente
+                  <DollarSign className="w-4 h-4 text-emerald-500" /> Meses Ativos por Cliente
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-[300px]">
@@ -572,9 +572,9 @@ export default function Performance() {
                     <BarChart data={clientLtvData.slice(0, 15)} margin={{ bottom: 60 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="name" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={60} />
-                      <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, "LTV"]} />
-                      <Bar dataKey="ltv" name="LTV" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v} meses`, "Tempo ativo"]} />
+                      <Bar dataKey="months" name="Meses" fill="#10b981" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -611,8 +611,8 @@ export default function Performance() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-bold text-emerald-500">R$ {stats.totalLtv.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
-                            <p className="text-[10px] text-muted-foreground">LTV Total</p>
+                            <p className="text-sm font-bold text-emerald-500">{stats.totalMonths} meses</p>
+                            <p className="text-[10px] text-muted-foreground">Total Acumulado</p>
                           </div>
                         </div>
                       );

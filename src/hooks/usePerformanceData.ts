@@ -279,7 +279,7 @@ export function usePerformanceData(period: string) {
     })).sort((a, b) => b.resolved - a.resolved);
   }, [grupos, pendingDemands, gruposMap]);
 
-  // LTV calculation: months as client × investimento_ads
+  // LTV calculation: months as active client
   const getClientLtvData = useCallback((gestorName: string | null) => {
     const clientGrupos = gestorName
       ? grupos.filter(g => g.gestor_responsavel === gestorName)
@@ -287,23 +287,20 @@ export function usePerformanceData(period: string) {
 
     const now = new Date();
     return clientGrupos
-      .filter(g => g.data_entrada && g.investimento_ads)
+      .filter(g => g.data_entrada)
       .map(g => {
         const entrada = new Date(g.data_entrada!);
         const months = Math.max(1, Math.floor((now.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-        const ltv = months * (g.investimento_ads || 0);
         return {
           group_id: g.group_id,
           name: gruposMap[g.group_id]?.nome?.replace(/\s*\(.*?\)/, '').substring(0, 20) || g.group_id.substring(0, 12),
-          ltv,
           months,
-          monthlyValue: g.investimento_ads || 0,
         };
       })
-      .sort((a, b) => b.ltv - a.ltv);
+      .sort((a, b) => b.months - a.months);
   }, [grupos, gruposMap]);
 
-  // LTV evolution by month (cumulative)
+  // LTV evolution: number of active clients per month
   const getLtvEvolution = useCallback((gestorName: string | null) => {
     const clientGrupos = gestorName
       ? grupos.filter(g => g.gestor_responsavel === gestorName)
@@ -313,19 +310,17 @@ export function usePerformanceData(period: string) {
     const monthlyMap = new Map<string, number>();
 
     for (const g of clientGrupos) {
-      if (!g.data_entrada || !g.investimento_ads) continue;
+      if (!g.data_entrada) continue;
       const entrada = new Date(g.data_entrada);
-      // For each month since entry, accumulate the monthly value
       const totalMonths = Math.max(1, Math.floor((now.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24 * 30)));
       for (let m = 0; m < Math.min(totalMonths, 24); m++) {
         const date = new Date(entrada);
         date.setMonth(date.getMonth() + m);
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthlyMap.set(key, (monthlyMap.get(key) || 0) + (g.investimento_ads || 0));
+        monthlyMap.set(key, (monthlyMap.get(key) || 0) + 1);
       }
     }
 
-    // Convert to cumulative
     const sorted = Array.from(monthlyMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     let cumulative = 0;
     return sorted.map(([month, value]) => {
@@ -334,13 +329,12 @@ export function usePerformanceData(period: string) {
     });
   }, [grupos]);
 
-  // LTV summary stats
+  // LTV summary stats (months-based)
   const getLtvStats = useCallback((gestorName: string | null) => {
     const ltvData = getClientLtvData(gestorName);
-    const totalLtv = ltvData.reduce((s, d) => s + d.ltv, 0);
-    const avgLtv = ltvData.length > 0 ? totalLtv / ltvData.length : 0;
-    const avgMonths = ltvData.length > 0 ? ltvData.reduce((s, d) => s + d.months, 0) / ltvData.length : 0;
-    return { totalLtv, avgLtv, avgMonths, clientCount: ltvData.length };
+    const totalMonths = ltvData.reduce((s, d) => s + d.months, 0);
+    const avgMonths = ltvData.length > 0 ? totalMonths / ltvData.length : 0;
+    return { totalMonths, avgMonths, clientCount: ltvData.length };
   }, [getClientLtvData]);
 
   // All gestors ranking
