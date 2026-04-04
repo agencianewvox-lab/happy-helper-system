@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import {
   MessageSquare, Timer, CheckCircle, TrendingUp, Users, ArrowUpDown,
-  Trophy, Medal, Award, Heart, ListChecks, AlertTriangle, Activity, Star,
+  Trophy, Medal, Award, Heart, ListChecks, AlertTriangle, Activity, Star, DollarSign,
 } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { usePerformanceData, type GestorMetrics } from "@/hooks/usePerformanceData";
