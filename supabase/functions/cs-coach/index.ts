@@ -282,6 +282,99 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ============================
+    // WEEKLY REPORT TASKS (Fridays)
+    // ============================
+    if (dayOfWeek === 5) { // Friday
+      const isMorning = currentTime >= "08:30" && currentTime < "10:00";
+      const isNoon = currentTime >= "12:00" && currentTime < "13:00";
+
+      if (isMorning) {
+        // Create weekly report tasks for each gestor+client
+        for (const grupo of grupos) {
+          const responsavel = grupo.gestor_responsavel;
+          if (!responsavel) continue;
+
+          // Check if task already exists for this week
+          const weekStart = new Date(brasiliaHour);
+          weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay() + 1); // Monday
+          weekStart.setUTCHours(0, 0, 0, 0);
+
+          const { data: existingTask } = await supabase
+            .from("tasks")
+            .select("id")
+            .eq("group_id", grupo.group_id)
+            .ilike("title", "%relatório semanal%")
+            .gte("created_at", weekStart.toISOString())
+            .limit(1);
+
+          if (!existingTask || existingTask.length === 0) {
+            await supabase.from("tasks").insert({
+              title: `Enviar relatório semanal - ${grupo.nome}`,
+              description: `Envie o relatório dos últimos 7 dias para o cliente ${grupo.nome}. Inclua métricas de desempenho, resultados de ads e próximos passos.`,
+              assigned_to: responsavel,
+              group_id: grupo.group_id,
+              priority: "alta",
+              status: "pendente",
+              due_date: new Date(brasiliaHour.toISOString().split("T")[0]).toISOString().split("T")[0],
+            });
+          }
+        }
+      }
+
+      if (isNoon) {
+        // Check if report was sent by analyzing WhatsApp messages
+        // and send reminder if not
+        for (const grupo of grupos) {
+          const responsavel = grupo.gestor_responsavel;
+          if (!responsavel) continue;
+
+          // Find the weekly report task for this week
+          const weekStart = new Date(brasiliaHour);
+          weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay() + 1);
+          weekStart.setUTCHours(0, 0, 0, 0);
+
+          const { data: reportTasks } = await supabase
+            .from("tasks")
+            .select("id, status")
+            .eq("group_id", grupo.group_id)
+            .ilike("title", "%relatório semanal%")
+            .gte("created_at", weekStart.toISOString())
+            .eq("status", "pendente")
+            .limit(1);
+
+          if (!reportTasks || reportTasks.length === 0) continue;
+
+          // Check WhatsApp for report-related messages sent today by team
+          const todayStart = new Date(brasiliaHour.toISOString().split("T")[0] + "T00:00:00Z");
+          const groupConvs = convByGroup[grupo.group_id] || [];
+          const reportSent = groupConvs.some((c: any) => {
+            if (c.direcao !== "saida") return false;
+            if (new Date(c.recebido_em) < todayStart) return false;
+            const msg = (c.mensagem || "").toLowerCase();
+            return /relat[oó]rio|report|resultado.*semana|m[eé]tricas|desempenho.*semanal|resumo.*semana/i.test(msg);
+          });
+
+          if (reportSent) {
+            // Auto-complete the task
+            await supabase
+              .from("tasks")
+              .update({ status: "concluída", updated_at: new Date().toISOString() })
+              .eq("id", reportTasks[0].id);
+          } else {
+            // Send coach nudge reminder
+            opportunities.push({
+              tipo: "pendencia_esquecida",
+              destinatario: responsavel,
+              group_id: grupo.group_id,
+              group_name: grupo.nome,
+              context: `O relatório semanal do cliente "${grupo.nome}" ainda não foi enviado e já passa do meio-dia! Envie agora para manter o cliente atualizado.`,
+            });
+          }
+        }
+      }
+    }
+
     // NPS REAL REMINDER: Check if 3+ months since last survey response, create task & coach nudge
     const npsLastByGroup = new Map<string, string>();
     for (const s of (npsSurveys || [])) {
@@ -295,11 +388,10 @@ Deno.serve(async (req) => {
       if (!responsavel) continue;
 
       const lastSurvey = npsLastByGroup.get(grupo.group_id);
-      if (!lastSurvey) continue; // Only remind after first survey exists
+      if (!lastSurvey) continue;
 
       const monthsSinceSurvey = (now.getTime() - new Date(lastSurvey).getTime()) / (1000 * 60 * 60 * 24 * 30);
       if (monthsSinceSurvey >= 3) {
-        // Check if task already exists for this cycle
         const { data: existingTask } = await supabase
           .from("tasks")
           .select("id")
@@ -309,7 +401,6 @@ Deno.serve(async (req) => {
           .limit(1);
 
         if (!existingTask || existingTask.length === 0) {
-          // Create task for the manager
           const surveyType = (grupo.categoria || "").toLowerCase().includes("clínica") ? "clinica" : "operacao";
           await supabase.from("tasks").insert({
             title: `Enviar pesquisa NPS Real - ${grupo.nome}`,
@@ -320,7 +411,6 @@ Deno.serve(async (req) => {
             status: "pendente",
           });
 
-          // Also add coach opportunity
           opportunities.push({
             tipo: "padrao_detectado",
             destinatario: responsavel,
