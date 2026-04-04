@@ -15,6 +15,7 @@ import Agenda from "./pages/Agenda";
 import PesquisaNps from "./pages/PesquisaNps";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
 
 const queryClient = new QueryClient();
 
@@ -30,7 +31,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
+  return <>
+    <DailyMotivationalPopup />
+    {children}
+  </>;
 }
 
 const App = () => (
