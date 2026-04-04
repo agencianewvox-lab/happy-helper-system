@@ -604,33 +604,72 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                     </Select>
                   </div>
                 </div>
-                {/* Nível de Estrelas */}
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                  <span className="text-lg mt-1 shrink-0">⭐</span>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <Label className="text-xs text-muted-foreground font-medium">Nível do Cliente</Label>
-                    <div className="flex gap-2 mt-1">
-                      {[1, 2, 3].map((n) => (
-                        <Button
-                          key={n}
-                          type="button"
-                          size="sm"
-                          variant={clientInfo.estrelas === String(n) ? "default" : "outline"}
-                          className={cn("h-8 px-3 text-sm gap-1", clientInfo.estrelas === String(n) && "bg-amber-500 hover:bg-amber-600 text-white border-amber-500")}
-                          onClick={() => setClientInfo(prev => ({ ...prev, estrelas: prev.estrelas === String(n) ? "" : String(n) }))}
-                        >
-                          {"⭐".repeat(n)}
-                        </Button>
-                      ))}
+                {/* Classificação por Categorias */}
+                <div className="space-y-3">
+                  {/* Dificuldade de Gerar Resultado */}
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                    <span className="text-lg mt-1 shrink-0">🎯</span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <Label className="text-xs text-muted-foreground font-medium">Dificuldade de Gerar Resultado</Label>
+                      <p className="text-[10px] text-muted-foreground">1⭐ = Segmento fácil · 2⭐ = Médio · 3⭐ = Nicho complexo</p>
+                      <div className="flex gap-2 mt-1">
+                        {[1, 2, 3].map((n) => (
+                          <Button
+                            key={n}
+                            type="button"
+                            size="sm"
+                            variant={clientInfo.estrelas_dificuldade === String(n) ? "default" : "outline"}
+                            className={cn("h-8 px-3 text-sm gap-1", clientInfo.estrelas_dificuldade === String(n) && "bg-amber-500 hover:bg-amber-600 text-white border-amber-500")}
+                            onClick={() => setClientInfo(prev => ({ ...prev, estrelas_dificuldade: prev.estrelas_dificuldade === String(n) ? "" : String(n) }))}
+                          >
+                            {"⭐".repeat(n)}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground font-medium">Motivo</Label>
-                      <Textarea
-                        value={clientInfo.estrelas_motivo}
-                        onChange={(e) => setClientInfo(prev => ({ ...prev, estrelas_motivo: e.target.value }))}
-                        placeholder="Explique o motivo da classificação..."
-                        className="mt-1 text-sm bg-background/50 min-h-[50px]"
-                      />
+                  </div>
+                  {/* Fator Financeiro */}
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                    <span className="text-lg mt-1 shrink-0">💰</span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <Label className="text-xs text-muted-foreground font-medium">Fator Financeiro</Label>
+                      <p className="text-[10px] text-muted-foreground">1⭐ = Impacto baixo · 2⭐ = Razoável · 3⭐ = Extremamente importante</p>
+                      <div className="flex gap-2 mt-1">
+                        {[1, 2, 3].map((n) => (
+                          <Button
+                            key={n}
+                            type="button"
+                            size="sm"
+                            variant={clientInfo.estrelas_financeiro === String(n) ? "default" : "outline"}
+                            className={cn("h-8 px-3 text-sm gap-1", clientInfo.estrelas_financeiro === String(n) && "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500")}
+                            onClick={() => setClientInfo(prev => ({ ...prev, estrelas_financeiro: prev.estrelas_financeiro === String(n) ? "" : String(n) }))}
+                          >
+                            {"⭐".repeat(n)}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Temperamento do Cliente */}
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                    <span className="text-lg mt-1 shrink-0">🧠</span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <Label className="text-xs text-muted-foreground font-medium">Temperamento do Cliente</Label>
+                      <p className="text-[10px] text-muted-foreground">1⭐ = Calmo e tranquilo · 2⭐ = Moderado · 3⭐ = Apressado / Impaciente</p>
+                      <div className="flex gap-2 mt-1">
+                        {[1, 2, 3].map((n) => (
+                          <Button
+                            key={n}
+                            type="button"
+                            size="sm"
+                            variant={clientInfo.estrelas_temperamento === String(n) ? "default" : "outline"}
+                            className={cn("h-8 px-3 text-sm gap-1", clientInfo.estrelas_temperamento === String(n) && "bg-red-500 hover:bg-red-600 text-white border-red-500")}
+                            onClick={() => setClientInfo(prev => ({ ...prev, estrelas_temperamento: prev.estrelas_temperamento === String(n) ? "" : String(n) }))}
+                          >
+                            {"⭐".repeat(n)}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
