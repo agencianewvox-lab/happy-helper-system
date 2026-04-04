@@ -1069,11 +1069,19 @@ Deno.serve(async (req) => {
       }
 
       // ===== ALISSON AI AUTO-REPLY =====
-      console.log("Phone:", phone, "| isAlisson:", isAlisson, "| Message:", messageText?.substring(0, 50));
+      console.log("Phone:", phone, "| isAlisson:", isAlisson, "| isTeamMember:", isTeamMember, "| Message:", messageText?.substring(0, 50));
       if (isAlisson && messageText && shouldRespondToMessage(messageText)) {
         console.log("Alisson message detected, triggering AI reply...");
         handleAlissonAIReply(messageText, groupId, supabase).catch((err) =>
           console.error("Alisson AI reply error:", err)
+        );
+      }
+
+      // ===== TEAM MEMBER COACH REPLY =====
+      if (!isAlisson && isTeamMember && teamWebhook && messageText && !isGroup) {
+        console.log(`Team member ${teamWebhook.name} replied: ${messageText.substring(0, 50)}`);
+        handleTeamCoachReply(messageText, data.pushName || "", teamWebhook, supabase).catch((err) =>
+          console.error("Team coach reply error:", err)
         );
       }
 
