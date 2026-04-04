@@ -100,11 +100,17 @@ function shouldRespondToMessage(text: string): boolean {
 const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
-async function fetchMetaAdsForAccount(accountId: string, token: string): Promise<any | null> {
+async function fetchMetaAdsForAccount(accountId: string, token: string, datePreset?: string, since?: string, until?: string): Promise<any | null> {
   try {
     const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
     const fields = "spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,reach,frequency";
-    const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
+    let dateFilter = "";
+    if (since && until) {
+      dateFilter = `&time_range={"since":"${since}","until":"${until}"}`;
+    } else {
+      dateFilter = `&date_preset=${datePreset || "last_30d"}`;
+    }
+    const url = `${META_BASE}/${actId}/insights?fields=${fields}${dateFilter}&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.error || !data.data?.length) return null;
