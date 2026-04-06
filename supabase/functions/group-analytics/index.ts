@@ -593,11 +593,11 @@ async function detectPendingWithAI(allCandidates: CandidateMessage[], apiKey: st
     const batch = allCandidates.slice(i, i + BATCH_SIZE);
     const conversationText = buildCandidateContext(batch);
     try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "gpt-4o",
           messages: [
             { role: "system", content: NEW_PENDING_PROMPT },
             { role: "user", content: `Analise as mensagens candidatas abaixo:\n\n${conversationText}` },
@@ -721,11 +721,11 @@ async function detectIntentWithAI(groupConversations: Map<string, any[]>, apiKey
     const batch = contextParts.slice(i, i + BATCH_SIZE);
     const conversationText = batch.map(b => b.text).join("\n\n");
     try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: INTENT_DETECTION_PROMPT },
             { role: "user", content: `Classifique a intenção de cada grupo:\n\n${conversationText}` },
@@ -786,8 +786,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const OPENAI_API_KEY = Deno.env.get("openai");
+    if (!OPENAI_API_KEY) throw new Error("OpenAI API key not configured");
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -946,8 +946,8 @@ Deno.serve(async (req) => {
     let aiPendingItems: AIPendingItem[] = [];
     let intentMap = new Map<string, IntentCategory>();
     const [pendingResult, intentResult] = await Promise.allSettled([
-      detectPendingWithAI(allCandidates, LOVABLE_API_KEY),
-      detectIntentWithAI(groupedConvs, LOVABLE_API_KEY),
+      detectPendingWithAI(allCandidates, OPENAI_API_KEY),
+      detectIntentWithAI(groupedConvs, OPENAI_API_KEY),
     ]);
     if (pendingResult.status === "fulfilled") aiPendingItems = pendingResult.value;
     else console.error("AI pending failed:", pendingResult.reason);
