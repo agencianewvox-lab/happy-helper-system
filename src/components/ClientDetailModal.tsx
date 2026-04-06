@@ -151,6 +151,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
         estrelas_dificuldade: (data as any).estrelas_dificuldade != null ? String((data as any).estrelas_dificuldade) : "",
         estrelas_financeiro: (data as any).estrelas_financeiro != null ? String((data as any).estrelas_financeiro) : "",
         estrelas_temperamento: (data as any).estrelas_temperamento != null ? String((data as any).estrelas_temperamento) : "",
+        responsavel_master: (data as any).responsavel_master || "",
+        responsavel_socio: (data as any).responsavel_socio || "",
       });
     }
   }, [grupo?.id]);
