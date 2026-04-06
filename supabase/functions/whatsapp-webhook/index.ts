@@ -1472,6 +1472,8 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
     };
 
+    let aiData: any = null;
+
     const aiResp = await fetch(aiUrl, {
       method: "POST",
       headers: {
@@ -1481,13 +1483,32 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       body: JSON.stringify(requestBody),
     });
 
-    if (!aiResp.ok) {
-      console.error("AI error for team reply:", await aiResp.text());
-      return;
+    if (aiResp.ok) {
+      aiData = await aiResp.json();
+    } else {
+      const errText = await aiResp.text();
+      console.error("AI error for team reply:", errText);
+      // Fallback to OpenAI if Lovable AI failed
+      if (lovableKey && openaiKey) {
+        console.log(`Falling back to OpenAI for ${firstName}`);
+        requestBody.model = "gpt-4o-mini";
+        const fallbackResp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
+          body: JSON.stringify(requestBody),
+        });
+        if (fallbackResp.ok) {
+          aiData = await fallbackResp.json();
+        } else {
+          console.error("OpenAI fallback also failed:", await fallbackResp.text());
+          return;
+        }
+      } else {
+        return;
+      }
     }
 
-    const aiData = await aiResp.json();
-    const choice = aiData.choices?.[0];
+    const choice = aiData?.choices?.[0];
     if (!choice) return;
 
     let reply = choice.message?.content?.trim() || "";
@@ -1645,40 +1666,40 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
             }
           }
         }
-      }
 
-      // Handle salvar_nota_cliente
-      if (fnName === "salvar_nota_cliente") {
-        const matchedGroup = allGroups.find((g: any) =>
-          g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
-          args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
-        );
-        if (matchedGroup) {
-          const { error: noteErr } = await supabase.from("client_notes").insert({
-            group_id: matchedGroup.group_id,
-            content: args.note_content,
-            author_name: `Vox (via ${firstName})`,
-          });
-          toolResults.push(noteErr ? `❌ Erro ao salvar nota: ${noteErr.message}` : `✅ Nota salva no card de ${matchedGroup.nome}`);
-        } else {
-          toolResults.push(`⚠️ Cliente "${args.group_name}" não encontrado para salvar nota.`);
+        // Handle salvar_nota_cliente
+        if (fnName === "salvar_nota_cliente") {
+          const matchedGroup = allGroups.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+          );
+          if (matchedGroup) {
+            const { error: noteErr } = await supabase.from("client_notes").insert({
+              group_id: matchedGroup.group_id,
+              content: args.note_content,
+              author_name: `Vox (via ${firstName})`,
+            });
+            toolResults.push(noteErr ? `❌ Erro ao salvar nota: ${noteErr.message}` : `✅ Nota salva no card de ${matchedGroup.nome}`);
+          } else {
+            toolResults.push(`⚠️ Cliente "${args.group_name}" não encontrado para salvar nota.`);
+          }
         }
-      }
 
-      // Handle registrar_feedback
-      if (fnName === "registrar_feedback") {
-        const matchedGroup = args.group_name ? allGroups.find((g: any) =>
-          g.nome.toLowerCase().includes(args.group_name.toLowerCase())
-        ) : null;
-        await supabase.from("team_feedback_log").insert({
-          member_name: teamWebhook.name,
-          message: args.message_summary,
-          category: args.category || "geral",
-          group_id: matchedGroup?.group_id || null,
-          group_name: matchedGroup?.nome || args.group_name || null,
-          relevance: args.relevance || "low",
-        });
-        toolResults.push(`✅ Feedback registrado.`);
+        // Handle registrar_feedback
+        if (fnName === "registrar_feedback") {
+          const matchedGroup = args.group_name ? allGroups.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase())
+          ) : null;
+          await supabase.from("team_feedback_log").insert({
+            member_name: teamWebhook.name,
+            message: args.message_summary,
+            category: args.category || "geral",
+            group_id: matchedGroup?.group_id || null,
+            group_name: matchedGroup?.nome || args.group_name || null,
+            relevance: args.relevance || "low",
+          });
+          toolResults.push(`✅ Feedback registrado.`);
+        }
       }
 
       // Follow-up with tool results
@@ -1688,11 +1709,14 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           tool_call_id: tc.id,
           content: toolResults[i] || "OK",
         }));
-        const followUp = await fetch(aiUrl, {
+        // Use OpenAI for follow-up if primary failed (detected by requestBody.model being gpt-4o-mini from fallback)
+        const followUpUrl = requestBody.model === "gpt-4o-mini" ? "https://api.openai.com/v1/chat/completions" : aiUrl;
+        const followUpKey = requestBody.model === "gpt-4o-mini" ? openaiKey : aiKey;
+        const followUp = await fetch(followUpUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${followUpKey}` },
           body: JSON.stringify({
-            model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+            model: requestBody.model === "gpt-4o-mini" ? "gpt-4o-mini" : (lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini"),
             messages: [...aiMessages, choice.message, ...toolResultMessages],
             max_tokens: 500,
           }),
