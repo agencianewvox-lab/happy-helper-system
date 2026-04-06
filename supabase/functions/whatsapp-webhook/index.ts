@@ -1000,11 +1000,8 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           // Generate cutucada message with AI
           const firstName = targetName.split(" ")[0];
           const OPENAI_API_KEY_COACH = Deno.env.get("openai");
-          const lovableKeyCoach = Deno.env.get("LOVABLE_API_KEY");
-          const coachAiUrl = lovableKeyCoach
-            ? "https://ai.gateway.lovable.dev/v1/chat/completions"
-            : "https://api.openai.com/v1/chat/completions";
-          const coachAiKey = lovableKeyCoach || OPENAI_API_KEY_COACH;
+          const coachAiUrl = "https://api.openai.com/v1/chat/completions";
+          const coachAiKey = OPENAI_API_KEY_COACH;
 
           let cutucadaMsg = "";
           try {
@@ -1012,7 +1009,7 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${coachAiKey}` },
               body: JSON.stringify({
-                model: lovableKeyCoach ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                model: "gpt-4o-mini",
                 messages: [
                   { role: "system", content: `Você é a Vox, coach de CS da agência New Vox. Gere uma mensagem curta e direta de cutucada para ${firstName} via WhatsApp. Tom de colega gente boa, informal, incentivador. Máximo 300 caracteres. Adicione "(responda 👍 se já fez)" no final.` },
                   { role: "user", content: `Cutucada para ${firstName}: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
@@ -1208,13 +1205,10 @@ async function handleTeamCoachReply(
 
     if (!shouldRespondToMessage(messageText)) return;
 
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     const openaiKey = Deno.env.get("openai");
     const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
-    const aiUrl = lovableKey
-      ? "https://ai.gateway.lovable.dev/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
-    const aiKey = lovableKey || openaiKey;
+    const aiUrl = "https://api.openai.com/v1/chat/completions";
+    const aiKey = openaiKey;
     if (!aiKey) return;
 
     const firstName = teamWebhook.name.split(" ")[0];
@@ -1466,7 +1460,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
     ];
 
     const requestBody: any = {
-      model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+      model: "gpt-4o-mini",
       messages: aiMessages,
       max_tokens: 1500,
       tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
@@ -1488,24 +1482,8 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
     } else {
       const errText = await aiResp.text();
       console.error("AI error for team reply:", errText);
-      // Fallback to OpenAI if Lovable AI failed
-      if (lovableKey && openaiKey) {
-        console.log(`Falling back to OpenAI for ${firstName}`);
-        requestBody.model = "gpt-4o-mini";
-        const fallbackResp = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
-          body: JSON.stringify(requestBody),
-        });
-        if (fallbackResp.ok) {
-          aiData = await fallbackResp.json();
-        } else {
-          console.error("OpenAI fallback also failed:", await fallbackResp.text());
-          return;
-        }
-      } else {
-        return;
-      }
+      // Retry not possible - OpenAI is the only provider
+      return;
     }
 
     const choice = aiData?.choices?.[0];
@@ -1629,7 +1607,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
                 body: JSON.stringify({
-                  model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                  model: "gpt-4o-mini",
                   messages: [
                     { role: "system", content: `Você é a Vox, coach de CS. Gere uma cutucada curta para ${targetFirstName}. Tom amigável. Máx 300 chars. Termine com "(responda 👍 se já fez)".` },
                     { role: "user", content: `Cutucada: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
@@ -1710,13 +1688,11 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           content: toolResults[i] || "OK",
         }));
         // Use OpenAI for follow-up if primary failed (detected by requestBody.model being gpt-4o-mini from fallback)
-        const followUpUrl = requestBody.model === "gpt-4o-mini" ? "https://api.openai.com/v1/chat/completions" : aiUrl;
-        const followUpKey = requestBody.model === "gpt-4o-mini" ? openaiKey : aiKey;
-        const followUp = await fetch(followUpUrl, {
+        const followUp = await fetch(aiUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${followUpKey}` },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
           body: JSON.stringify({
-            model: requestBody.model === "gpt-4o-mini" ? "gpt-4o-mini" : (lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini"),
+            model: "gpt-4o-mini",
             messages: [...aiMessages, choice.message, ...toolResultMessages],
             max_tokens: 500,
           }),

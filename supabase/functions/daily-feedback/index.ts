@@ -56,7 +56,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const openaiKey = Deno.env.get("openai");
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // Check day/time (BRT = UTC-3)
@@ -305,33 +304,7 @@ Regras da mensagem:
           }
         }
 
-        // Fallback to Lovable AI if OpenAI failed
-        if (!aiSuccess && lovableKey) {
-          console.log(`Using Lovable AI fallback for ${member.name}`);
-          const lovableResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${lovableKey}`,
-            },
-            body: JSON.stringify({
-              model: "openai/gpt-5-mini",
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-              max_tokens: 300,
-            }),
-          });
-
-          if (lovableResp.ok) {
-            const lovableData = await lovableResp.json();
-            feedbackMsg = lovableData.choices?.[0]?.message?.content?.trim() || "";
-          } else {
-            const errText = await lovableResp.text();
-            console.error(`Lovable AI error for ${member.name}: ${errText}`);
-          }
-        }
+        // No fallback - OpenAI is the only provider
 
         if (!feedbackMsg) {
           console.error(`No AI response for ${member.name}, skipping`);
