@@ -1482,16 +1482,8 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
     } else {
       const errText = await aiResp.text();
       console.error("AI error for team reply:", errText);
-      // Fallback to OpenAI if Lovable AI failed
-      if (lovableKey && openaiKey) {
-        console.log(`Falling back to OpenAI for ${firstName}`);
-        requestBody.model = "gpt-4o-mini";
-        const fallbackResp = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
-          body: JSON.stringify(requestBody),
-        });
-        if (fallbackResp.ok) {
+      // Retry not possible - OpenAI is the only provider
+      if (false) {
           aiData = await fallbackResp.json();
         } else {
           console.error("OpenAI fallback also failed:", await fallbackResp.text());
