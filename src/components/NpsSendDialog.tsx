@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/03f12fb5-48ed-4f30-8aaa-02a8912768e3";
+import { supabase } from "@/integrations/supabase/client";
 const PUBLISHED_APP_URL = "https://happy-helper-system.lovable.app";
 
 const MSG_OPERACAO = `Olá, Time! Tudo bem?
@@ -71,15 +71,10 @@ export function NpsSendDialog({ groupId, groupName, categoria, responsavelMaster
   const handleSend = async () => {
     setSending(true);
     try {
-      const res = await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          group_id: groupId,
-          message,
-        }),
+      const { error } = await supabase.functions.invoke("send-nps-webhook", {
+        body: { group_id: groupId, message },
       });
-      if (!res.ok) throw new Error("Erro ao enviar");
+      if (error) throw error;
       toast.success(`Pesquisa NPS enviada para ${groupName}!`);
       setOpen(false);
     } catch {
