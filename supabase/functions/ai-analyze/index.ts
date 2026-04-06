@@ -515,6 +515,147 @@ REGRAS:
       });
     }
 
+    // Webhook map for cutucadas
+    const CUTUCADA_WEBHOOK_MAP: Record<string, string> = {
+      "Murillo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
+      "Murilo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
+      "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
+      "Priscila": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
+      "Netto": "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
+      "Jader": "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
+    };
+
+    // Check for cutucada intent
+    const isCutucada = detectCutucadaIntent(messages);
+    if (isCutucada) {
+      const cutucadaSystemPrompt = `${fullSystemPrompt}
+
+CAPACIDADE ADICIONAL - ENVIAR CUTUCADA:
+Quando o usuário pedir para enviar uma cutucada, cutucar, lembrar ou cobrar alguém da equipe, você DEVE extrair as informações e responder com um JSON entre as tags <SEND_CUTUCADA> e </SEND_CUTUCADA>.
+
+Formato:
+<SEND_CUTUCADA>
+{
+  "destinatario": "Nome do destinatário",
+  "mensagem_contexto": "Contexto da cutucada",
+  "group_name": "nome do cliente (ou null)",
+  "tipo": "pendencia_esquecida|frt_alto|grupo_parado|geral|tarefa_pendente"
+}
+</SEND_CUTUCADA>
+
+EQUIPE DISPONÍVEL para cutucada: Murilo Araújo (Murillo), Netto Monge, Jader Costa, Priscilla.
+
+Após o JSON, escreva uma confirmação amigável.
+Se não especificou para quem, pergunte antes de gerar o JSON.`;
+
+      const cutucadaResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [{ role: "system", content: cutucadaSystemPrompt }, ...messages],
+        }),
+      });
+
+      if (!cutucadaResponse.ok) {
+        return new Response(JSON.stringify({ error: "Erro ao processar cutucada" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const cutucadaData = await cutucadaResponse.json();
+      let content = cutucadaData.choices?.[0]?.message?.content || "";
+
+      const cutucadaMatch = content.match(/<SEND_CUTUCADA>([\s\S]*?)<\/SEND_CUTUCADA>/);
+      if (cutucadaMatch) {
+        try {
+          const info = JSON.parse(cutucadaMatch[1].trim());
+          const targetName = info.destinatario;
+          
+          // Find webhook
+          const targetWebhookUrl = Object.entries(CUTUCADA_WEBHOOK_MAP).find(([key]) =>
+            targetName.toLowerCase().includes(key.toLowerCase()) ||
+            key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
+          )?.[1];
+
+          if (!targetWebhookUrl) {
+            content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
+            content += "\n\n⚠️ Não encontrei o webhook para essa pessoa.";
+          } else {
+            // Find matched group
+            let matchedGroup: any = null;
+            if (info.group_name) {
+              matchedGroup = grupos.find((g: any) =>
+                g.nome.toLowerCase().includes(info.group_name.toLowerCase())
+              );
+            }
+
+            // Generate cutucada message
+            const targetFirstName = targetName.split(" ")[0];
+            let cutucadaMsg = "";
+            try {
+              const genResp = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: "gpt-4o-mini",
+                  messages: [
+                    { role: "system", content: `Você é a Vox, coach de CS. Gere uma cutucada curta para ${targetFirstName}. Tom amigável. Máx 300 chars. Termine com "(responda 👍 se já fez)".` },
+                    { role: "user", content: `Cutucada: ${info.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
+                  ],
+                  max_tokens: 200,
+                }),
+              });
+              if (genResp.ok) {
+                const genData = await genResp.json();
+                cutucadaMsg = genData.choices?.[0]?.message?.content?.trim() || "";
+              }
+            } catch (e) {
+              console.error("Error generating cutucada msg:", e);
+            }
+
+            if (!cutucadaMsg) {
+              cutucadaMsg = `E aí ${targetFirstName}! 👋 ${info.mensagem_contexto}. Bora resolver? (responda 👍 se já fez)`;
+            }
+
+            // Send via webhook
+            try {
+              const encodedMsg = encodeURIComponent(cutucadaMsg);
+              await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
+              
+              // Save to coach_messages
+              await supabase.from("coach_messages").insert({
+                destinatario_nome: targetName,
+                mensagem: cutucadaMsg,
+                tipo: info.tipo || "geral",
+                group_id: matchedGroup?.group_id || null,
+                enviada: true,
+                enviada_em: new Date().toISOString(),
+              });
+
+              content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
+              content += `\n\n✅ **Cutucada enviada para ${targetName}!** Mensagem: "${cutucadaMsg.slice(0, 100)}..."`;
+            } catch (e) {
+              console.error("Error sending cutucada:", e);
+              content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
+              content += "\n\n⚠️ Erro ao enviar cutucada. Tente novamente.";
+            }
+          }
+        } catch (parseErr) {
+          console.error("Error parsing cutucada:", parseErr);
+        }
+      }
+
+      const encoder = new TextEncoder();
+      const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+      return new Response(encoder.encode(sseData), {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
     // Check for task creation intent
     const isTaskCreation = detectTaskIntent(messages);
     if (isTaskCreation) {
