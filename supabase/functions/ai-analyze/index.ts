@@ -83,6 +83,46 @@ function detectCutucadaIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 
+function detectDateRangeFromMessages(messages: any[]): { since: string; until: string } | null {
+  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUser) return null;
+  const text = lastUser.content;
+
+  // Match patterns like "01/04 a 06/04", "01/04 até 06/04", "de 01/04 a 06/04"
+  const rangeMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (rangeMatch) {
+    const now = new Date();
+    const year1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
+    const year2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
+    const since = `${year1}-${rangeMatch[2].padStart(2, "0")}-${rangeMatch[1].padStart(2, "0")}`;
+    const until = `${year2}-${rangeMatch[5].padStart(2, "0")}-${rangeMatch[4].padStart(2, "0")}`;
+    return { since, until };
+  }
+
+  // Match "dia 01/04" or "no dia 06/04/2025"
+  const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (singleDayMatch) {
+    const now = new Date();
+    const year = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
+    const date = `${year}-${singleDayMatch[2].padStart(2, "0")}-${singleDayMatch[1].padStart(2, "0")}`;
+    return { since: date, until: date };
+  }
+
+  // "hoje"
+  if (/\bhoje\b/i.test(text)) {
+    const today = new Date().toISOString().split("T")[0];
+    return { since: today, until: today };
+  }
+
+  // "ontem"
+  if (/\bontem\b/i.test(text)) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    return { since: yesterday, until: yesterday };
+  }
+
+  return null;
+}
+
 function detectComplexQuery(messages: any[]): boolean {
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return false;
