@@ -121,6 +121,30 @@ export type Database = {
         }
         Relationships: []
       }
+      client_notes: {
+        Row: {
+          author_name: string
+          content: string
+          created_at: string
+          group_id: string
+          id: string
+        }
+        Insert: {
+          author_name: string
+          content: string
+          created_at?: string
+          group_id: string
+          id?: string
+        }
+        Update: {
+          author_name?: string
+          content?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
       coach_config: {
         Row: {
           ativo: boolean | null

@@ -18,7 +18,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp, ArrowUpRight, ArrowDownRight,
-  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone, UserCheck, AlertCircle, Siren,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone, UserCheck, AlertCircle, Siren, StickyNote,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -26,6 +26,7 @@ import {
 import { MetaAdsTab } from "@/components/MetaAdsTab";
 import { NpsDetailPanel } from "@/components/NpsDetailPanel";
 import { NpsSurveyTab } from "@/components/NpsSurveyTab";
+import { ClientNotesTab } from "@/components/ClientNotesTab";
 
 interface Conversa {
   id: string;
@@ -257,6 +258,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
             <TabsTrigger value="meta-ads" className="flex-1 gap-1"><Megaphone className="w-3 h-3" /> Ads</TabsTrigger>
             <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
+            <TabsTrigger value="notas" className="flex-1 gap-1"><StickyNote className="w-3 h-3" /> Notas</TabsTrigger>
           </TabsList>
 
           <TabsContent value="indicadores" className="space-y-4 mt-4">
@@ -724,6 +726,10 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
 
           <TabsContent value="nps-real" className="mt-4">
             <NpsSurveyTab groupId={grupo.group_id} categoria={grupo.categoria} />
+          </TabsContent>
+
+          <TabsContent value="notas" className="mt-4">
+            <ClientNotesTab groupId={grupo.group_id} />
           </TabsContent>
         </Tabs>
       </DialogContent>
