@@ -418,9 +418,11 @@ Deno.serve(async (req) => {
       // Ads data
       const ads = adsDataMap.get(gid);
       if (ads) {
-        line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
+        const periodLabel = ads.date_range || "últimos 30 dias";
+        line += `\n  📊 META ADS (${periodLabel}): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
       } else if (g.ad_account_id) {
-        line += `\n  📊 META ADS: Conta vinculada mas sem dados nos últimos 30 dias`;
+        const periodLabel = detectedDateRange ? `${detectedDateRange.since} a ${detectedDateRange.until}` : "últimos 30 dias";
+        line += `\n  📊 META ADS: Conta vinculada mas sem dados no período (${periodLabel})`;
       }
 
       // NPS Real surveys
