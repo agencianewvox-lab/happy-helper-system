@@ -914,10 +914,11 @@ ${dataContext}`;
       });
     }
 
-    // Chat mode: choose model based on complexity
+    // Chat mode: choose model based on complexity or ads date queries
     const isComplex = detectComplexQuery(messages);
-    const model = isComplex ? "gpt-4o" : "gpt-4o-mini";
-    console.log(`Chat mode: using ${model} (complex=${isComplex})`);
+    const hasDateRange = !!detectedDateRange;
+    const model = (isComplex || hasDateRange) ? "gpt-4o" : "gpt-4o-mini";
+    console.log(`Chat mode: using ${model} (complex=${isComplex}, dateRange=${hasDateRange})`);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
