@@ -71,15 +71,10 @@ export function NpsSendDialog({ groupId, groupName, categoria, responsavelMaster
   const handleSend = async () => {
     setSending(true);
     try {
-      const res = await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          group_id: groupId,
-          message,
-        }),
+      const { error } = await supabase.functions.invoke("send-nps-webhook", {
+        body: { group_id: groupId, message },
       });
-      if (!res.ok) throw new Error("Erro ao enviar");
+      if (error) throw error;
       toast.success(`Pesquisa NPS enviada para ${groupName}!`);
       setOpen(false);
     } catch {
