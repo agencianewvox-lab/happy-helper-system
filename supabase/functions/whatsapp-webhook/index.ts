@@ -296,12 +296,22 @@ async function handleAlissonAIReply(
       .select("*")
       .eq("resolved", false);
 
-    const [pendingResResult, ...conversasResults] = await Promise.all([
+    // Fetch recent coach messages for context about cutucadas
+    const coachMsgsPromise = supabase
+      .from("coach_messages")
+      .select("destinatario_nome, mensagem, tipo, group_id, enviada_em, resultado")
+      .eq("enviada", true)
+      .order("enviada_em", { ascending: false })
+      .limit(30);
+
+    const [pendingResResult, coachMsgsResult, ...conversasResults] = await Promise.all([
       pendingResPromise,
+      coachMsgsPromise,
       ...conversasPromises,
     ]);
 
     const pendingResolutions = pendingResResult.data || [];
+    const recentCoachMsgs = coachMsgsResult.data || [];
     const groupMsgsMap = new Map<string, any[]>();
     for (let i = 0; i < groupIds.length; i++) {
       groupMsgsMap.set(groupIds[i], conversasResults[i].data || []);
