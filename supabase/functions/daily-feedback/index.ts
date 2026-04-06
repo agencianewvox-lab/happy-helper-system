@@ -58,6 +58,13 @@ Deno.serve(async (req) => {
     const openaiKey = Deno.env.get("openai");
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Load configurable prompts from DB
+    const { data: promptConfigs } = await supabase.from("ai_prompts_config").select("prompt_key, prompt_value");
+    const promptMap = new Map<string, string>();
+    for (const pc of (promptConfigs || [])) promptMap.set(pc.prompt_key, pc.prompt_value);
+    const DB_FEEDBACK_SYSTEM = promptMap.get("daily_feedback_system_prompt");
+    const DB_FEEDBACK_RULES = promptMap.get("daily_feedback_rules");
+
     // Check day/time (BRT = UTC-3)
     const now = new Date();
     const brasiliaMs = now.getTime() - 3 * 3600000;
@@ -250,9 +257,9 @@ Dados de hoje (${dateFormatted}):
 
 Lembre: máximo 500 caracteres. Uma mensagem de WhatsApp curta e pessoal.`;
 
-      const systemPrompt = `Você é a Vox, colega de trabalho da equipe da agência New Vox. Todo dia às 18h você manda uma mensagem rápida pra cada pessoa da equipe fazendo um resumão de como foi o dia. O tom é de amigo de trabalho — informal, sincero, incentivador mas honesto. Você trata a pessoa pelo primeiro nome. Você usa emojis com moderação. Você NUNCA é robótico, formal ou corporativo.
+      const systemPrompt = DB_FEEDBACK_SYSTEM || `Você é a Vox, colega de trabalho da equipe da agência New Vox. Todo dia às 18h você manda uma mensagem rápida pra cada pessoa da equipe fazendo um resumão de como foi o dia. O tom é de amigo de trabalho — informal, sincero, incentivador mas honesto. Você trata a pessoa pelo primeiro nome. Você usa emojis com moderação. Você NUNCA é robótico, formal ou corporativo.`;
 
-Regras da mensagem:
+      const rulesPrompt = DB_FEEDBACK_RULES || `Regras da mensagem:
 - MÁXIMO 500 caracteres. Isso é inegociável. Se passar, cortar. É uma mensagem de WhatsApp, não um email.
 - Começar sempre com o nome da pessoa e uma saudação casual variada (nunca a mesma todo dia). Exemplos: 'Netto, bora fechar o dia!', 'E aí Jader, resumão do dia:', 'Priscila, olha como foi hoje:', 'Murillo, fechando o expediente!', 'Thais, rapidinho antes de ir:'
 - Ir direto ao ponto. Não precisa de introdução.
@@ -271,6 +278,8 @@ Regras da mensagem:
 - Se não tem muita informação sobre a pessoa, mandar algo breve e genérico mas ainda pessoal
 - IMPORTANTE: No final da mensagem, SEMPRE adicione uma quebra de linha e depois: "Quer que eu agende alguma tarefa pra você amanhã? Me conta se fez algo hoje que eu não vi, assim fico mais esperta sobre seus projetos! 😉"`;
 
+      const fullSystemPrompt = systemPrompt + "\n\n" + rulesPrompt;
+
       // Generate with AI
       let feedbackMsg = "";
       try {
@@ -287,7 +296,7 @@ Regras da mensagem:
             body: JSON.stringify({
               model: "gpt-4o-mini",
               messages: [
-                { role: "system", content: systemPrompt },
+              { role: "system", content: fullSystemPrompt },
                 { role: "user", content: userPrompt },
               ],
               max_tokens: 300,

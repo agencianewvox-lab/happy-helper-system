@@ -505,6 +505,23 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "editar_prompt",
+      description: "Edita um prompt ou regra de IA do sistema Vox. Use quando Alisson pedir para mudar, alterar, editar, atualizar qualquer prompt, regra, instrução ou comportamento da IA. SOMENTE Alisson pode usar esta ferramenta.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt_key: { type: "string", description: "Chave do prompt a editar (ex: vox_chat_system_prompt, vox_master_prompt, equipe_info, regras_negocio, vox_whatsapp_alisson_prompt, vox_whatsapp_team_prompt, daily_feedback_system_prompt, daily_feedback_rules, executive_briefing_prompt, cs_coach_nudge_prompt)" },
+          new_value: { type: "string", description: "Novo conteúdo completo do prompt" },
+          description_hint: { type: "string", description: "Breve descrição do que foi alterado", nullable: true },
+        },
+        required: ["prompt_key", "new_value"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
@@ -524,6 +541,11 @@ async function handleAlissonAIReply(
       return;
     }
     const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
+
+    // Load configurable prompts from DB
+    const { data: promptConfigs } = await supabase.from("ai_prompts_config").select("prompt_key, prompt_value");
+    const promptMap = new Map<string, string>();
+    for (const pc of (promptConfigs || [])) promptMap.set(pc.prompt_key, pc.prompt_value);
 
     // Fetch all groups
     const { data: grupos } = await supabase.from("whatsapp_grupos").select("*").order("nome");
@@ -743,7 +765,8 @@ async function handleAlissonAIReply(
       }
     }
 
-    const systemPrompt = `Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você está respondendo diretamente ao Alisson (sócio proprietário) via WhatsApp. Você é o agente pessoal dele para gestão da operação.
+    const DB_ALISSON_PROMPT = promptMap.get("vox_whatsapp_alisson_prompt");
+    const systemPrompt = `${DB_ALISSON_PROMPT || "Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você está respondendo diretamente ao Alisson (sócio proprietário) via WhatsApp. Você é o agente pessoal dele para gestão da operação."}
 
 EQUIPE NEW VOX (conheça cada um para direcionar ações corretamente):
 - Jader Costa: Gestor de tráfego
@@ -778,6 +801,8 @@ SUAS CAPACIDADES COMO AGENTE:
 8. RECOMENDAÇÕES PROATIVAS — Ações prioritárias com QUEM deve fazer, PARA QUAL cliente, e POR QUÊ.
 
 9. ENVIAR CUTUCADA — Quando Alisson pedir para cutucar, lembrar, cobrar ou enviar cutucada para alguém da equipe, use "enviar_cutucada". A cutucada será enviada IMEDIATAMENTE via WhatsApp para a pessoa.
+
+10. EDITAR PROMPTS/REGRAS DA IA — Quando Alisson pedir para mudar, alterar, editar, atualizar qualquer prompt, regra, instrução ou comportamento da IA/Vox, use "editar_prompt". Chaves disponíveis: vox_chat_system_prompt, vox_master_prompt, equipe_info, regras_negocio, vox_whatsapp_alisson_prompt, vox_whatsapp_team_prompt, daily_feedback_system_prompt, daily_feedback_rules, executive_briefing_prompt, cs_coach_nudge_prompt. Se Alisson pedir para mudar algo que não corresponde a nenhuma chave existente, pergunte antes de agir.
 
 REGRAS:
 - Responda DIRETO e CONCISO (máximo 400 palavras) — é WhatsApp
@@ -1106,10 +1131,52 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
         });
         toolResults.push(`✅ Feedback registrado.`);
       }
+
+      // Handle editar_prompt (ONLY for Alisson)
+      if (fnName === "editar_prompt") {
+        const { prompt_key, new_value, description_hint } = args;
+        // Check if prompt exists
+        const { data: existing } = await supabase
+          .from("ai_prompts_config")
+          .select("id, prompt_label")
+          .eq("prompt_key", prompt_key)
+          .maybeSingle();
+
+        if (existing) {
+          const { error: updateErr } = await supabase
+            .from("ai_prompts_config")
+            .update({
+              prompt_value: new_value,
+              updated_at: new Date().toISOString(),
+              updated_by: "Alisson Lima (via WhatsApp)",
+            })
+            .eq("prompt_key", prompt_key);
+
+          if (updateErr) {
+            toolResults.push(`❌ Erro ao editar prompt: ${updateErr.message}`);
+          } else {
+            toolResults.push(`✅ Prompt "${existing.prompt_label}" (${prompt_key}) atualizado com sucesso!`);
+          }
+        } else {
+          // Create new prompt
+          const { error: insertErr } = await supabase.from("ai_prompts_config").insert({
+            prompt_key,
+            prompt_label: description_hint || prompt_key,
+            prompt_value: new_value,
+            prompt_category: "Geral",
+            updated_by: "Alisson Lima (via WhatsApp)",
+          });
+          if (insertErr) {
+            toolResults.push(`❌ Erro ao criar prompt: ${insertErr.message}`);
+          } else {
+            toolResults.push(`✅ Novo prompt "${prompt_key}" criado com sucesso!`);
+          }
+        }
+      }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "editar_prompt"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
