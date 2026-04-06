@@ -58,6 +58,13 @@ Deno.serve(async (req) => {
     const openaiKey = Deno.env.get("openai");
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Load configurable prompts from DB
+    const { data: promptConfigs } = await supabase.from("ai_prompts_config").select("prompt_key, prompt_value");
+    const promptMap = new Map<string, string>();
+    for (const pc of (promptConfigs || [])) promptMap.set(pc.prompt_key, pc.prompt_value);
+    const DB_FEEDBACK_SYSTEM = promptMap.get("daily_feedback_system_prompt");
+    const DB_FEEDBACK_RULES = promptMap.get("daily_feedback_rules");
+
     // Check day/time (BRT = UTC-3)
     const now = new Date();
     const brasiliaMs = now.getTime() - 3 * 3600000;
