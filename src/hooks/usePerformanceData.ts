@@ -69,6 +69,7 @@ export function usePerformanceData(period: string) {
   const [npsPredictions, setNpsPredictions] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [npsSurveys, setNpsSurveys] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<{ user_id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const { start, end } = useMemo(() => getDateRange(period), [period]);
@@ -77,13 +78,14 @@ export function usePerformanceData(period: string) {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes, npsSurveysRes] = await Promise.all([
+      const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes, npsSurveysRes, profilesRes] = await Promise.all([
         supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, data_entrada, investimento_ads, plano"),
         supabase.from("nps_prediction_history").select("*").gte("recorded_at", startISO).order("recorded_at"),
         supabase.from("tasks").select("*").gte("created_at", startISO),
         supabase.from("pending_demand_resolutions").select("*").gte("created_at", startISO),
         supabase.from("nps_predictions").select("*"),
         supabase.from("nps_surveys").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("user_id, full_name"),
       ]);
 
       if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
@@ -92,6 +94,7 @@ export function usePerformanceData(period: string) {
       if (pendingRes.data) setPendingDemands(pendingRes.data);
       if (npsPredRes.data) setNpsPredictions(npsPredRes.data);
       if (npsSurveysRes.data) setNpsSurveys(npsSurveysRes.data as any[]);
+      if (profilesRes.data) setProfiles(profilesRes.data as any[]);
     } catch (err) {
       console.error("Performance data fetch error:", err);
     } finally {
