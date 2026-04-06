@@ -69,6 +69,7 @@ export function usePerformanceData(period: string) {
   const [npsPredictions, setNpsPredictions] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [npsSurveys, setNpsSurveys] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<{ user_id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const { start, end } = useMemo(() => getDateRange(period), [period]);
@@ -77,13 +78,14 @@ export function usePerformanceData(period: string) {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes, npsSurveysRes] = await Promise.all([
+      const [gruposRes, npsHistRes, tasksRes, pendingRes, npsPredRes, npsSurveysRes, profilesRes] = await Promise.all([
         supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, data_entrada, investimento_ads, plano"),
         supabase.from("nps_prediction_history").select("*").gte("recorded_at", startISO).order("recorded_at"),
         supabase.from("tasks").select("*").gte("created_at", startISO),
         supabase.from("pending_demand_resolutions").select("*").gte("created_at", startISO),
         supabase.from("nps_predictions").select("*"),
         supabase.from("nps_surveys").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("user_id, full_name"),
       ]);
 
       if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
@@ -92,6 +94,7 @@ export function usePerformanceData(period: string) {
       if (pendingRes.data) setPendingDemands(pendingRes.data);
       if (npsPredRes.data) setNpsPredictions(npsPredRes.data);
       if (npsSurveysRes.data) setNpsSurveys(npsSurveysRes.data as any[]);
+      if (profilesRes.data) setProfiles(profilesRes.data as any[]);
     } catch (err) {
       console.error("Performance data fetch error:", err);
     } finally {
@@ -108,6 +111,24 @@ export function usePerformanceData(period: string) {
     }
     return Array.from(set).sort();
   }, [grupos]);
+
+  // Map user_id to gestor_responsavel name
+  const PROFILE_TO_GESTOR: Record<string, string> = {
+    "Murillo": "Murilo Araújo",
+    "Netto": "Netto Monge",
+    "Jader": "Jader Costa",
+    "Priscilla": "Priscilla Borges",
+    "Alisson": "Alisson Lima",
+  };
+
+  const userIdToGestorName = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of profiles) {
+      const gestorName = PROFILE_TO_GESTOR[p.full_name];
+      if (gestorName) map[p.user_id] = gestorName;
+    }
+    return map;
+  }, [profiles]);
 
   const gruposMap = useMemo(() => {
     const map: Record<string, GrupoInfo> = {};
@@ -143,9 +164,21 @@ export function usePerformanceData(period: string) {
       .map(([date, d]) => ({ date, score: Number((d.sum / d.count).toFixed(1)) }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Tasks
+    // Tasks - only count as completed by this gestor if they actually completed it
     const clientTasks = tasks.filter(t => clientIds.has(t.group_id));
-    const tasksCompleted = clientTasks.filter(t => t.status === "concluida" || t.status === "concluída").length;
+    const tasksCompleted = gestorName
+      ? clientTasks.filter(t => {
+          const isCompleted = t.status === "concluida" || t.status === "concluída" || t.status === "feito";
+          if (!isCompleted) return false;
+          // If completed_by is set, check if this gestor actually completed it
+          if (t.completed_by) {
+            const completedByGestor = userIdToGestorName[t.completed_by];
+            return completedByGestor === gestorName;
+          }
+          // Legacy: no completed_by, attribute to assigned person
+          return true;
+        }).length
+      : clientTasks.filter(t => t.status === "concluida" || t.status === "concluída" || t.status === "feito").length;
     const tasksTotal = clientTasks.length;
 
     // Tasks Evolution
@@ -154,16 +187,34 @@ export function usePerformanceData(period: string) {
       const date = t.created_at.substring(0, 10);
       const entry = taskDateMap.get(date) || { completed: 0, total: 0 };
       entry.total++;
-      if (t.status === "concluida" || t.status === "concluída") entry.completed++;
+      const isCompleted = t.status === "concluida" || t.status === "concluída" || t.status === "feito";
+      if (isCompleted) {
+        if (gestorName && t.completed_by) {
+          const completedByGestor = userIdToGestorName[t.completed_by];
+          if (completedByGestor === gestorName) entry.completed++;
+        } else if (!gestorName || !t.completed_by) {
+          entry.completed++;
+        }
+      }
       taskDateMap.set(date, entry);
     }
     const tasksEvolution = Array.from(taskDateMap.entries())
       .map(([date, d]) => ({ date, ...d }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Pending Demands
+    // Pending Demands - only count as resolved by this gestor if they actually resolved it
     const clientPending = pendingDemands.filter(p => clientIds.has(p.group_id));
-    const pendingResolved = clientPending.filter(p => p.resolved).length;
+    const pendingResolved = gestorName
+      ? clientPending.filter(p => {
+          if (!p.resolved) return false;
+          if (p.resolved_by) {
+            const resolvedByGestor = userIdToGestorName[p.resolved_by];
+            return resolvedByGestor === gestorName;
+          }
+          // Legacy: no resolved_by, attribute to assigned gestor
+          return true;
+        }).length
+      : clientPending.filter(p => p.resolved).length;
     const pendingTotal = clientPending.length;
 
     // Pending Evolution
@@ -236,7 +287,7 @@ export function usePerformanceData(period: string) {
       totalGroups,
       scores: { nps: npsScore, npsReal: npsRealScore, frt: frtScore, tasks: tasksScore, resolutions: resolutionsScore, sentiment: sentimentScore, inactivity: inactivityScore, overall },
     };
-  }, [grupos, npsPredictions, npsHistory, tasks, pendingDemands, npsSurveys]);
+  }, [grupos, npsPredictions, npsHistory, tasks, pendingDemands, npsSurveys, userIdToGestorName]);
 
   // Per-client NPS data
   const getClientNpsData = useCallback((gestorName: string | null) => {

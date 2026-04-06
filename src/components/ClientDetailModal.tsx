@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Grupo, NpsPrediction } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -79,6 +80,7 @@ function trendLabel(trend?: string) {
 }
 
 export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props) {
+  const { user } = useAuth();
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [conversas, setConversas] = useState<Conversa[]>([]);
@@ -201,8 +203,12 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const handleResolve = useCallback(async (term: string, requestedAt: string, resolved: boolean) => {
     const key = makeKey(term, requestedAt);
     setSavingKey(key);
+    const upsertData: any = { group_id: groupId, term, requested_at: requestedAt, resolved, resolved_at: new Date().toISOString() };
+    if (resolved && user?.id) {
+      upsertData.resolved_by = user.id;
+    }
     const { error } = await supabase.from("pending_demand_resolutions").upsert(
-      { group_id: groupId, term, requested_at: requestedAt, resolved, resolved_at: new Date().toISOString() },
+      upsertData,
       { onConflict: "group_id,term,requested_at" }
     );
     if (!error) setResolutions((prev) => ({ ...prev, [key]: resolved }));
