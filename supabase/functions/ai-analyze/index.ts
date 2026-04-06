@@ -78,7 +78,7 @@ function detectCutucadaIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 
-
+function detectComplexQuery(messages: any[]): boolean {
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
