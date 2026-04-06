@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Search, Star, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { NpsSendDialog } from "@/components/NpsSendDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
