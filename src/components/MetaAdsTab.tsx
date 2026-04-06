@@ -334,7 +334,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
                     onSelect={setCustomUntil}
                     locale={ptBR}
                     disabled={(date) => date > new Date() || (customSince ? date < customSince : false)}
-                    className="rounded-md border"
+                    className={cn("rounded-md border pointer-events-auto")}
                   />
                 </div>
                 <Button

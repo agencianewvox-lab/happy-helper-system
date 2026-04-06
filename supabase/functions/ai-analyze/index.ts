@@ -9,11 +9,15 @@ const corsHeaders = {
 const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
-async function fetchMetaAdsForAccount(accountId: string, token: string): Promise<any | null> {
+async function fetchMetaAdsForAccount(accountId: string, token: string, since?: string, until?: string): Promise<any | null> {
   try {
     const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
     const fields = "spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,reach,frequency";
-    const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
+    let dateFilter = "&date_preset=last_30d";
+    if (since && until) {
+      dateFilter = `&time_range={"since":"${since}","until":"${until}"}`;
+    }
+    const url = `${META_BASE}/${actId}/insights?fields=${fields}${dateFilter}&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.error || !data.data?.length) return null;
@@ -36,6 +40,7 @@ async function fetchMetaAdsForAccount(accountId: string, token: string): Promise
       leads: parseInt(leads),
       purchases: parseInt(purchases),
       cpa: cpa ? parseFloat(cpa) : null,
+      date_range: since && until ? `${since} a ${until}` : "últimos 30 dias",
     };
   } catch (e) {
     console.error("Meta Ads fetch error for", accountId, e);
