@@ -554,10 +554,13 @@ Regras:
 
       let mensagem = "";
       try {
-        const aiUrl = lovableKey
-          ? "https://ai.gateway.lovable.dev/v1/chat/completions"
-          : "https://api.openai.com/v1/chat/completions";
-        const aiKey = lovableKey || openaiKey;
+        const aiUrl = "https://api.openai.com/v1/chat/completions";
+        const aiKey = openaiKey;
+
+        if (!aiKey) {
+          console.error("No OpenAI API key configured");
+          continue;
+        }
 
         const aiResp = await fetch(aiUrl, {
           method: "POST",
@@ -566,7 +569,7 @@ Regras:
             "Authorization": `Bearer ${aiKey}`,
           },
           body: JSON.stringify({
-            model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+            model: "gpt-4o-mini",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
