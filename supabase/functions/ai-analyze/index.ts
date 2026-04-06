@@ -609,6 +609,11 @@ ${coachHistoryContext}
 
     const masterFirstName = isMaster && userName ? userName.split(' ')[0] : null;
 
+    // Use DB prompts if available, otherwise fall back to hardcoded
+    const EFFECTIVE_SYSTEM_PROMPT = DB_SYSTEM_PROMPT || SYSTEM_PROMPT;
+    const EFFECTIVE_EQUIPE = DB_EQUIPE ? `\n\n${DB_EQUIPE}` : "";
+    const EFFECTIVE_REGRAS = DB_REGRAS ? `\n\n${DB_REGRAS}` : "";
+
     const MASTER_PROMPT = isMaster && masterFirstName ? `
 MODO MASTER ATIVO — Você está conversando com ${masterFirstName}, um dos sócios-proprietários da New Vox. Ele tem nível MASTER de acesso ao sistema.
 
