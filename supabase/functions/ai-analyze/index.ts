@@ -614,8 +614,33 @@ ${coachHistoryContext}
     const EFFECTIVE_EQUIPE = DB_EQUIPE ? `\n\n${DB_EQUIPE}` : "";
     const EFFECTIVE_REGRAS = DB_REGRAS ? `\n\n${DB_REGRAS}` : "";
 
-    const MASTER_PROMPT = isMaster && masterFirstName ? `
-MODO MASTER ATIVO — Você está conversando com ${masterFirstName}, um dos sócios-proprietários da New Vox. Ele tem nível MASTER de acesso ao sistema.
+    const MASTER_PROMPT = isMaster && masterFirstName ? (DB_MASTER_PROMPT || `
+MODO MASTER ATIVO — Você está conversando com ${masterFirstName}, um dos sócios-proprietários da New Vox.`).replace(/\{masterFirstName\}/g, masterFirstName) + `
+
+AÇÕES MASTER DISPONÍVEIS (responda com tags XML quando o master pedir):
+
+1. ATRIBUIR RESPONSÁVEL:
+<ASSIGN_RESPONSIBLE>
+{"group_id": "group_id do cliente", "field": "gestor_responsavel|responsavel_master|responsavel_socio", "new_value": "Nome da pessoa"}
+</ASSIGN_RESPONSIBLE>
+
+2. ATUALIZAR CLIENTE:
+<UPDATE_CLIENT>
+{"group_id": "group_id", "updates": {"plano": "novo valor", "investimento_ads": 3000}}
+</UPDATE_CLIENT>
+
+3. RESOLVER PENDÊNCIA:
+<RESOLVE_PENDING>
+{"group_id": "group_id", "term": "termo da pendência", "resolved_by": "nome de quem resolveu"}
+</RESOLVE_PENDING>
+
+4. CONTROLE DO SISTEMA:
+<SYSTEM_CONTROL>
+{"action": "pause_coach|resume_coach", "target": "all", "reason": "motivo opcional"}
+</SYSTEM_CONTROL>
+
+Após cada ação, confirme o que foi feito em texto amigável.
+` : "";
 
 TRATAMENTO:
 - Trate ${masterFirstName} com proximidade e parceria, como braço direito estratégico da empresa
