@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,10 +9,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Search, Star, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { NpsSendDialog } from "@/components/NpsSendDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { NpsSendDialog } from "@/components/NpsSendDialog";
 
 interface NpsSurveyRow {
   id: string;
@@ -44,7 +45,7 @@ export default function NpsReal() {
   const [filterType, setFilterType] = useState<string>("all");
 
   useEffect(() => {
-    async function fetch() {
+    async function fetchData() {
       setLoading(true);
       const [surveyRes, gruposRes] = await Promise.all([
         supabase.from("nps_surveys").select("*").order("created_at", { ascending: false }),
@@ -54,7 +55,7 @@ export default function NpsReal() {
       if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
       setLoading(false);
     }
-    fetch();
+    fetchData();
   }, []);
 
   const gruposMap = useMemo(() => {
@@ -63,7 +64,26 @@ export default function NpsReal() {
     return map;
   }, [grupos]);
 
-  const filtered = useMemo(() => {
+  // Surveys by group for counting
+  const surveysByGroup = useMemo(() => {
+    const map: Record<string, NpsSurveyRow[]> = {};
+    for (const s of surveys) {
+      if (!map[s.group_id]) map[s.group_id] = [];
+      map[s.group_id].push(s);
+    }
+    return map;
+  }, [surveys]);
+
+  const filteredGrupos = useMemo(() => {
+    return grupos.filter((g) => {
+      const matchSearch =
+        g.nome.toLowerCase().includes(search.toLowerCase()) ||
+        (g.gestor_responsavel || "").toLowerCase().includes(search.toLowerCase());
+      return matchSearch;
+    });
+  }, [grupos, search]);
+
+  const filteredSurveys = useMemo(() => {
     return surveys.filter((s) => {
       const grupo = gruposMap[s.group_id];
       const nome = grupo?.nome || s.group_id;
@@ -112,28 +132,28 @@ export default function NpsReal() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">NPS Real</h1>
-        <p className="text-muted-foreground text-sm">Todas as respostas das pesquisas de satisfação</p>
+        <p className="text-muted-foreground text-sm">Envie pesquisas e acompanhe as respostas de satisfação</p>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="bg-card border-border/40">
           <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Total Respostas</p>
-            <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+            <p className="text-xs text-muted-foreground mb-1">Total Clientes</p>
+            <p className="text-2xl font-bold text-foreground">{grupos.length}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/40">
           <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Média</p>
-            <p className={`text-2xl font-bold ${getScoreColor(stats.avg)}`}>{stats.avg}</p>
+            <p className="text-xs text-muted-foreground mb-1">Respostas</p>
+            <p className="text-2xl font-bold text-foreground">{stats.total}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/40">
           <CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">NPS Score</p>
             <p className={`text-2xl font-bold ${stats.nps >= 50 ? "text-green-400" : stats.nps >= 0 ? "text-yellow-400" : "text-red-400"}`}>
-              {stats.nps}
+              {stats.total > 0 ? stats.nps : "—"}
             </p>
           </CardContent>
         </Card>
@@ -151,93 +171,153 @@ export default function NpsReal() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por cliente, gestor ou comentário..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="operacao">Operação</SelectItem>
-            <SelectItem value="clinica">Clínica</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por cliente ou gestor..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
-      {/* Table */}
-      <Card className="bg-card border-border/40">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Gestor</TableHead>
-                <TableHead>Nota</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Comentário</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Ação</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    Nenhuma resposta encontrada
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((s) => {
-                  const grupo = gruposMap[s.group_id];
-                  return (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-medium text-foreground">
-                        {grupo?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 25) || s.group_id.substring(0, 12)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {grupo?.gestor_responsavel || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`text-lg font-bold ${getScoreColor(s.score)}`}>{s.score}</span>
-                      </TableCell>
-                      <TableCell>{getScoreBadge(s.score)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {s.survey_type === "clinica" ? "Clínica" : "Operação"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[250px] truncate text-sm text-muted-foreground">
-                        {s.comment || "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {format(new Date(s.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                      </TableCell>
-                      <TableCell>
-                        <NpsSendDialog
-                          groupId={s.group_id}
-                          groupName={grupo?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 25) || s.group_id.substring(0, 12)}
-                          categoria={grupo?.categoria}
-                        />
+      <Tabs defaultValue="clientes" className="w-full">
+        <TabsList>
+          <TabsTrigger value="clientes">Clientes ({filteredGrupos.length})</TabsTrigger>
+          <TabsTrigger value="respostas">Respostas ({filteredSurveys.length})</TabsTrigger>
+        </TabsList>
+
+        {/* Tab: All clients with send button */}
+        <TabsContent value="clientes">
+          <Card className="bg-card border-border/40">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Gestor</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Respostas</TableHead>
+                    <TableHead>Enviar NPS</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredGrupos.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Nenhum cliente encontrado
                       </TableCell>
                     </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  ) : (
+                    filteredGrupos.map((g) => {
+                      const count = surveysByGroup[g.group_id]?.length || 0;
+                      return (
+                        <TableRow key={g.group_id}>
+                          <TableCell className="font-medium text-foreground">
+                            {g.nome?.replace(/\s*\(.*?\)/, "").substring(0, 30)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {g.gestor_responsavel || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {g.categoria || "Operação"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={count > 0 ? "default" : "secondary"} className="text-xs">
+                              {count}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <NpsSendDialog
+                              groupId={g.group_id}
+                              groupName={g.nome?.replace(/\s*\(.*?\)/, "").substring(0, 30)}
+                              categoria={g.categoria}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Survey responses */}
+        <TabsContent value="respostas">
+          <div className="flex justify-end mb-3">
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="operacao">Operação</SelectItem>
+                <SelectItem value="clinica">Clínica</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Card className="bg-card border-border/40">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Gestor</TableHead>
+                    <TableHead>Nota</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Comentário</TableHead>
+                    <TableHead>Data</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSurveys.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        Nenhuma resposta recebida ainda
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredSurveys.map((s) => {
+                      const grupo = gruposMap[s.group_id];
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium text-foreground">
+                            {grupo?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 25) || s.group_id.substring(0, 12)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {grupo?.gestor_responsavel || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`text-lg font-bold ${getScoreColor(s.score)}`}>{s.score}</span>
+                          </TableCell>
+                          <TableCell>{getScoreBadge(s.score)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {s.survey_type === "clinica" ? "Clínica" : "Operação"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-[250px] truncate text-sm text-muted-foreground">
+                            {s.comment || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {format(new Date(s.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
