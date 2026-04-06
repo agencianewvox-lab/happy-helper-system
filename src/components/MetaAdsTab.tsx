@@ -304,15 +304,17 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
             {/* Custom date range */}
             <Popover>
               <PopoverTrigger asChild>
-                <Badge
+                <Button
+                  type="button"
                   variant={useCustomRange ? "default" : "outline"}
-                  className="cursor-pointer text-[10px] gap-1"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] gap-1"
                 >
                   <CalendarIcon className="w-3 h-3" />
                   {useCustomRange && customSince && customUntil
                     ? `${format(customSince, "dd/MM", { locale: ptBR })} - ${format(customUntil, "dd/MM", { locale: ptBR })}`
                     : "Período"}
-                </Badge>
+                </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-3 space-y-3" align="start">
                 <div className="space-y-2">
