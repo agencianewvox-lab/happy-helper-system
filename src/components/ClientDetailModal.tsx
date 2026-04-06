@@ -80,6 +80,7 @@ function trendLabel(trend?: string) {
 }
 
 export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props) {
+  const { user } = useAuth();
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [conversas, setConversas] = useState<Conversa[]>([]);
