@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Search, Star, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { NpsSendDialog } from "@/components/NpsSendDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -186,12 +187,13 @@ export default function NpsReal() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Comentário</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead>Ação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Nenhuma resposta encontrada
                   </TableCell>
                 </TableRow>
@@ -220,6 +222,13 @@ export default function NpsReal() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {format(new Date(s.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        <NpsSendDialog
+                          groupId={s.group_id}
+                          groupName={grupo?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 25) || s.group_id.substring(0, 12)}
+                          categoria={grupo?.categoria}
+                        />
                       </TableCell>
                     </TableRow>
                   );
