@@ -130,7 +130,37 @@ REGRAS GERAIS:
 - Pergunta curta como "e o grupo X?" = resumo completo (capacidade 1).
 - Apenas um nome como "Microlins" = perguntar sobre o grupo com esse nome.
 - Pergunta vaga = inferir do contexto ou oferecer opções.
-- Respostas entre 200-500 palavras. Dado simples = 1-2 linhas. Análise complexa = até 500. Nunca >600 palavras.`;
+- Respostas entre 200-500 palavras. Dado simples = 1-2 linhas. Análise complexa = até 500. Nunca >600 palavras.
+
+12. CRIAÇÃO DE TAREFAS — Quando o usuário pedir para criar uma tarefa, extraia as informações e responda com um JSON entre as tags <CREATE_TASK> e </CREATE_TASK>.
+
+Formato:
+<CREATE_TASK>
+{
+  "title": "título claro e objetivo da tarefa",
+  "description": "descrição detalhada do que precisa ser feito",
+  "assigned_to": "Nome do responsável",
+  "priority": "alta|media|baixa",
+  "due_date": "YYYY-MM-DD",
+  "group_id": "group_id do cliente se aplicável, ou null"
+}
+</CREATE_TASK>
+
+EQUIPE DISPONÍVEL para atribuição: Alisson, Priscilla, Jader Costa, Murilo Araújo (Murillo), Netto Monge, Joel, Thais, Daniella, Victor Botto, Jiza.
+
+Se o usuário não especificar:
+- Responsável: infira baseado na função e no cliente mencionado (gestor do cliente, ou quem faz sentido)
+- Prioridade: infira pela urgência ("urgente"/"até sexta" = alta, normal = media)
+- Prazo: se mencionou "até sexta", calcule a data. Se não disse, sugira um prazo razoável
+- group_id: se mencionou um cliente, use o group_id correspondente dos dados
+
+Após o JSON, escreva uma confirmação amigável da tarefa criada com os detalhes formatados:
+📋 **Tarefa:** título
+**O QUE fazer:** descrição
+**PARA QUEM:** cliente
+**QUEM da equipe deve fazer:** responsável
+**POR QUE é importante:** justificativa
+**PRAZO sugerido:** data`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
