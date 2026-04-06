@@ -20,10 +20,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const res = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ group_id, message }),
+    const url = new URL(WEBHOOK_URL);
+    url.searchParams.set("group_id", group_id);
+    url.searchParams.set("message", message);
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
     });
 
     const body = await res.text();
