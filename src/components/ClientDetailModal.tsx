@@ -86,6 +86,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
     plano: "", investimento_ads: "", data_entrada: "", data_ciclo_ads: "",
     aniversario_cliente: "", aniversario_empresa: "", acessos_cliente: "",
     gestor_responsavel: "", briefing: "", estrelas_dificuldade: "", estrelas_financeiro: "", estrelas_temperamento: "",
+    responsavel_master: "", responsavel_socio: "",
   });
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
@@ -134,7 +135,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const fetchClientInfo = useCallback(async () => {
     if (!grupo?.id) return;
     const { data } = await supabase.from("whatsapp_grupos")
-      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento")
+      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, responsavel_master, responsavel_socio")
       .eq("id", grupo.id).single();
     if (data) {
       setClientInfo({
@@ -150,6 +151,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
         estrelas_dificuldade: (data as any).estrelas_dificuldade != null ? String((data as any).estrelas_dificuldade) : "",
         estrelas_financeiro: (data as any).estrelas_financeiro != null ? String((data as any).estrelas_financeiro) : "",
         estrelas_temperamento: (data as any).estrelas_temperamento != null ? String((data as any).estrelas_temperamento) : "",
+        responsavel_master: (data as any).responsavel_master || "",
+        responsavel_socio: (data as any).responsavel_socio || "",
       });
     }
   }, [grupo?.id]);
@@ -171,6 +174,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
       estrelas_dificuldade: clientInfo.estrelas_dificuldade ? Number(clientInfo.estrelas_dificuldade) : null,
       estrelas_financeiro: clientInfo.estrelas_financeiro ? Number(clientInfo.estrelas_financeiro) : null,
       estrelas_temperamento: clientInfo.estrelas_temperamento ? Number(clientInfo.estrelas_temperamento) : null,
+      responsavel_master: clientInfo.responsavel_master || null,
+      responsavel_socio: clientInfo.responsavel_socio || null,
     } as any).eq("id", grupo.id);
     setSavingInfo(false);
     if (!error) { setInfoSaved(true); setTimeout(() => setInfoSaved(false), 2000); }
@@ -589,6 +594,22 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                     <div className="flex-1 min-w-0">
                       <Label className="text-xs text-muted-foreground font-medium">Aniv. Empresa</Label>
                       <Input type="date" value={clientInfo.aniversario_empresa} onChange={(e) => setClientInfo(prev => ({ ...prev, aniversario_empresa: e.target.value }))} className="mt-1 h-8 text-sm bg-background/50" />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Responsável Master</Label>
+                      <Input value={clientInfo.responsavel_master} onChange={(e) => setClientInfo(prev => ({ ...prev, responsavel_master: e.target.value }))} placeholder="Nome do responsável master" className="mt-1 h-8 text-sm bg-background/50" />
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Responsável Sócio/Supervisor</Label>
+                      <Input value={clientInfo.responsavel_socio} onChange={(e) => setClientInfo(prev => ({ ...prev, responsavel_socio: e.target.value }))} placeholder="Nome do sócio/supervisor" className="mt-1 h-8 text-sm bg-background/50" />
                     </div>
                   </div>
                 </div>
