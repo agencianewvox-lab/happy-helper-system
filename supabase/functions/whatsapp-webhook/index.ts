@@ -1055,10 +1055,48 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           }
         }
       }
+
+      // Handle salvar_nota_cliente
+      if (fnName === "salvar_nota_cliente") {
+        const matchedGroup = grupos.find((g: any) =>
+          g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+          args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+        );
+        if (matchedGroup) {
+          const { error: noteErr } = await supabase.from("client_notes").insert({
+            group_id: matchedGroup.group_id,
+            content: args.note_content,
+            author_name: "Vox (via feedback)",
+          });
+          if (!noteErr) {
+            toolResults.push(`✅ Nota salva no card de ${matchedGroup.nome}`);
+          } else {
+            toolResults.push(`❌ Erro ao salvar nota: ${noteErr.message}`);
+          }
+        } else {
+          toolResults.push(`⚠️ Cliente "${args.group_name}" não encontrado para salvar nota.`);
+        }
+      }
+
+      // Handle registrar_feedback
+      if (fnName === "registrar_feedback") {
+        const matchedGroup = args.group_name ? grupos.find((g: any) =>
+          g.nome.toLowerCase().includes(args.group_name.toLowerCase())
+        ) : null;
+        await supabase.from("team_feedback_log").insert({
+          member_name: "Alisson Lima",
+          message: args.message_summary,
+          category: args.category || "geral",
+          group_id: matchedGroup?.group_id || null,
+          group_name: matchedGroup?.nome || args.group_name || null,
+          relevance: args.relevance || "low",
+        });
+        toolResults.push(`✅ Feedback registrado.`);
+      }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
