@@ -1437,8 +1437,10 @@ CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
 - Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar, cutucar, cutucada, lembrar, cobrar), EXECUTE usando as ferramentas disponíveis`;
     } else {
       toolsPromptSection += `
+- ${firstName} pode RESOLVER pendências dos seus clientes — quando disser que resolveu/fez/completou algo, use "resolver_pendencia"
 - ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa"
-- Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem`;
+- Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem
+- IMPORTANTE: Se ${firstName} confirmar que resolveu/fez/tratou uma pendência (mesmo com "joia", "feito", "já resolvi"), SEMPRE use resolver_pendencia para marcar como feito no sistema`;
     }
 
     const systemPrompt = `Você é a Vox, analista sênior de CS e assistente pessoal da equipe da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp. Você é uma colega de trabalho inteligente, prestativa e proativa.
