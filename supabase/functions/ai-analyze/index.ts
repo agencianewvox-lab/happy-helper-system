@@ -105,7 +105,7 @@ function detectDateRangeInfoFromMessages(messages: any[]): DateRangeInfo | null 
   if (!lastUser) return null;
   const text = lastUser.content;
 
-  const rangeMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  const rangeMatch = text.match(/(?:entre\s+)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|e|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (rangeMatch) {
     const now = new Date();
     const explicitYear = !!(rangeMatch[3] || rangeMatch[6]);
@@ -186,6 +186,17 @@ function detectExactAdsSpendQuery(messages: any[]): boolean {
   const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "valor", "quanto", "quanto foi", "total", "meta ads", "ads"].some((k) => text.includes(k));
   const hasDateIntent = !!detectDateRangeInfoFromMessages(messages);
   return hasAdsIntent && hasDateIntent;
+}
+
+function normalizeGroupName(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/^nv\s*-\s*/i, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const SYSTEM_PROMPT = `Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você conhece profundamente cada cliente, cada número, cada métrica. Você fala de forma direta, objetiva, sem enrolação. Usa português brasileiro natural, como alguém que trabalha na agência falaria numa reunião. Pode usar emojis para facilitar a leitura mas sem exagero.
@@ -531,10 +542,10 @@ ${coachHistoryContext}
       const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
       const userText = lastUser?.content?.toLowerCase() || "";
       const dateRangeInfo = detectDateRangeInfoFromMessages(messages);
+      const normalizedUserText = normalizeGroupName(userText);
       const matchedGroup = grupos.find((g: any) => {
-        const name = (g.nome || "").toLowerCase();
-        const simplified = name.replace(/^nv\s*-\s*/i, "").trim();
-        return userText.includes(name) || userText.includes(simplified);
+        const normalizedName = normalizeGroupName(g.nome || "");
+        return normalizedUserText.includes(normalizedName);
       });
 
       if (matchedGroup && dateRangeInfo) {

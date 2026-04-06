@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
 import {
   Loader2, DollarSign, Eye, MousePointerClick,
@@ -86,9 +87,9 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [datePreset, setDatePreset] = useState("last_30d");
-  const [customSince, setCustomSince] = useState<Date | undefined>(undefined);
-  const [customUntil, setCustomUntil] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [useCustomRange, setUseCustomRange] = useState(false);
+  const [periodPopoverOpen, setPeriodPopoverOpen] = useState(false);
 
   // Fetch saved ad_account_id
   useEffect(() => {
@@ -165,9 +166,9 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
     setError(null);
     try {
       const body: any = { ad_account_id: savedAccountId };
-      if (useCustomRange && customSince && customUntil) {
-        body.since = format(customSince, "yyyy-MM-dd");
-        body.until = format(customUntil, "yyyy-MM-dd");
+      if (useCustomRange && dateRange?.from && dateRange?.to) {
+        body.since = format(dateRange.from, "yyyy-MM-dd");
+        body.until = format(dateRange.to, "yyyy-MM-dd");
       } else {
         body.date_preset = datePreset;
       }
@@ -182,7 +183,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [savedAccountId, datePreset, useCustomRange, customSince, customUntil]);
+  }, [savedAccountId, datePreset, useCustomRange, dateRange]);
 
   useEffect(() => {
     if (savedAccountId) fetchAds();
@@ -302,7 +303,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
             ))}
 
             {/* Custom date range */}
-            <Popover>
+            <Popover open={periodPopoverOpen} onOpenChange={setPeriodPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
@@ -311,39 +312,31 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
                   className="h-6 px-2 text-[10px] gap-1"
                 >
                   <CalendarIcon className="w-3 h-3" />
-                  {useCustomRange && customSince && customUntil
-                    ? `${format(customSince, "dd/MM", { locale: ptBR })} - ${format(customUntil, "dd/MM", { locale: ptBR })}`
+                  {useCustomRange && dateRange?.from && dateRange?.to
+                    ? `${format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} - ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`
                     : "Período"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-3 space-y-3" align="start">
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">De:</Label>
+                  <Label className="text-xs text-muted-foreground">De / Até:</Label>
                   <Calendar
-                    mode="single"
-                    selected={customSince}
-                    onSelect={setCustomSince}
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
                     locale={ptBR}
                     disabled={(date) => date > new Date()}
-                    className={cn("rounded-md border pointer-events-auto")}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Até:</Label>
-                  <Calendar
-                    mode="single"
-                    selected={customUntil}
-                    onSelect={setCustomUntil}
-                    locale={ptBR}
-                    disabled={(date) => date > new Date() || (customSince ? date < customSince : false)}
                     className={cn("rounded-md border pointer-events-auto")}
                   />
                 </div>
                 <Button
                   size="sm"
                   className="w-full text-xs"
-                  disabled={!customSince || !customUntil}
-                  onClick={() => { setUseCustomRange(true); }}
+                  disabled={!dateRange?.from || !dateRange?.to}
+                  onClick={() => {
+                    setUseCustomRange(true);
+                    setPeriodPopoverOpen(false);
+                  }}
                 >
                   Aplicar período
                 </Button>
