@@ -117,12 +117,13 @@ function buildDateRangeForYear(range: DateRangeInfo, year: number) {
 }
 
 function detectDateRangeInfo(text: string): DateRangeInfo | null {
-  const rangeMatch = text.match(/(?:entre\s+)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|e|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  const rangeMatch = text.match(/(?:entre\s+)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|e|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?(?:\s+de\s+(\d{4}))?/i);
   if (rangeMatch) {
     const now = new Date();
-    const explicitYear = !!(rangeMatch[3] || rangeMatch[6]);
-    const resolvedYear1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
-    const resolvedYear2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
+    const trailingYear = rangeMatch[7] || null;
+    const explicitYear = !!(rangeMatch[3] || rangeMatch[6] || trailingYear);
+    const resolvedYear1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : (trailingYear || String(now.getFullYear()));
+    const resolvedYear2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : (trailingYear || String(now.getFullYear()));
     const startDay = rangeMatch[1].padStart(2, "0");
     const startMonth = rangeMatch[2].padStart(2, "0");
     const endDay = rangeMatch[4].padStart(2, "0");
