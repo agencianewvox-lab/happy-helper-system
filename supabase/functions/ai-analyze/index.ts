@@ -527,33 +527,71 @@ ${coachHistoryContext}
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
 
-    if (detectExactAdsSpendQuery(messages) && detectedDateRange) {
+    if (detectExactAdsSpendQuery(messages)) {
       const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
       const userText = lastUser?.content?.toLowerCase() || "";
+      const dateRangeInfo = detectDateRangeInfoFromMessages(messages);
       const matchedGroup = grupos.find((g: any) => {
         const name = (g.nome || "").toLowerCase();
         const simplified = name.replace(/^nv\s*-\s*/i, "").trim();
         return userText.includes(name) || userText.includes(simplified);
       });
 
-      if (matchedGroup) {
-        const matchedAds = adsDataMap.get(matchedGroup.group_id);
-        const periodLabel = `${detectedDateRange.since} a ${detectedDateRange.until}`;
-
-        let content = "";
-        if (matchedAds) {
-          content = `O gasto total do Meta Ads de ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${periodLabel} foi de R$${matchedAds.spend.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
-        } else if (matchedGroup.ad_account_id) {
-          content = `Não encontrei dados de Meta Ads para ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${periodLabel}.`;
-        } else {
-          content = `${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} não possui conta de Meta Ads vinculada.`;
-        }
+      if (matchedGroup && dateRangeInfo) {
+        const formatPeriod = (since: string, until: string) => {
+          const formatOne = (value: string) => {
+            const [year, month, day] = value.split("-");
+            return `${day}/${month}/${year}`;
+          };
+          return `${formatOne(since)} a ${formatOne(until)}`;
+        };
 
         const encoder = new TextEncoder();
-        const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
-        return new Response(encoder.encode(sseData), {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
+        const sendSse = (content: string) => {
+          const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+          return new Response(encoder.encode(sseData), {
+            headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+          });
+        };
+
+        if (!matchedGroup.ad_account_id) {
+          return sendSse(`${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} não possui conta de Meta Ads vinculada.`);
+        }
+
+        let resolvedAds = adsDataMap.get(matchedGroup.group_id);
+        let resolvedRange = { since: dateRangeInfo.since, until: dateRangeInfo.until };
+
+        if (!dateRangeInfo.explicitYear) {
+          const currentYear = new Date().getFullYear();
+          const currentRange = buildDateRangeForYear(dateRangeInfo, currentYear);
+          const previousRange = buildDateRangeForYear(dateRangeInfo, currentYear - 1);
+
+          const [currentAds, previousAds] = await Promise.all([
+            fetchMetaAdsForAccount(matchedGroup.ad_account_id, META_TOKEN!, currentRange.since, currentRange.until),
+            fetchMetaAdsForAccount(matchedGroup.ad_account_id, META_TOKEN!, previousRange.since, previousRange.until),
+          ]);
+
+          const hasCurrentData = !!currentAds && currentAds.spend > 0;
+          const hasPreviousData = !!previousAds && previousAds.spend > 0;
+
+          if (hasCurrentData && hasPreviousData) {
+            return sendSse(`Encontrei dados para mais de um ano no intervalo ${dateRangeInfo.startDay}/${dateRangeInfo.startMonth} a ${dateRangeInfo.endDay}/${dateRangeInfo.endMonth}. Para te responder com precisão, me diga se você quer ${currentYear} ou ${currentYear - 1}.`);
+          }
+
+          if (hasCurrentData) {
+            resolvedAds = currentAds;
+            resolvedRange = currentRange;
+          } else if (hasPreviousData) {
+            resolvedAds = previousAds;
+            resolvedRange = previousRange;
+          }
+        }
+
+        if (resolvedAds) {
+          return sendSse(`O gasto total do Meta Ads de ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)} foi de R$${resolvedAds.spend.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`);
+        }
+
+        return sendSse(`Não encontrei dados de Meta Ads para ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)}.`);
       }
     }
 
