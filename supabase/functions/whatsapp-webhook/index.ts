@@ -1000,11 +1000,8 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           // Generate cutucada message with AI
           const firstName = targetName.split(" ")[0];
           const OPENAI_API_KEY_COACH = Deno.env.get("openai");
-          const lovableKeyCoach = Deno.env.get("LOVABLE_API_KEY");
-          const coachAiUrl = lovableKeyCoach
-            ? "https://ai.gateway.lovable.dev/v1/chat/completions"
-            : "https://api.openai.com/v1/chat/completions";
-          const coachAiKey = lovableKeyCoach || OPENAI_API_KEY_COACH;
+          const coachAiUrl = "https://api.openai.com/v1/chat/completions";
+          const coachAiKey = OPENAI_API_KEY_COACH;
 
           let cutucadaMsg = "";
           try {
