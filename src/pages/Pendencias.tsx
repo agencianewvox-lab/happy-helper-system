@@ -126,13 +126,17 @@ export default function Pendencias() {
   const updateStatus = useCallback(async (id: string, newStatus: DemandStatus) => {
     setUpdating(id);
     const resolved = newStatus === "feito";
+    const updateData: any = {
+      status: newStatus,
+      resolved,
+      resolved_at: resolved ? new Date().toISOString() : null,
+    };
+    if (resolved && user?.id) {
+      updateData.resolved_by = user.id;
+    }
     const { error } = await supabase
       .from("pending_demand_resolutions")
-      .update({
-        status: newStatus,
-        resolved,
-        resolved_at: resolved ? new Date().toISOString() : null,
-      } as any)
+      .update(updateData)
       .eq("id", id);
 
     if (!error) {

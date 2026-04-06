@@ -134,9 +134,13 @@ export default function Tarefas() {
 
   const updateStatus = useCallback(async (id: string, newStatus: TaskStatus) => {
     setUpdating(id);
+    const updateData: any = { status: newStatus, updated_at: new Date().toISOString() };
+    if (newStatus === "feito" && user?.id) {
+      updateData.completed_by = user.id;
+    }
     const { error } = await supabase
       .from("tasks")
-      .update({ status: newStatus, updated_at: new Date().toISOString() } as any)
+      .update(updateData)
       .eq("id", id);
 
     if (!error) {
