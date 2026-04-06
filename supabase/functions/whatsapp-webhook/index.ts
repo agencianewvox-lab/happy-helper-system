@@ -489,6 +489,22 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "resolver_pendencia",
+      description: "Marca uma pendência específica como resolvida (feito). Use quando o membro da equipe confirmar que resolveu/fez/completou uma pendência de um cliente (ex: 'já resolvi', 'feito', 'já enviei', 'tá pronto').",
+      parameters: {
+        type: "object",
+        properties: {
+          group_name: { type: "string", description: "Nome do grupo/cliente cuja pendência foi resolvida" },
+          term_hint: { type: "string", description: "Parte do termo/descrição da pendência para identificá-la (opcional)", nullable: true },
+        },
+        required: ["group_name"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
