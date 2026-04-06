@@ -705,10 +705,89 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
         aiReply = args.question;
         console.log("AI asking follow-up question:", args.question);
       }
+
+      if (fnName === "enviar_cutucada") {
+        // Find the webhook for the target person
+        const targetName = args.destinatario;
+        const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+          targetName.toLowerCase().includes(key.toLowerCase()) ||
+          key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
+        )?.[1];
+
+        if (!targetWebhookUrl) {
+          toolResults.push(`❌ Não encontrei webhook para "${targetName}". Pessoas disponíveis: ${Object.keys(TEAM_WEBHOOK_MAP).join(", ")}`);
+        } else {
+          // Find matched group if specified
+          let matchedGroup: any = null;
+          if (args.group_name) {
+            matchedGroup = grupos.find((g: any) =>
+              g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+              args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+            );
+          }
+
+          // Generate cutucada message with AI
+          const firstName = targetName.split(" ")[0];
+          const OPENAI_API_KEY_COACH = Deno.env.get("openai");
+          const lovableKeyCoach = Deno.env.get("LOVABLE_API_KEY");
+          const coachAiUrl = lovableKeyCoach
+            ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+            : "https://api.openai.com/v1/chat/completions";
+          const coachAiKey = lovableKeyCoach || OPENAI_API_KEY_COACH;
+
+          let cutucadaMsg = "";
+          try {
+            const coachResp = await fetch(coachAiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${coachAiKey}` },
+              body: JSON.stringify({
+                model: lovableKeyCoach ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                messages: [
+                  { role: "system", content: `Você é a Vox, coach de CS da agência New Vox. Gere uma mensagem curta e direta de cutucada para ${firstName} via WhatsApp. Tom de colega gente boa, informal, incentivador. Máximo 300 caracteres. Adicione "(responda 👍 se já fez)" no final.` },
+                  { role: "user", content: `Cutucada para ${firstName}: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
+                ],
+                max_tokens: 200,
+              }),
+            });
+            if (coachResp.ok) {
+              const coachData = await coachResp.json();
+              cutucadaMsg = coachData.choices?.[0]?.message?.content?.trim() || "";
+            }
+          } catch (e) {
+            console.error("Error generating cutucada:", e);
+          }
+
+          if (!cutucadaMsg) {
+            cutucadaMsg = `E aí ${firstName}! 👋 ${args.mensagem_contexto}${matchedGroup ? ` (${matchedGroup.nome})` : ""}. Bora resolver isso? (responda 👍 se já fez)`;
+          }
+
+          // Send via webhook
+          try {
+            const encodedMsg = encodeURIComponent(cutucadaMsg);
+            const sendResp = await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
+            console.log(`Cutucada sent to ${targetName}: ${sendResp.status}`);
+
+            // Save to coach_messages
+            await supabase.from("coach_messages").insert({
+              destinatario_nome: targetName,
+              mensagem: cutucadaMsg,
+              tipo: args.tipo || "geral",
+              group_id: matchedGroup?.group_id || null,
+              enviada: true,
+              enviada_em: new Date().toISOString(),
+            });
+
+            toolResults.push(`✅ Cutucada enviada para ${targetName}! Mensagem: "${cutucadaMsg.slice(0, 80)}..."`);
+          } catch (e) {
+            console.error(`Failed to send cutucada to ${targetName}:`, e);
+            toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
+          }
+        }
+      }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
