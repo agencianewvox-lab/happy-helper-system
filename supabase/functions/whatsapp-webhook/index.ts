@@ -1615,7 +1615,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
                 body: JSON.stringify({
-                  model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                  model: "gpt-4o-mini",
                   messages: [
                     { role: "system", content: `Você é a Vox, coach de CS. Gere uma cutucada curta para ${targetFirstName}. Tom amigável. Máx 300 chars. Termine com "(responda 👍 se já fez)".` },
                     { role: "user", content: `Cutucada: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
