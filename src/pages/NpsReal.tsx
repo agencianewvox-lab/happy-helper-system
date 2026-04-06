@@ -223,6 +223,13 @@ export default function NpsReal() {
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {format(new Date(s.created_at), "dd/MM/yyyy", { locale: ptBR })}
                       </TableCell>
+                      <TableCell>
+                        <NpsSendDialog
+                          groupId={s.group_id}
+                          groupName={grupo?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 25) || s.group_id.substring(0, 12)}
+                          categoria={grupo?.categoria}
+                        />
+                      </TableCell>
                     </TableRow>
                   );
                 })
