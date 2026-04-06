@@ -1485,7 +1485,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       model: "gpt-4o-mini",
       messages: aiMessages,
       max_tokens: 1500,
-      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
+      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!, AGENT_TOOLS.find((t: any) => t.function.name === "resolver_pendencia")!],
     };
 
     let aiData: any = null;
