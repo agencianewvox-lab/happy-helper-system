@@ -531,6 +531,8 @@ export type Database = {
           investimento_ads: number | null
           nome: string
           plano: string | null
+          responsavel_master: string | null
+          responsavel_socio: string | null
         }
         Insert: {
           acessos_cliente?: string | null
@@ -551,6 +553,8 @@ export type Database = {
           investimento_ads?: number | null
           nome: string
           plano?: string | null
+          responsavel_master?: string | null
+          responsavel_socio?: string | null
         }
         Update: {
           acessos_cliente?: string | null
@@ -571,6 +575,8 @@ export type Database = {
           investimento_ads?: number | null
           nome?: string
           plano?: string | null
+          responsavel_master?: string | null
+          responsavel_socio?: string | null
         }
         Relationships: []
       }
