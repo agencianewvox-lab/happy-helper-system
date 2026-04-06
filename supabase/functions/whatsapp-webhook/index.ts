@@ -1183,12 +1183,12 @@ async function handleTeamCoachReply(
   supabase: any
 ) {
   try {
-    // Check for 👍 reaction - mark last coach message as "feito"
+    // Check for 👍 reaction - mark last coach message as "feito" AND resolve related pending demands
     const trimmed = messageText.trim();
-    if (trimmed === "👍" || trimmed === "👍🏻" || trimmed === "👍🏼" || trimmed === "👍🏽" || trimmed === "👍🏾" || trimmed === "👍🏿") {
+    if (trimmed === "👍" || trimmed === "👍🏻" || trimmed === "👍🏼" || trimmed === "👍🏽" || trimmed === "👍🏾" || trimmed === "👍🏿" || /^(joia|jóia|feito|resolvido|pronto|ok|done|sim|já fiz|ja fiz|já resolvi|ja resolvi)$/i.test(trimmed)) {
       const { data: lastMsg } = await supabase
         .from("coach_messages")
-        .select("id")
+        .select("id, group_id, mensagem")
         .eq("destinatario_nome", teamWebhook.name)
         .eq("enviada", true)
         .is("resultado", null)
@@ -1199,6 +1199,12 @@ async function handleTeamCoachReply(
       if (lastMsg) {
         await supabase.from("coach_messages").update({ resultado: "feito" }).eq("id", lastMsg.id);
         console.log(`Marked coach message ${lastMsg.id} as 'feito' for ${teamWebhook.name}`);
+
+        // Also auto-resolve pending demands for the group referenced in the coach message
+        if (lastMsg.group_id) {
+          await autoResolvePendingDemands(lastMsg.group_id, teamWebhook.name, supabase);
+          console.log(`Auto-resolved pending demands for group ${lastMsg.group_id} after ${teamWebhook.name} confirmed with thumbs up`);
+        }
       }
       return;
     }
