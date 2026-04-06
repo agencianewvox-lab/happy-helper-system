@@ -1482,8 +1482,29 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
     });
 
     if (!aiResp.ok) {
-      console.error("AI error for team reply:", await aiResp.text());
-      return;
+      const errText = await aiResp.text();
+      console.error("AI error for team reply:", errText);
+      // Fallback to OpenAI if Lovable AI failed and OpenAI is available
+      if (lovableKey && openaiKey) {
+        console.log(`Falling back to OpenAI for ${firstName}`);
+        requestBody.model = "gpt-4o-mini";
+        const fallbackResp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
+          body: JSON.stringify(requestBody),
+        });
+        if (!fallbackResp.ok) {
+          console.error("OpenAI fallback also failed:", await fallbackResp.text());
+          return;
+        }
+        const fallbackData = await fallbackResp.json();
+        const fallbackChoice = fallbackData.choices?.[0];
+        if (!fallbackChoice) return;
+        // Continue with fallback data below
+        Object.assign(aiResp, { _fallbackData: fallbackData });
+      } else {
+        return;
+      }
     }
 
     const aiData = await aiResp.json();
