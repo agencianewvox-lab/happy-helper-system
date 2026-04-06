@@ -1205,13 +1205,10 @@ async function handleTeamCoachReply(
 
     if (!shouldRespondToMessage(messageText)) return;
 
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     const openaiKey = Deno.env.get("openai");
     const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
-    const aiUrl = lovableKey
-      ? "https://ai.gateway.lovable.dev/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
-    const aiKey = lovableKey || openaiKey;
+    const aiUrl = "https://api.openai.com/v1/chat/completions";
+    const aiKey = openaiKey;
     if (!aiKey) return;
 
     const firstName = teamWebhook.name.split(" ")[0];
