@@ -297,13 +297,19 @@ Deno.serve(async (req) => {
       groupMsgsMap.set(groupIds[i], msgs);
     }
 
+    // Detect date range from user messages for ads queries
+    const detectedDateRange = detectDateRangeFromMessages(messages);
+
     // Fetch Meta Ads data for groups with linked ad accounts
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
     const adsDataMap = new Map<string, any>();
 
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
+        const adsData = await fetchMetaAdsForAccount(
+          g.ad_account_id, META_TOKEN,
+          detectedDateRange?.since, detectedDateRange?.until
+        );
         if (adsData) adsDataMap.set(g.group_id, adsData);
       });
       await Promise.all(adsPromises);
