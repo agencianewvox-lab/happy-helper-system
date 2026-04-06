@@ -287,7 +287,7 @@ export function usePerformanceData(period: string) {
       totalGroups,
       scores: { nps: npsScore, npsReal: npsRealScore, frt: frtScore, tasks: tasksScore, resolutions: resolutionsScore, sentiment: sentimentScore, inactivity: inactivityScore, overall },
     };
-  }, [grupos, npsPredictions, npsHistory, tasks, pendingDemands, npsSurveys]);
+  }, [grupos, npsPredictions, npsHistory, tasks, pendingDemands, npsSurveys, userIdToGestorName]);
 
   // Per-client NPS data
   const getClientNpsData = useCallback((gestorName: string | null) => {
