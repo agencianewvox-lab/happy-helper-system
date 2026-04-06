@@ -946,8 +946,8 @@ Deno.serve(async (req) => {
     let aiPendingItems: AIPendingItem[] = [];
     let intentMap = new Map<string, IntentCategory>();
     const [pendingResult, intentResult] = await Promise.allSettled([
-      detectPendingWithAI(allCandidates, LOVABLE_API_KEY),
-      detectIntentWithAI(groupedConvs, LOVABLE_API_KEY),
+      detectPendingWithAI(allCandidates, OPENAI_API_KEY),
+      detectIntentWithAI(groupedConvs, OPENAI_API_KEY),
     ]);
     if (pendingResult.status === "fulfilled") aiPendingItems = pendingResult.value;
     else console.error("AI pending failed:", pendingResult.reason);
