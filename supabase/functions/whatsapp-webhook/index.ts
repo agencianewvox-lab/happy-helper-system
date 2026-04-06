@@ -522,6 +522,22 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "editar_config_sistema",
+      description: "Edita uma configuração/regra do sistema (SLA, sentimento, churn, FRT, prioridade, filtros, equipe, etc). Use quando Alisson pedir para mudar qualquer parâmetro, limiar, peso, tempo, regra ou configuração operacional do sistema. Exemplos: mudar tempo de SLA, alterar peso de sentimento, mudar limiar de churn, adicionar palavras-chave, etc. SOMENTE Alisson pode usar.",
+      parameters: {
+        type: "object",
+        properties: {
+          config_key: { type: "string", description: "Chave da configuração (ex: sla_response_minutes, sentiment_critical_weight, churn_label_critico, frt_excellent_max, priority_churn_threshold, team_members, sentiment_critical_terms, etc). Se não souber a chave exata, use a mais próxima." },
+          new_value: { type: "string", description: "Novo valor da configuração" },
+        },
+        required: ["config_key", "new_value"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
