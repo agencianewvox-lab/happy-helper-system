@@ -130,9 +130,19 @@ function detectComplexQuery(messages: any[]): boolean {
   const complexKeywords = [
     "comparar", "comparação", "todos os grupos", "análise geral", "visão geral",
     "panorama", "ranking", "equipe", "performance da equipe", "tendência",
-    "evolução", "upsell", "oportunidades", "quem posso",
+    "evolução", "upsell", "oportunidades", "quem posso", "investimento",
+    "gasto", "meta ads", "ads", "período", "periodo",
   ];
   return complexKeywords.some(k => text.includes(k));
+}
+
+function detectExactAdsSpendQuery(messages: any[]): boolean {
+  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUser) return false;
+  const text = lastUser.content.toLowerCase();
+  const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "meta ads", "ads"].some((k) => text.includes(k));
+  const hasDateIntent = !!detectDateRangeFromMessages(messages);
+  return hasAdsIntent && hasDateIntent;
 }
 
 const SYSTEM_PROMPT = `Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você conhece profundamente cada cliente, cada número, cada métrica. Você fala de forma direta, objetiva, sem enrolação. Usa português brasileiro natural, como alguém que trabalha na agência falaria numa reunião. Pode usar emojis para facilitar a leitura mas sem exagero.
