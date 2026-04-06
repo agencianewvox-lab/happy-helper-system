@@ -1759,7 +1759,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       }
 
       // Follow-up with tool results
-      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback"].includes(tc.function?.name))) {
+      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "resolver_pendencia"].includes(tc.function?.name))) {
         const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
           role: "tool",
           tool_call_id: tc.id,
