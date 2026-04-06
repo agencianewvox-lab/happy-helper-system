@@ -1493,8 +1493,8 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
     let reply = choice.message?.content?.trim() || "";
     const toolCalls = choice.message?.tool_calls || [];
 
-    // Process tool calls for Priscilla (same logic as Alisson)
-    if (isOwner && toolCalls.length > 0) {
+    // Process tool calls for all team members
+    if (toolCalls.length > 0) {
       const toolResults: string[] = [];
       for (const tc of toolCalls) {
         const fnName = tc.function?.name;
