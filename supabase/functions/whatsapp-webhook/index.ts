@@ -489,6 +489,22 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "resolver_pendencia",
+      description: "Marca uma pendência específica como resolvida (feito). Use quando o membro da equipe confirmar que resolveu/fez/completou uma pendência de um cliente (ex: 'já resolvi', 'feito', 'já enviei', 'tá pronto').",
+      parameters: {
+        type: "object",
+        properties: {
+          group_name: { type: "string", description: "Nome do grupo/cliente cuja pendência foi resolvida" },
+          term_hint: { type: "string", description: "Parte do termo/descrição da pendência para identificá-la (opcional)", nullable: true },
+        },
+        required: ["group_name"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
@@ -1183,12 +1199,12 @@ async function handleTeamCoachReply(
   supabase: any
 ) {
   try {
-    // Check for 👍 reaction - mark last coach message as "feito"
+    // Check for 👍 reaction - mark last coach message as "feito" AND resolve related pending demands
     const trimmed = messageText.trim();
-    if (trimmed === "👍" || trimmed === "👍🏻" || trimmed === "👍🏼" || trimmed === "👍🏽" || trimmed === "👍🏾" || trimmed === "👍🏿") {
+    if (trimmed === "👍" || trimmed === "👍🏻" || trimmed === "👍🏼" || trimmed === "👍🏽" || trimmed === "👍🏾" || trimmed === "👍🏿" || /^(joia|jóia|feito|resolvido|pronto|ok|done|sim|já fiz|ja fiz|já resolvi|ja resolvi)$/i.test(trimmed)) {
       const { data: lastMsg } = await supabase
         .from("coach_messages")
-        .select("id")
+        .select("id, group_id, mensagem")
         .eq("destinatario_nome", teamWebhook.name)
         .eq("enviada", true)
         .is("resultado", null)
@@ -1199,6 +1215,12 @@ async function handleTeamCoachReply(
       if (lastMsg) {
         await supabase.from("coach_messages").update({ resultado: "feito" }).eq("id", lastMsg.id);
         console.log(`Marked coach message ${lastMsg.id} as 'feito' for ${teamWebhook.name}`);
+
+        // Also auto-resolve pending demands for the group referenced in the coach message
+        if (lastMsg.group_id) {
+          await autoResolvePendingDemands(lastMsg.group_id, teamWebhook.name, supabase);
+          console.log(`Auto-resolved pending demands for group ${lastMsg.group_id} after ${teamWebhook.name} confirmed with thumbs up`);
+        }
       }
       return;
     }
@@ -1415,8 +1437,10 @@ CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
 - Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar, cutucar, cutucada, lembrar, cobrar), EXECUTE usando as ferramentas disponíveis`;
     } else {
       toolsPromptSection += `
+- ${firstName} pode RESOLVER pendências dos seus clientes — quando disser que resolveu/fez/completou algo, use "resolver_pendencia"
 - ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa"
-- Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem`;
+- Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem
+- IMPORTANTE: Se ${firstName} confirmar que resolveu/fez/tratou uma pendência (mesmo com "joia", "feito", "já resolvi"), SEMPRE use resolver_pendencia para marcar como feito no sistema`;
     }
 
     const systemPrompt = `Você é a Vox, analista sênior de CS e assistente pessoal da equipe da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp. Você é uma colega de trabalho inteligente, prestativa e proativa.
@@ -1463,7 +1487,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       model: "gpt-4o-mini",
       messages: aiMessages,
       max_tokens: 1500,
-      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
+      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!, AGENT_TOOLS.find((t: any) => t.function.name === "resolver_pendencia")!],
     };
 
     let aiData: any = null;
@@ -1678,10 +1702,66 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           });
           toolResults.push(`✅ Feedback registrado.`);
         }
+
+        // Handle resolver_pendencia
+        if (fnName === "resolver_pendencia") {
+          const matchedGroup = allGroups.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+          );
+          if (matchedGroup) {
+            let query = supabase
+              .from("pending_demand_resolutions")
+              .select("id, term")
+              .eq("group_id", matchedGroup.group_id)
+              .eq("resolved", false);
+
+            const { data: unresolvedDemands } = await query;
+
+            if (!unresolvedDemands || unresolvedDemands.length === 0) {
+              toolResults.push(`⚠️ Não encontrei pendências abertas para ${matchedGroup.nome}.`);
+            } else {
+              // If term_hint provided, try to match specific demand
+              let toResolve = unresolvedDemands;
+              if (args.term_hint) {
+                const hint = args.term_hint.toLowerCase();
+                const filtered = unresolvedDemands.filter((d: any) => d.term.toLowerCase().includes(hint));
+                if (filtered.length > 0) toResolve = filtered;
+              }
+
+              const profileName = matchTeamProfileName(teamWebhook.name);
+              let resolvedByUserId: string | null = null;
+              if (profileName) {
+                const { data: profile } = await supabase.from("profiles").select("user_id").eq("full_name", profileName).maybeSingle();
+                if (profile) resolvedByUserId = profile.user_id;
+              }
+
+              const ids = toResolve.map((d: any) => d.id);
+              const { error: resolveErr } = await supabase
+                .from("pending_demand_resolutions")
+                .update({
+                  resolved: true,
+                  status: "feito",
+                  resolved_at: new Date().toISOString(),
+                  resolved_by: resolvedByUserId,
+                })
+                .in("id", ids);
+
+              if (resolveErr) {
+                toolResults.push(`❌ Erro ao resolver: ${resolveErr.message}`);
+              } else {
+                const terms = toResolve.map((d: any) => `"${d.term}"`).join(", ");
+                toolResults.push(`✅ ${toResolve.length} pendência(s) resolvida(s) de ${matchedGroup.nome}: ${terms}`);
+              }
+            }
+          } else {
+            toolResults.push(`❌ Cliente "${args.group_name}" não encontrado.`);
+          }
+        }
       }
 
       // Follow-up with tool results
-      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback"].includes(tc.function?.name))) {
+      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "resolver_pendencia"].includes(tc.function?.name))) {
         const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
           role: "tool",
           tool_call_id: tc.id,
