@@ -275,34 +275,68 @@ Regras da mensagem:
       // Generate with AI
       let feedbackMsg = "";
       try {
-        if (!openaiKey) {
-          console.error("No OpenAI API key configured");
-          continue;
+        // Try OpenAI first, fallback to Lovable AI
+        let aiSuccess = false;
+
+        if (openaiKey) {
+          const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${openaiKey}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              max_tokens: 300,
+            }),
+          });
+
+          if (aiResp.ok) {
+            const aiData = await aiResp.json();
+            feedbackMsg = aiData.choices?.[0]?.message?.content?.trim() || "";
+            if (feedbackMsg) aiSuccess = true;
+          } else {
+            const errText = await aiResp.text();
+            console.error(`OpenAI error for ${member.name}: ${errText}`);
+          }
         }
 
-        const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${openaiKey}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            max_tokens: 300,
-          }),
-        });
+        // Fallback to Lovable AI if OpenAI failed
+        if (!aiSuccess && lovableKey) {
+          console.log(`Using Lovable AI fallback for ${member.name}`);
+          const lovableResp = await fetch("https://api.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${lovableKey}`,
+            },
+            body: JSON.stringify({
+              model: "openai/gpt-5-mini",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              max_tokens: 300,
+            }),
+          });
 
-        if (!aiResp.ok) {
-          console.error(`AI error for ${member.name}:`, await aiResp.text());
-          continue;
+          if (lovableResp.ok) {
+            const lovableData = await lovableResp.json();
+            feedbackMsg = lovableData.choices?.[0]?.message?.content?.trim() || "";
+          } else {
+            const errText = await lovableResp.text();
+            console.error(`Lovable AI error for ${member.name}: ${errText}`);
+          }
         }
 
-        const aiData = await aiResp.json();
-        feedbackMsg = aiData.choices?.[0]?.message?.content?.trim() || "";
+        if (!feedbackMsg) {
+          console.error(`No AI response for ${member.name}, skipping`);
+          continue;
+        }
       } catch (e) {
         console.error(`AI failed for ${member.name}:`, e);
         continue;
