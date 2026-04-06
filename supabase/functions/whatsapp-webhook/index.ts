@@ -542,6 +542,11 @@ async function handleAlissonAIReply(
     }
     const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
 
+    // Load configurable prompts from DB
+    const { data: promptConfigs } = await supabase.from("ai_prompts_config").select("prompt_key, prompt_value");
+    const promptMap = new Map<string, string>();
+    for (const pc of (promptConfigs || [])) promptMap.set(pc.prompt_key, pc.prompt_value);
+
     // Fetch all groups
     const { data: grupos } = await supabase.from("whatsapp_grupos").select("*").order("nome");
     if (!grupos?.length) return;
