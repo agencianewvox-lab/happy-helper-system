@@ -235,6 +235,7 @@ export default function NpsReal() {
                               groupId={g.group_id}
                               groupName={g.nome?.replace(/\s*\(.*?\)/, "").substring(0, 30)}
                               categoria={g.categoria}
+                              responsavelMaster={g.responsavel_master}
                             />
                           </TableCell>
                         </TableRow>
