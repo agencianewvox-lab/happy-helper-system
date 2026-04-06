@@ -1129,6 +1129,48 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
         });
         toolResults.push(`✅ Feedback registrado.`);
       }
+
+      // Handle editar_prompt (ONLY for Alisson)
+      if (fnName === "editar_prompt") {
+        const { prompt_key, new_value, description_hint } = args;
+        // Check if prompt exists
+        const { data: existing } = await supabase
+          .from("ai_prompts_config")
+          .select("id, prompt_label")
+          .eq("prompt_key", prompt_key)
+          .maybeSingle();
+
+        if (existing) {
+          const { error: updateErr } = await supabase
+            .from("ai_prompts_config")
+            .update({
+              prompt_value: new_value,
+              updated_at: new Date().toISOString(),
+              updated_by: "Alisson Lima (via WhatsApp)",
+            })
+            .eq("prompt_key", prompt_key);
+
+          if (updateErr) {
+            toolResults.push(`❌ Erro ao editar prompt: ${updateErr.message}`);
+          } else {
+            toolResults.push(`✅ Prompt "${existing.prompt_label}" (${prompt_key}) atualizado com sucesso!`);
+          }
+        } else {
+          // Create new prompt
+          const { error: insertErr } = await supabase.from("ai_prompts_config").insert({
+            prompt_key,
+            prompt_label: description_hint || prompt_key,
+            prompt_value: new_value,
+            prompt_category: "Geral",
+            updated_by: "Alisson Lima (via WhatsApp)",
+          });
+          if (insertErr) {
+            toolResults.push(`❌ Erro ao criar prompt: ${insertErr.message}`);
+          } else {
+            toolResults.push(`✅ Novo prompt "${prompt_key}" criado com sucesso!`);
+          }
+        }
+      }
     }
 
     // If there were tool calls and we need a follow-up response with results
