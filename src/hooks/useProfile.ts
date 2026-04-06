@@ -19,12 +19,17 @@ const GESTOR_NAME_MAP: Record<string, string> = {
 };
 
 export function useProfile() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
+
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
 
     if (!user) {
       setProfile(null);
