@@ -786,8 +786,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const OPENAI_API_KEY = Deno.env.get("openai");
+    if (!OPENAI_API_KEY) throw new Error("OpenAI API key not configured");
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
