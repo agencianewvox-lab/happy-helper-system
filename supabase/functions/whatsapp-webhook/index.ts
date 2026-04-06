@@ -505,6 +505,23 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "editar_prompt",
+      description: "Edita um prompt ou regra de IA do sistema Vox. Use quando Alisson pedir para mudar, alterar, editar, atualizar qualquer prompt, regra, instrução ou comportamento da IA. SOMENTE Alisson pode usar esta ferramenta.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt_key: { type: "string", description: "Chave do prompt a editar (ex: vox_chat_system_prompt, vox_master_prompt, equipe_info, regras_negocio, vox_whatsapp_alisson_prompt, vox_whatsapp_team_prompt, daily_feedback_system_prompt, daily_feedback_rules, executive_briefing_prompt, cs_coach_nudge_prompt)" },
+          new_value: { type: "string", description: "Novo conteúdo completo do prompt" },
+          description_hint: { type: "string", description: "Breve descrição do que foi alterado", nullable: true },
+        },
+        required: ["prompt_key", "new_value"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
