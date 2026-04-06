@@ -15,10 +15,12 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 interface ChatAreaProps {
   conversationId: string | null;
   gestorFilter?: string | null;
+  isMaster?: boolean;
+  userName?: string;
   onTitleUpdate: (title: string) => void;
 }
 
-export function ChatArea({ conversationId, gestorFilter, onTitleUpdate }: ChatAreaProps) {
+export function ChatArea({ conversationId, gestorFilter, isMaster, userName, onTitleUpdate }: ChatAreaProps) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -81,7 +83,7 @@ export function ChatArea({ conversationId, gestorFilter, onTitleUpdate }: ChatAr
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages, type: "chat", gestorFilter }),
+        body: JSON.stringify({ messages: allMessages, type: "chat", gestorFilter, isMaster, userName }),
       });
 
       if (!resp.ok) {
@@ -155,7 +157,11 @@ export function ChatArea({ conversationId, gestorFilter, onTitleUpdate }: ChatAr
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <div className="text-center space-y-3">
           <Sparkles className="w-12 h-12 mx-auto opacity-30" />
-          <p className="text-lg font-medium">Selecione ou crie uma conversa</p>
+          <p className="text-lg font-medium">
+            {isMaster
+              ? `Oi ${userName?.split(" ")[0] || ""}! Pronta pra qualquer coisa que precisar. Quer um panorama da operação ou já tem algo em mente?`
+              : "Selecione ou crie uma conversa"}
+          </p>
           <p className="text-sm">Use a barra lateral para começar</p>
         </div>
       </div>
@@ -171,7 +177,11 @@ export function ChatArea({ conversationId, gestorFilter, onTitleUpdate }: ChatAr
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <p className="text-sm">Envie uma mensagem para começar a conversa</p>
+            <p className="text-sm">
+              {isMaster
+                ? `Oi ${userName?.split(" ")[0] || ""}! Pronta pra qualquer coisa que precisar. Quer um panorama da operação ou já tem algo em mente?`
+                : "Envie uma mensagem para começar a conversa"}
+            </p>
           </div>
         ) : null}
 

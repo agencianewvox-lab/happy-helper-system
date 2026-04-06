@@ -1,4 +1,4 @@
-import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck } from "lucide-react";
+import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck, Shield } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -16,31 +16,47 @@ import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 
 interface DashboardSidebarProps {
   isAdmin: boolean;
+  isMaster?: boolean;
   onSignOut: () => void;
 }
 
 const navItems = [
-  { title: "Performance", url: "/performance", icon: BarChart3, adminOnly: false, badgeKey: null },
-  { title: "Chat IA", url: "/chat", icon: Brain, adminOnly: false, badgeKey: null },
-  { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, badgeKey: "tarefas" as const },
-  { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false, badgeKey: "agenda" as const },
-  { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false, badgeKey: "pendencias" as const },
-  { title: "NPS Preditivo", url: "/nps", icon: Heart, adminOnly: true, badgeKey: null },
-  { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: true, badgeKey: null },
+  { title: "Performance", url: "/performance", icon: BarChart3, adminOnly: false, masterOnly: false, badgeKey: null },
+  { title: "Chat IA", url: "/chat", icon: Brain, adminOnly: false, masterOnly: false, badgeKey: null },
+  { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
+  { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false, masterOnly: false, badgeKey: "agenda" as const },
+  { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false, masterOnly: false, badgeKey: "pendencias" as const },
+  { title: "NPS Preditivo", url: "/nps", icon: Heart, adminOnly: true, masterOnly: false, badgeKey: null },
+  { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: true, masterOnly: false, badgeKey: null },
+  { title: "Painel Admin", url: "/admin", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },
 ];
 
-export function DashboardSidebar({ isAdmin, onSignOut }: DashboardSidebarProps) {
+export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: DashboardSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const location = useLocation();
   const badges = useSidebarBadges();
 
-  const filteredItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const filteredItems = navItems.filter(item => {
+    if (item.masterOnly && !isMaster) return false;
+    if (item.adminOnly && !isAdmin) return false;
+    return true;
+  });
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/40">
       <SidebarContent className="pt-4">
+        {/* Master badge */}
+        {isMaster && !collapsed && (
+          <div className="px-4 pb-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
+              <Shield className="w-3 h-3" />
+              Master
+            </span>
+          </div>
+        )}
+
         <SidebarGroup>
           <SidebarGroupLabel className={cn(collapsed && "sr-only")}>
             Navegação

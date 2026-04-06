@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { messages, type, gestorFilter, groupId } = await req.json();
+    const { messages, type, gestorFilter, groupId, isMaster, userName } = await req.json();
     const safeMessages = Array.isArray(messages) ? messages : [];
 
     // Fetch groups (filtered by gestor if provided)
@@ -597,7 +597,74 @@ ${contextLines.join("\n")}
 ${coachHistoryContext}
 `;
 
-    const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
+    const masterFirstName = isMaster && userName ? userName.split(' ')[0] : null;
+
+    const MASTER_PROMPT = isMaster && masterFirstName ? `
+MODO MASTER ATIVO — Você está conversando com ${masterFirstName}, um dos sócios-proprietários da New Vox. Ele tem nível MASTER de acesso ao sistema.
+
+TRATAMENTO:
+- Trate ${masterFirstName} com proximidade e parceria, como braço direito estratégico da empresa
+- Seja direta, confiante e proativa. Sem vaguezas, sem excesso de ressalvas
+- Pode ser mais informal que com outros membros da equipe, mantendo profissionalismo
+- Não use tom de subordinação ('se você permitir', 'posso ajudar?'). Use tom de parceria ('acabei de verificar', 'recomendo fazer X porque Y')
+- Se identificar algo crítico, TRAGA a informação mesmo sem ser perguntada. Você é a consultora estratégica dele.
+
+PERMISSÕES TOTAIS:
+${masterFirstName} pode pedir qualquer coisa relacionada à operação. Você pode e deve:
+- Responder qualquer pergunta sobre qualquer cliente (dados financeiros, satisfação, histórico, ads, NPS, risco de churn)
+- Analisar e comparar performance individual de qualquer colaborador da equipe
+- Mostrar dados estratégicos de negócio (MRR, receita por cliente, LTV, projeções)
+- Executar ações administrativas via tags XML (ASSIGN_RESPONSIBLE, UPDATE_CLIENT, RESOLVE_PENDING, SYSTEM_CONTROL)
+
+Quando ele pedir uma ação, EXECUTE direto. Só peça confirmação quando for destrutivo/irreversível (deletar permanente). Para criar, atribuir, modificar — execute e confirme o que foi feito em texto claro.
+
+IMPORTANTE SOBRE PRISCILLA: Se ${masterFirstName} for 'Priscilla', ela é sócia MAS também trabalha na operação como social media. Se ela perguntar sobre clientes que ela atende operacionalmente, pode dar dicas práticas como se fosse para qualquer membro da equipe. Se ela perguntar como dona, dê visão estratégica. Identifique pelo tipo da pergunta.
+
+ORIENTAÇÃO EM TEMPO REAL:
+Se ${masterFirstName} descrever um problema acontecendo agora ('o cliente X tá bravo, o que faço?'), você deve:
+1. Analisar o histórico do cliente imediatamente nos dados que você tem
+2. Identificar causa provável
+3. Sugerir ação específica e executável agora
+4. Se fizer sentido, já preparar rascunho de resposta para ele enviar
+
+HIERARQUIA DA EQUIPE NEW VOX:
+- NÍVEL MASTER (donos, controle total): Alisson (sócio), Priscilla (sócia, também atua como social media operacional)
+- ADMIN (gestão geral): Joel (gerente geral)
+- GESTORES DE TRÁFEGO: Jader Costa, Murilo Araújo, Netto Monge
+- EQUIPE OPERACIONAL: Thais, Daniella, Victor Botto, Jiza
+
+Quando o master pedir para atribuir responsável, sugerir o membro mais adequado baseado em função:
+- Questão de tráfego/ads → Jader, Murilo ou Netto
+- Questão de social media/conteúdo → Priscilla ou Thais
+- Questão gerencial/escalada → Joel
+- Decisão estratégica → Alisson ou Priscilla (masters)
+
+AÇÕES MASTER DISPONÍVEIS (responda com tags XML quando o master pedir):
+
+1. ATRIBUIR RESPONSÁVEL:
+<ASSIGN_RESPONSIBLE>
+{"group_id": "group_id do cliente", "field": "gestor_responsavel|responsavel_master|responsavel_socio", "new_value": "Nome da pessoa"}
+</ASSIGN_RESPONSIBLE>
+
+2. ATUALIZAR CLIENTE:
+<UPDATE_CLIENT>
+{"group_id": "group_id", "updates": {"plano": "novo valor", "investimento_ads": 3000}}
+</UPDATE_CLIENT>
+
+3. RESOLVER PENDÊNCIA:
+<RESOLVE_PENDING>
+{"group_id": "group_id", "term": "termo da pendência", "resolved_by": "nome de quem resolveu"}
+</RESOLVE_PENDING>
+
+4. CONTROLE DO SISTEMA:
+<SYSTEM_CONTROL>
+{"action": "pause_coach|resume_coach", "target": "all", "reason": "motivo opcional"}
+</SYSTEM_CONTROL>
+
+Após cada ação, confirme o que foi feito em texto amigável.
+` : "";
+
+    const fullSystemPrompt = MASTER_PROMPT + SYSTEM_PROMPT + "\n\n" + dataContext;
 
     if (detectExactAdsSpendQuery(safeMessages)) {
       const lastUser = [...safeMessages].reverse().find((m: any) => m.role === "user");
@@ -1107,11 +1174,136 @@ ${dataContext}`;
       });
     }
 
+    // Master action detection
+    if (isMaster) {
+      const lastUserMsg = getLastUserMessage(safeMessages);
+      const lastText = lastUserMsg?.content?.toLowerCase() || "";
+      const masterActionKeywords = [
+        "atribui", "coloca como gestor", "muda o gestor", "tira o", "transfere",
+        "muda o plano", "atualiza o investimento", "altera", "marca o aniversário",
+        "resolve a pendência", "marca como feito", "marca como resolvido",
+        "pausa o coach", "desativa", "ativa o coach", "liga o coach",
+        "atualiza o briefing", "muda o", "altera o",
+      ];
+      const isMasterAction = masterActionKeywords.some(k => lastText.includes(k));
+
+      if (isMasterAction) {
+        const masterResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [{ role: "system", content: fullSystemPrompt }, ...safeMessages],
+          }),
+        });
+
+        if (masterResponse.ok) {
+          const masterData = await masterResponse.json();
+          let content = masterData.choices?.[0]?.message?.content || "";
+
+          // Process ASSIGN_RESPONSIBLE
+          const assignMatch = content.match(/<ASSIGN_RESPONSIBLE>([\s\S]*?)<\/ASSIGN_RESPONSIBLE>/);
+          if (assignMatch) {
+            try {
+              const info = JSON.parse(assignMatch[1].trim());
+              const allowedFields = ["gestor_responsavel", "responsavel_master", "responsavel_socio"];
+              if (info.group_id && allowedFields.includes(info.field)) {
+                const { data: before } = await supabase.from("whatsapp_grupos").select("*").eq("group_id", info.group_id).single();
+                await supabase.from("whatsapp_grupos").update({ [info.field]: info.new_value }).eq("group_id", info.group_id);
+                await supabase.from("master_actions_log").insert({
+                  executed_by: userName || "Master",
+                  action_type: "assign_responsible",
+                  target_group_id: info.group_id,
+                  description: `Alterou ${info.field} para "${info.new_value}" no grupo ${before?.nome || info.group_id}`,
+                  dados_antes: { [info.field]: before?.[info.field] },
+                  dados_depois: { [info.field]: info.new_value },
+                });
+                content = content.replace(/<ASSIGN_RESPONSIBLE>[\s\S]*?<\/ASSIGN_RESPONSIBLE>/, "");
+                content += `\n\n✅ **Responsável atualizado!** ${info.field} → ${info.new_value}`;
+              }
+            } catch (e) { console.error("ASSIGN_RESPONSIBLE error:", e); }
+          }
+
+          // Process UPDATE_CLIENT
+          const updateMatch = content.match(/<UPDATE_CLIENT>([\s\S]*?)<\/UPDATE_CLIENT>/);
+          if (updateMatch) {
+            try {
+              const info = JSON.parse(updateMatch[1].trim());
+              if (info.group_id && info.updates) {
+                const { data: before } = await supabase.from("whatsapp_grupos").select("*").eq("group_id", info.group_id).single();
+                await supabase.from("whatsapp_grupos").update(info.updates).eq("group_id", info.group_id);
+                await supabase.from("master_actions_log").insert({
+                  executed_by: userName || "Master",
+                  action_type: "update_client",
+                  target_group_id: info.group_id,
+                  description: `Atualizou dados do grupo ${before?.nome || info.group_id}: ${Object.keys(info.updates).join(", ")}`,
+                  dados_antes: before || {},
+                  dados_depois: info.updates,
+                });
+                content = content.replace(/<UPDATE_CLIENT>[\s\S]*?<\/UPDATE_CLIENT>/, "");
+                content += `\n\n✅ **Cliente atualizado!** Campos: ${Object.keys(info.updates).join(", ")}`;
+              }
+            } catch (e) { console.error("UPDATE_CLIENT error:", e); }
+          }
+
+          // Process RESOLVE_PENDING
+          const resolveMatch = content.match(/<RESOLVE_PENDING>([\s\S]*?)<\/RESOLVE_PENDING>/);
+          if (resolveMatch) {
+            try {
+              const info = JSON.parse(resolveMatch[1].trim());
+              if (info.group_id && info.term) {
+                await supabase.from("pending_demand_resolutions")
+                  .update({ resolved: true, resolved_at: new Date().toISOString(), status: "resolvido" })
+                  .eq("group_id", info.group_id)
+                  .ilike("term", `%${info.term}%`);
+                await supabase.from("master_actions_log").insert({
+                  executed_by: userName || "Master",
+                  action_type: "resolve_pending",
+                  target_group_id: info.group_id,
+                  description: `Resolveu pendência "${info.term}" ${info.resolved_by ? `(por ${info.resolved_by})` : ""}`,
+                });
+                content = content.replace(/<RESOLVE_PENDING>[\s\S]*?<\/RESOLVE_PENDING>/, "");
+                content += `\n\n✅ **Pendência resolvida!** "${info.term}"`;
+              }
+            } catch (e) { console.error("RESOLVE_PENDING error:", e); }
+          }
+
+          // Process SYSTEM_CONTROL
+          const controlMatch = content.match(/<SYSTEM_CONTROL>([\s\S]*?)<\/SYSTEM_CONTROL>/);
+          if (controlMatch) {
+            try {
+              const info = JSON.parse(controlMatch[1].trim());
+              if (info.action === "pause_coach") {
+                await supabase.from("coach_config").update({ ativo: false }).neq("id", "00000000");
+                content = content.replace(/<SYSTEM_CONTROL>[\s\S]*?<\/SYSTEM_CONTROL>/, "");
+                content += "\n\n✅ **CS Coach pausado!**";
+              } else if (info.action === "resume_coach") {
+                await supabase.from("coach_config").update({ ativo: true }).neq("id", "00000000");
+                content = content.replace(/<SYSTEM_CONTROL>[\s\S]*?<\/SYSTEM_CONTROL>/, "");
+                content += "\n\n✅ **CS Coach reativado!**";
+              }
+              await supabase.from("master_actions_log").insert({
+                executed_by: userName || "Master",
+                action_type: "system_control",
+                description: `Ação: ${info.action}${info.reason ? ` — ${info.reason}` : ""}`,
+              });
+            } catch (e) { console.error("SYSTEM_CONTROL error:", e); }
+          }
+
+          const encoder = new TextEncoder();
+          const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+          return new Response(encoder.encode(sseData), {
+            headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+          });
+        }
+      }
+    }
+
     // Chat mode: choose model based on complexity or ads date queries
     const isComplex = detectComplexQuery(safeMessages);
     const hasDateRange = !!detectedDateRange;
-    const model = (isComplex || hasDateRange) ? "gpt-4o" : "gpt-4o-mini";
-    console.log(`Chat mode: using ${model} (complex=${isComplex}, dateRange=${hasDateRange})`);
+    const model = (isComplex || hasDateRange || isMaster) ? "gpt-4o" : "gpt-4o-mini";
+    console.log(`Chat mode: using ${model} (complex=${isComplex}, dateRange=${hasDateRange}, master=${!!isMaster})`);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

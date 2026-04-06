@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.daily-feedback]
 verify_jwt = false
+
+[functions.notify-masters]
+verify_jwt = false
+
+[functions.executive-briefing]
+verify_jwt = false

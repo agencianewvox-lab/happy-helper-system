@@ -13,6 +13,7 @@ import NpsPreditivo from "./pages/NpsPreditivo";
 import NpsReal from "./pages/NpsReal";
 import Agenda from "./pages/Agenda";
 import PesquisaNps from "./pages/PesquisaNps";
+import PainelAdmin from "./pages/PainelAdmin";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
@@ -53,6 +54,7 @@ const App = () => (
           <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
           <Route path="/nps-real" element={<ProtectedRoute><NpsReal /></ProtectedRoute>} />
           <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
           <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

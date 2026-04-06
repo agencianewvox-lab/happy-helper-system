@@ -244,6 +244,108 @@ export type Database = {
         }
         Relationships: []
       }
+      executive_briefings: {
+        Row: {
+          briefing_date: string
+          conteudo: string
+          created_at: string
+          dados_base: Json | null
+          enviado_alisson: boolean
+          enviado_priscilla: boolean
+          id: string
+        }
+        Insert: {
+          briefing_date: string
+          conteudo: string
+          created_at?: string
+          dados_base?: Json | null
+          enviado_alisson?: boolean
+          enviado_priscilla?: boolean
+          id?: string
+        }
+        Update: {
+          briefing_date?: string
+          conteudo?: string
+          created_at?: string
+          dados_base?: Json | null
+          enviado_alisson?: boolean
+          enviado_priscilla?: boolean
+          id?: string
+        }
+        Relationships: []
+      }
+      master_actions_log: {
+        Row: {
+          action_type: string
+          dados_antes: Json | null
+          dados_depois: Json | null
+          description: string
+          executed_at: string
+          executed_by: string
+          id: string
+          target_group_id: string | null
+        }
+        Insert: {
+          action_type: string
+          dados_antes?: Json | null
+          dados_depois?: Json | null
+          description: string
+          executed_at?: string
+          executed_by: string
+          id?: string
+          target_group_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          dados_antes?: Json | null
+          dados_depois?: Json | null
+          description?: string
+          executed_at?: string
+          executed_by?: string
+          id?: string
+          target_group_id?: string | null
+        }
+        Relationships: []
+      }
+      master_notifications: {
+        Row: {
+          created_at: string
+          dados_relacionados: Json | null
+          destinatario: string
+          enviada_em: string
+          group_id: string | null
+          id: string
+          lida: boolean
+          mensagem: string
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          dados_relacionados?: Json | null
+          destinatario: string
+          enviada_em?: string
+          group_id?: string | null
+          id?: string
+          lida?: boolean
+          mensagem: string
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          dados_relacionados?: Json | null
+          destinatario?: string
+          enviada_em?: string
+          group_id?: string | null
+          id?: string
+          lida?: boolean
+          mensagem?: string
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
       nps_prediction_history: {
         Row: {
           group_id: string
@@ -435,21 +537,27 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          is_master: boolean
           role: string
+          telefone: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           full_name: string
           id?: string
+          is_master?: boolean
           role?: string
+          telefone?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           full_name?: string
           id?: string
+          is_master?: boolean
           role?: string
+          telefone?: string | null
           user_id?: string
         }
         Relationships: []
