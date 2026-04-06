@@ -83,44 +83,87 @@ function detectCutucadaIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 
-function detectDateRangeFromMessages(messages: any[]): { since: string; until: string } | null {
+type DateRangeInfo = {
+  since: string;
+  until: string;
+  explicitYear: boolean;
+  startDay: string;
+  startMonth: string;
+  endDay: string;
+  endMonth: string;
+};
+
+function buildDateRangeForYear(range: DateRangeInfo, year: number) {
+  return {
+    since: `${year}-${range.startMonth}-${range.startDay}`,
+    until: `${year}-${range.endMonth}-${range.endDay}`,
+  };
+}
+
+function detectDateRangeInfoFromMessages(messages: any[]): DateRangeInfo | null {
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return null;
   const text = lastUser.content;
 
-  // Match patterns like "01/04 a 06/04", "01/04 até 06/04", "de 01/04 a 06/04"
   const rangeMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (rangeMatch) {
     const now = new Date();
-    const year1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
-    const year2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
-    const since = `${year1}-${rangeMatch[2].padStart(2, "0")}-${rangeMatch[1].padStart(2, "0")}`;
-    const until = `${year2}-${rangeMatch[5].padStart(2, "0")}-${rangeMatch[4].padStart(2, "0")}`;
-    return { since, until };
+    const explicitYear = !!(rangeMatch[3] || rangeMatch[6]);
+    const resolvedYear1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
+    const resolvedYear2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
+    const startDay = rangeMatch[1].padStart(2, "0");
+    const startMonth = rangeMatch[2].padStart(2, "0");
+    const endDay = rangeMatch[4].padStart(2, "0");
+    const endMonth = rangeMatch[5].padStart(2, "0");
+
+    return {
+      since: `${resolvedYear1}-${startMonth}-${startDay}`,
+      until: `${resolvedYear2}-${endMonth}-${endDay}`,
+      explicitYear,
+      startDay,
+      startMonth,
+      endDay,
+      endMonth,
+    };
   }
 
-  // Match "dia 01/04" or "no dia 06/04/2025"
   const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (singleDayMatch) {
     const now = new Date();
-    const year = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
-    const date = `${year}-${singleDayMatch[2].padStart(2, "0")}-${singleDayMatch[1].padStart(2, "0")}`;
-    return { since: date, until: date };
+    const explicitYear = !!singleDayMatch[3];
+    const resolvedYear = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
+    const day = singleDayMatch[1].padStart(2, "0");
+    const month = singleDayMatch[2].padStart(2, "0");
+    const date = `${resolvedYear}-${month}-${day}`;
+    return {
+      since: date,
+      until: date,
+      explicitYear,
+      startDay: day,
+      startMonth: month,
+      endDay: day,
+      endMonth: month,
+    };
   }
 
-  // "hoje"
   if (/\bhoje\b/i.test(text)) {
     const today = new Date().toISOString().split("T")[0];
-    return { since: today, until: today };
+    const [year, month, day] = today.split("-");
+    return { since: today, until: today, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
   }
 
-  // "ontem"
   if (/\bontem\b/i.test(text)) {
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    return { since: yesterday, until: yesterday };
+    const [year, month, day] = yesterday.split("-");
+    return { since: yesterday, until: yesterday, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
   }
 
   return null;
+}
+
+function detectDateRangeFromMessages(messages: any[]): { since: string; until: string } | null {
+  const info = detectDateRangeInfoFromMessages(messages);
+  return info ? { since: info.since, until: info.until } : null;
 }
 
 function detectComplexQuery(messages: any[]): boolean {
@@ -130,9 +173,19 @@ function detectComplexQuery(messages: any[]): boolean {
   const complexKeywords = [
     "comparar", "comparação", "todos os grupos", "análise geral", "visão geral",
     "panorama", "ranking", "equipe", "performance da equipe", "tendência",
-    "evolução", "upsell", "oportunidades", "quem posso",
+    "evolução", "upsell", "oportunidades", "quem posso", "investimento",
+    "gasto", "meta ads", "ads", "período", "periodo", "valor", "quanto",
   ];
   return complexKeywords.some(k => text.includes(k));
+}
+
+function detectExactAdsSpendQuery(messages: any[]): boolean {
+  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUser) return false;
+  const text = lastUser.content.toLowerCase();
+  const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "valor", "quanto", "quanto foi", "total", "meta ads", "ads"].some((k) => text.includes(k));
+  const hasDateIntent = !!detectDateRangeInfoFromMessages(messages);
+  return hasAdsIntent && hasDateIntent;
 }
 
 const SYSTEM_PROMPT = `Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você conhece profundamente cada cliente, cada número, cada métrica. Você fala de forma direta, objetiva, sem enrolação. Usa português brasileiro natural, como alguém que trabalha na agência falaria numa reunião. Pode usar emojis para facilitar a leitura mas sem exagero.
@@ -473,6 +526,74 @@ ${coachHistoryContext}
 `;
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
+
+    if (detectExactAdsSpendQuery(messages)) {
+      const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+      const userText = lastUser?.content?.toLowerCase() || "";
+      const dateRangeInfo = detectDateRangeInfoFromMessages(messages);
+      const matchedGroup = grupos.find((g: any) => {
+        const name = (g.nome || "").toLowerCase();
+        const simplified = name.replace(/^nv\s*-\s*/i, "").trim();
+        return userText.includes(name) || userText.includes(simplified);
+      });
+
+      if (matchedGroup && dateRangeInfo) {
+        const formatPeriod = (since: string, until: string) => {
+          const formatOne = (value: string) => {
+            const [year, month, day] = value.split("-");
+            return `${day}/${month}/${year}`;
+          };
+          return `${formatOne(since)} a ${formatOne(until)}`;
+        };
+
+        const encoder = new TextEncoder();
+        const sendSse = (content: string) => {
+          const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+          return new Response(encoder.encode(sseData), {
+            headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+          });
+        };
+
+        if (!matchedGroup.ad_account_id) {
+          return sendSse(`${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} não possui conta de Meta Ads vinculada.`);
+        }
+
+        let resolvedAds = adsDataMap.get(matchedGroup.group_id);
+        let resolvedRange = { since: dateRangeInfo.since, until: dateRangeInfo.until };
+
+        if (!dateRangeInfo.explicitYear) {
+          const currentYear = new Date().getFullYear();
+          const currentRange = buildDateRangeForYear(dateRangeInfo, currentYear);
+          const previousRange = buildDateRangeForYear(dateRangeInfo, currentYear - 1);
+
+          const [currentAds, previousAds] = await Promise.all([
+            fetchMetaAdsForAccount(matchedGroup.ad_account_id, META_TOKEN!, currentRange.since, currentRange.until),
+            fetchMetaAdsForAccount(matchedGroup.ad_account_id, META_TOKEN!, previousRange.since, previousRange.until),
+          ]);
+
+          const hasCurrentData = !!currentAds && currentAds.spend > 0;
+          const hasPreviousData = !!previousAds && previousAds.spend > 0;
+
+          if (hasCurrentData && hasPreviousData) {
+            return sendSse(`Encontrei dados para mais de um ano no intervalo ${dateRangeInfo.startDay}/${dateRangeInfo.startMonth} a ${dateRangeInfo.endDay}/${dateRangeInfo.endMonth}. Para te responder com precisão, me diga se você quer ${currentYear} ou ${currentYear - 1}.`);
+          }
+
+          if (hasCurrentData) {
+            resolvedAds = currentAds;
+            resolvedRange = currentRange;
+          } else if (hasPreviousData) {
+            resolvedAds = previousAds;
+            resolvedRange = previousRange;
+          }
+        }
+
+        if (resolvedAds) {
+          return sendSse(`O gasto total do Meta Ads de ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)} foi de R$${resolvedAds.spend.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`);
+        }
+
+        return sendSse(`Não encontrei dados de Meta Ads para ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)}.`);
+      }
+    }
 
     // Summary mode: generate a concise professional summary for a single client
     if (type === "summary" && groupId) {
