@@ -1840,7 +1840,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ===== ALISSON AI AUTO-REPLY =====
+      // ===== AUTO-RESOLVE PENDING DEMANDS WHEN TEAM RESPONDS IN GROUP =====
+      if (isAllowedSource && direction === "saida" && groupId) {
+        autoResolvePendingDemands(groupId, contactName, supabase).catch((err) =>
+          console.error("Auto-resolve pending demands error:", err)
+        );
+      }
+
       console.log("Phone:", phone, "| isAlisson:", isAlisson, "| isTeamMember:", isTeamMember, "| Message:", messageText?.substring(0, 50));
       if (isAlisson && messageText && shouldRespondToMessage(messageText)) {
         console.log("Alisson message detected, triggering AI reply...");
