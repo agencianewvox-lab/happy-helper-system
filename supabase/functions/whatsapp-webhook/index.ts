@@ -670,6 +670,7 @@ REGRAS:
 - Se Alisson falar algo sem contexto claro, tente inferir ou pergunte usando a ferramenta
 - Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
 - Quando perguntarem sobre cutucadas (planejamento, histórico, próximas), consulte o histórico de cutucadas abaixo para responder com precisão
+- IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO nos dados abaixo, use EXATAMENTE esses valores ao responder. NUNCA estime ou arredonde. Reporte os números tal qual apareceram e mencione o período exato.
 
 DADOS DA OPERAÇÃO EM TEMPO REAL (${grupos.length} grupos, ${totalMsgs} mensagens, ${adsDataMap.size} contas de ads):
 
