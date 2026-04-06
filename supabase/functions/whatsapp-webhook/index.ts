@@ -1666,40 +1666,40 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
             }
           }
         }
-      }
 
-      // Handle salvar_nota_cliente
-      if (fnName === "salvar_nota_cliente") {
-        const matchedGroup = allGroups.find((g: any) =>
-          g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
-          args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
-        );
-        if (matchedGroup) {
-          const { error: noteErr } = await supabase.from("client_notes").insert({
-            group_id: matchedGroup.group_id,
-            content: args.note_content,
-            author_name: `Vox (via ${firstName})`,
-          });
-          toolResults.push(noteErr ? `❌ Erro ao salvar nota: ${noteErr.message}` : `✅ Nota salva no card de ${matchedGroup.nome}`);
-        } else {
-          toolResults.push(`⚠️ Cliente "${args.group_name}" não encontrado para salvar nota.`);
+        // Handle salvar_nota_cliente
+        if (fnName === "salvar_nota_cliente") {
+          const matchedGroup = allGroups.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+          );
+          if (matchedGroup) {
+            const { error: noteErr } = await supabase.from("client_notes").insert({
+              group_id: matchedGroup.group_id,
+              content: args.note_content,
+              author_name: `Vox (via ${firstName})`,
+            });
+            toolResults.push(noteErr ? `❌ Erro ao salvar nota: ${noteErr.message}` : `✅ Nota salva no card de ${matchedGroup.nome}`);
+          } else {
+            toolResults.push(`⚠️ Cliente "${args.group_name}" não encontrado para salvar nota.`);
+          }
         }
-      }
 
-      // Handle registrar_feedback
-      if (fnName === "registrar_feedback") {
-        const matchedGroup = args.group_name ? allGroups.find((g: any) =>
-          g.nome.toLowerCase().includes(args.group_name.toLowerCase())
-        ) : null;
-        await supabase.from("team_feedback_log").insert({
-          member_name: teamWebhook.name,
-          message: args.message_summary,
-          category: args.category || "geral",
-          group_id: matchedGroup?.group_id || null,
-          group_name: matchedGroup?.nome || args.group_name || null,
-          relevance: args.relevance || "low",
-        });
-        toolResults.push(`✅ Feedback registrado.`);
+        // Handle registrar_feedback
+        if (fnName === "registrar_feedback") {
+          const matchedGroup = args.group_name ? allGroups.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase())
+          ) : null;
+          await supabase.from("team_feedback_log").insert({
+            member_name: teamWebhook.name,
+            message: args.message_summary,
+            category: args.category || "geral",
+            group_id: matchedGroup?.group_id || null,
+            group_name: matchedGroup?.nome || args.group_name || null,
+            relevance: args.relevance || "low",
+          });
+          toolResults.push(`✅ Feedback registrado.`);
+        }
       }
 
       // Follow-up with tool results
