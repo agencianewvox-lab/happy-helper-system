@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { messages, type, gestorFilter, groupId } = await req.json();
+    const { messages, type, gestorFilter, groupId, isMaster, userName } = await req.json();
     const safeMessages = Array.isArray(messages) ? messages : [];
 
     // Fetch groups (filtered by gestor if provided)
