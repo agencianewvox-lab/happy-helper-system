@@ -1696,13 +1696,11 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           content: toolResults[i] || "OK",
         }));
         // Use OpenAI for follow-up if primary failed (detected by requestBody.model being gpt-4o-mini from fallback)
-        const followUpUrl = requestBody.model === "gpt-4o-mini" ? "https://api.openai.com/v1/chat/completions" : aiUrl;
-        const followUpKey = requestBody.model === "gpt-4o-mini" ? openaiKey : aiKey;
-        const followUp = await fetch(followUpUrl, {
+        const followUp = await fetch(aiUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${followUpKey}` },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
           body: JSON.stringify({
-            model: requestBody.model === "gpt-4o-mini" ? "gpt-4o-mini" : (lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini"),
+            model: "gpt-4o-mini",
             messages: [...aiMessages, choice.message, ...toolResultMessages],
             max_tokens: 500,
           }),
