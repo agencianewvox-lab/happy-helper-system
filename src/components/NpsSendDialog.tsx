@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/03f12fb5-48ed-4f30-8aaa-02a8912768e3";
+import { supabase } from "@/integrations/supabase/client";
 const PUBLISHED_APP_URL = "https://happy-helper-system.lovable.app";
 
 const MSG_OPERACAO = `Olá, Time! Tudo bem?
