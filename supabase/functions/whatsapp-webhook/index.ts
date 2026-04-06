@@ -97,6 +97,136 @@ function shouldRespondToMessage(text: string): boolean {
   return true;
 }
 
+// ===== DATE RANGE DETECTION & DETERMINISTIC ADS RESPONSE =====
+
+type DateRangeInfo = {
+  since: string;
+  until: string;
+  explicitYear: boolean;
+  startDay: string;
+  startMonth: string;
+  endDay: string;
+  endMonth: string;
+};
+
+function buildDateRangeForYear(range: DateRangeInfo, year: number) {
+  return {
+    since: `${year}-${range.startMonth}-${range.startDay}`,
+    until: `${year}-${range.endMonth}-${range.endDay}`,
+  };
+}
+
+function detectDateRangeInfo(text: string): DateRangeInfo | null {
+  const rangeMatch = text.match(/(?:entre\s+)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|e|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?(?:\s+de\s+(\d{4}))?/i);
+  if (rangeMatch) {
+    const now = new Date();
+    const trailingYear = rangeMatch[7] || null;
+    const explicitYear = !!(rangeMatch[3] || rangeMatch[6] || trailingYear);
+    const resolvedYear1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : (trailingYear || String(now.getFullYear()));
+    const resolvedYear2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : (trailingYear || String(now.getFullYear()));
+    const startDay = rangeMatch[1].padStart(2, "0");
+    const startMonth = rangeMatch[2].padStart(2, "0");
+    const endDay = rangeMatch[4].padStart(2, "0");
+    const endMonth = rangeMatch[5].padStart(2, "0");
+    return {
+      since: `${resolvedYear1}-${startMonth}-${startDay}`,
+      until: `${resolvedYear2}-${endMonth}-${endDay}`,
+      explicitYear, startDay, startMonth, endDay, endMonth,
+    };
+  }
+
+  const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (singleDayMatch) {
+    const now = new Date();
+    const explicitYear = !!singleDayMatch[3];
+    const resolvedYear = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
+    const day = singleDayMatch[1].padStart(2, "0");
+    const month = singleDayMatch[2].padStart(2, "0");
+    const date = `${resolvedYear}-${month}-${day}`;
+    return { since: date, until: date, explicitYear, startDay: day, startMonth: month, endDay: day, endMonth: month };
+  }
+
+  if (/\bhoje\b/i.test(text)) {
+    const today = new Date().toISOString().split("T")[0];
+    const [, month, day] = today.split("-");
+    return { since: today, until: today, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
+  }
+  if (/\bontem\b/i.test(text)) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    const [, month, day] = yesterday.split("-");
+    return { since: yesterday, until: yesterday, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
+  }
+  return null;
+}
+
+function normalizeGroupName(value: string) {
+  return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^nv\s*-\s*/i, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function isExactAdsSpendQuery(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "valor", "quanto", "quanto foi", "total", "meta ads", "ads"].some(k => lower.includes(k));
+  return hasAdsIntent && !!detectDateRangeInfo(text);
+}
+
+/**
+ * Try to answer an exact ads spend query deterministically. Returns the reply string or null if not applicable.
+ */
+async function tryExactAdsReply(
+  messageText: string,
+  grupos: any[],
+  metaToken: string
+): Promise<string | null> {
+  if (!isExactAdsSpendQuery(messageText)) return null;
+  const dateRangeInfo = detectDateRangeInfo(messageText);
+  if (!dateRangeInfo) return null;
+
+  const normalizedUserText = normalizeGroupName(messageText);
+  const matchedGroup = grupos.find((g: any) => {
+    const normalizedName = normalizeGroupName(g.nome || "");
+    return normalizedUserText.includes(normalizedName);
+  });
+
+  if (!matchedGroup || !matchedGroup.ad_account_id) {
+    if (matchedGroup) return `${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} não possui conta de Meta Ads vinculada.`;
+    return null; // let AI handle it
+  }
+
+  const formatPeriod = (since: string, until: string) => {
+    const formatOne = (v: string) => { const [y, m, d] = v.split("-"); return `${d}/${m}/${y}`; };
+    return `${formatOne(since)} a ${formatOne(until)}`;
+  };
+
+  let resolvedAds: any = null;
+  let resolvedRange = { since: dateRangeInfo.since, until: dateRangeInfo.until };
+
+  if (!dateRangeInfo.explicitYear) {
+    const currentYear = new Date().getFullYear();
+    const currentRange = buildDateRangeForYear(dateRangeInfo, currentYear);
+    const previousRange = buildDateRangeForYear(dateRangeInfo, currentYear - 1);
+    const [currentAds, previousAds] = await Promise.all([
+      fetchMetaAdsForAccount(matchedGroup.ad_account_id, metaToken, undefined, currentRange.since, currentRange.until),
+      fetchMetaAdsForAccount(matchedGroup.ad_account_id, metaToken, undefined, previousRange.since, previousRange.until),
+    ]);
+    const hasCurrentData = !!currentAds && currentAds.spend > 0;
+    const hasPreviousData = !!previousAds && previousAds.spend > 0;
+    if (hasCurrentData && hasPreviousData) {
+      return `Encontrei dados para mais de um ano no intervalo ${dateRangeInfo.startDay}/${dateRangeInfo.startMonth} a ${dateRangeInfo.endDay}/${dateRangeInfo.endMonth}. Para te responder com precisão, me diga se você quer ${currentYear} ou ${currentYear - 1}.`;
+    }
+    if (hasCurrentData) { resolvedAds = currentAds; resolvedRange = currentRange; }
+    else if (hasPreviousData) { resolvedAds = previousAds; resolvedRange = previousRange; }
+  } else {
+    resolvedAds = await fetchMetaAdsForAccount(matchedGroup.ad_account_id, metaToken, undefined, dateRangeInfo.since, dateRangeInfo.until);
+    resolvedRange = { since: dateRangeInfo.since, until: dateRangeInfo.until };
+  }
+
+  const clientName = matchedGroup.nome.replace(/^NV\s*-\s*/i, "").trim();
+  if (resolvedAds) {
+    return `O gasto total do Meta Ads de ${clientName} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)} foi de R$${resolvedAds.spend.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. (${resolvedAds.impressions} impressões, ${resolvedAds.clicks} cliques, CTR ${resolvedAds.ctr.toFixed(2)}%, ${resolvedAds.leads} leads${resolvedAds.cpa ? `, CPA R$${resolvedAds.cpa.toFixed(2)}` : ""})`;
+  }
+  return `Não encontrei dados de Meta Ads para ${clientName} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)}.`;
+}
+
 const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
@@ -280,6 +410,29 @@ async function handleAlissonAIReply(
     const { data: grupos } = await supabase.from("whatsapp_grupos").select("*").order("nome");
     if (!grupos?.length) return;
 
+    // === DETERMINISTIC ADS RESPONSE (before heavy context loading) ===
+    if (META_TOKEN && isExactAdsSpendQuery(messageText)) {
+      const exactReply = await tryExactAdsReply(messageText, grupos, META_TOKEN);
+      if (exactReply) {
+        console.log("Deterministic ads reply for Alisson:", exactReply.substring(0, 80));
+        await supabase.from("whatsapp_conversas").insert({
+          telefone: "5564992565779",
+          nome_contato: "Vox (IA)",
+          mensagem: exactReply,
+          group_id: groupId,
+          direcao: "saida",
+          status: "enviada",
+          recebido_em: new Date().toISOString(),
+        });
+        await fetch(ALISSON_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: "5564992565779", message: exactReply, groupId, type: "ai_response" }),
+        });
+        return;
+      }
+    }
+
     // Fetch last 50 messages per group for richer context
     const groupIds = grupos.map((g: any) => g.group_id);
     const conversasPromises = groupIds.map((gid: string) =>
@@ -322,14 +475,24 @@ async function handleAlissonAIReply(
     const adsDataMap = new Map<string, any>();
     const adsTodayMap = new Map<string, any>();
     const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Detect if user is asking about a specific date range
+    const detectedRange = detectDateRangeInfo(messageText);
+    const adsCustomRangeMap = new Map<string, any>();
+
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const [ads30d, adsToday] = await Promise.all([
+        const fetches: Promise<any>[] = [
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStr, todayStr),
-        ]);
-        if (ads30d) adsDataMap.set(g.group_id, ads30d);
-        if (adsToday) adsTodayMap.set(g.group_id, adsToday);
+        ];
+        if (detectedRange) {
+          fetches.push(fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, detectedRange.since, detectedRange.until));
+        }
+        const results = await Promise.all(fetches);
+        if (results[0]) adsDataMap.set(g.group_id, results[0]);
+        if (results[1]) adsTodayMap.set(g.group_id, results[1]);
+        if (detectedRange && results[2]) adsCustomRangeMap.set(g.group_id, results[2]);
       });
       await Promise.all(adsPromises);
     }
@@ -418,6 +581,10 @@ async function handleAlissonAIReply(
       if (adsToday) {
         line += `\n  📊 META ADS (HOJE ${todayStr}): Gasto R$${adsToday.spend.toFixed(2)}, ${adsToday.impressions} impressões, ${adsToday.clicks} cliques, CTR ${adsToday.ctr.toFixed(2)}%, Leads ${adsToday.leads}${adsToday.cpa ? `, CPA R$${adsToday.cpa.toFixed(2)}` : ""}, Alcance ${adsToday.reach}`;
       }
+      const adsCustom = adsCustomRangeMap.get(gid);
+      if (adsCustom && detectedRange) {
+        line += `\n  📊 META ADS (${detectedRange.since} a ${detectedRange.until}): Gasto R$${adsCustom.spend.toFixed(2)}, ${adsCustom.impressions} impressões, ${adsCustom.clicks} cliques, CTR ${adsCustom.ctr.toFixed(2)}%, Leads ${adsCustom.leads}${adsCustom.cpa ? `, CPA R$${adsCustom.cpa.toFixed(2)}` : ""}, Alcance ${adsCustom.reach}`;
+      }
       if (ads) {
         line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
       } else if (g.ad_account_id && !adsToday) {
@@ -504,6 +671,7 @@ REGRAS:
 - Se Alisson falar algo sem contexto claro, tente inferir ou pergunte usando a ferramenta
 - Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
 - Quando perguntarem sobre cutucadas (planejamento, histórico, próximas), consulte o histórico de cutucadas abaixo para responder com precisão
+- IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO nos dados abaixo, use EXATAMENTE esses valores ao responder. NUNCA estime ou arredonde. Reporte os números tal qual apareceram e mencione o período exato.
 
 DADOS DA OPERAÇÃO EM TEMPO REAL (${grupos.length} grupos, ${totalMsgs} mensagens, ${adsDataMap.size} contas de ads):
 
@@ -919,6 +1087,19 @@ async function handleTeamCoachReply(
     const { data: grupos } = await gruposQuery;
     const allGroups = grupos || [];
 
+    // === DETERMINISTIC ADS RESPONSE (before heavy context loading) ===
+    if (META_TOKEN && isExactAdsSpendQuery(messageText)) {
+      // For gestors, also check all groups (not just filtered) so they can ask about any client
+      const { data: allGrupos } = await supabase.from("whatsapp_grupos").select("*");
+      const exactReply = await tryExactAdsReply(messageText, allGrupos || allGroups, META_TOKEN);
+      if (exactReply) {
+        console.log(`Deterministic ads reply for ${firstName}:`, exactReply.substring(0, 80));
+        const encodedReply = encodeURIComponent(exactReply);
+        await fetch(`${teamWebhook.url}?message=${encodedReply}`);
+        return;
+      }
+    }
+
     // --- Fetch recent messages, pending, ads in parallel ---
     const groupIds = allGroups.map((g: any) => g.group_id);
 
@@ -972,14 +1153,23 @@ async function handleTeamCoachReply(
     const adsTodayMapTeam = new Map<string, any>();
     const todayStrTeam = new Date().toISOString().slice(0, 10);
     const groupsWithAds = allGroups.filter((g: any) => g.ad_account_id);
+
+    const detectedRangeTeam = detectDateRangeInfo(messageText);
+    const adsCustomRangeMapTeam = new Map<string, any>();
+
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const [ads30d, adsToday] = await Promise.all([
+        const fetches: Promise<any>[] = [
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStrTeam, todayStrTeam),
-        ]);
-        if (ads30d) adsDataMap.set(g.group_id, ads30d);
-        if (adsToday) adsTodayMapTeam.set(g.group_id, adsToday);
+        ];
+        if (detectedRangeTeam) {
+          fetches.push(fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, detectedRangeTeam.since, detectedRangeTeam.until));
+        }
+        const results = await Promise.all(fetches);
+        if (results[0]) adsDataMap.set(g.group_id, results[0]);
+        if (results[1]) adsTodayMapTeam.set(g.group_id, results[1]);
+        if (detectedRangeTeam && results[2]) adsCustomRangeMapTeam.set(g.group_id, results[2]);
       });
       await Promise.all(adsPromises);
     }
@@ -1029,6 +1219,10 @@ async function handleTeamCoachReply(
       }
       if (adsToday) {
         line += `\n  📊 Ads HOJE: R$${adsToday.spend.toFixed(2)} gasto, ${adsToday.clicks} cliques, ${adsToday.leads} leads`;
+      }
+      const adsCustomTeam = adsCustomRangeMapTeam.get(gid);
+      if (adsCustomTeam && detectedRangeTeam) {
+        line += `\n  📊 Ads (${detectedRangeTeam.since} a ${detectedRangeTeam.until}): R$${adsCustomTeam.spend.toFixed(2)} gasto, ${adsCustomTeam.clicks} cliques, ${adsCustomTeam.leads} leads${adsCustomTeam.cpa ? `, CPA R$${adsCustomTeam.cpa.toFixed(2)}` : ""}`;
       }
       if (ads) {
         line += `\n  📊 Ads 30d: R$${ads.spend.toFixed(0)} gasto, ${ads.leads} leads, ${ads.cpa ? `CPA R$${ads.cpa.toFixed(2)}` : ""}, CTR ${ads.ctr.toFixed(2)}%`;
@@ -1088,6 +1282,7 @@ REGRAS:
 - Responda em português brasileiro natural
 - ${firstName} tem acesso a ${accessScope}
 - Responda APENAS sobre os clientes listados abaixo. Se perguntar sobre algo fora do escopo, diga que não tem acesso a esses dados.
+- IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO nos dados abaixo, use EXATAMENTE esses valores. NUNCA estime ou arredonde. Mencione o período exato na resposta.
 - Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
 ${toolsPromptSection}
 
