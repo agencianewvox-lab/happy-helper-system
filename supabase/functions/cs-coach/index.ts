@@ -462,11 +462,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // TYPE 3: Pendências esquecidas (4h+)
+    // TYPE 3: Pendências esquecidas (1h+)
     if (tiposAtivos.includes("pendencia_esquecida")) {
       for (const pend of (pendencias || [])) {
         const hoursOpen = (now.getTime() - new Date(pend.created_at).getTime()) / (1000 * 60 * 60);
-        if (hoursOpen >= 4) {
+        if (hoursOpen >= 1) {
           const grupo = grupos.find((g: any) => g.group_id === pend.group_id);
           if (grupo?.gestor_responsavel) {
             opportunities.push({
