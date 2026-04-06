@@ -1063,8 +1063,9 @@ async function handleTeamCoachReply(
 SUAS CAPACIDADES COMO AGENTE:
 - Você pode CRIAR pendências e tarefas para qualquer membro da equipe quando ${firstName} pedir
 - Você pode REMOVER pendências e tarefas do quadro quando ${firstName} pedir
+- Você pode ENVIAR CUTUCADAS (nudges) para qualquer membro da equipe quando ${firstName} pedir — use "enviar_cutucada"
 - Se faltar informação, pergunte antes de agir
-- Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar), EXECUTE usando as ferramentas disponíveis`;
+- Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar, cutucar, cutucada, lembrar, cobrar), EXECUTE usando as ferramentas disponíveis`;
     }
 
     const systemPrompt = `Você é a Vox, analista sênior de CS da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp.
