@@ -1009,7 +1009,7 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${coachAiKey}` },
               body: JSON.stringify({
-                model: lovableKeyCoach ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                model: "gpt-4o-mini",
                 messages: [
                   { role: "system", content: `Você é a Vox, coach de CS da agência New Vox. Gere uma mensagem curta e direta de cutucada para ${firstName} via WhatsApp. Tom de colega gente boa, informal, incentivador. Máximo 300 caracteres. Adicione "(responda 👍 se já fez)" no final.` },
                   { role: "user", content: `Cutucada para ${firstName}: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
