@@ -765,7 +765,8 @@ async function handleAlissonAIReply(
       }
     }
 
-    const systemPrompt = `Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você está respondendo diretamente ao Alisson (sócio proprietário) via WhatsApp. Você é o agente pessoal dele para gestão da operação.
+    const DB_ALISSON_PROMPT = promptMap.get("vox_whatsapp_alisson_prompt");
+    const systemPrompt = `${DB_ALISSON_PROMPT || "Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você está respondendo diretamente ao Alisson (sócio proprietário) via WhatsApp. Você é o agente pessoal dele para gestão da operação."}
 
 EQUIPE NEW VOX (conheça cada um para direcionar ações corretamente):
 - Jader Costa: Gestor de tráfego
