@@ -484,6 +484,38 @@ ${coachHistoryContext}
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
 
+    const detectedDateRange = detectDateRangeFromMessages(messages);
+
+    if (detectExactAdsSpendQuery(messages) && detectedDateRange) {
+      const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+      const userText = lastUser?.content?.toLowerCase() || "";
+      const matchedGroup = grupos.find((g: any) => {
+        const name = (g.nome || "").toLowerCase();
+        const simplified = name.replace(/^nv\s*-\s*/i, "").trim();
+        return userText.includes(name) || userText.includes(simplified);
+      });
+
+      if (matchedGroup) {
+        const matchedAds = adsDataMap.get(matchedGroup.group_id);
+        const periodLabel = `${detectedDateRange.since} a ${detectedDateRange.until}`;
+
+        let content = "";
+        if (matchedAds) {
+          content = `O gasto total do Meta Ads de ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${periodLabel} foi de R$${matchedAds.spend.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+        } else if (matchedGroup.ad_account_id) {
+          content = `Não encontrei dados de Meta Ads para ${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} no período de ${periodLabel}.`;
+        } else {
+          content = `${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} não possui conta de Meta Ads vinculada.`;
+        }
+
+        const encoder = new TextEncoder();
+        const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+        return new Response(encoder.encode(sseData), {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+    }
+
     // Summary mode: generate a concise professional summary for a single client
     if (type === "summary" && groupId) {
       const targetGroup = grupos.find((g: any) => g.group_id === groupId);
