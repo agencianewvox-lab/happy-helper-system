@@ -48,8 +48,17 @@ async function fetchMetaAdsForAccount(accountId: string, token: string, since?: 
   }
 }
 
+function getSafeMessages(messages: any[]): any[] {
+  return Array.isArray(messages) ? messages : [];
+}
+
+function getLastUserMessage(messages: any[]): any | null {
+  const lastUser = [...getSafeMessages(messages)].reverse().find((m: any) => m.role === "user");
+  return lastUser || null;
+}
+
 function detectSchedulingIntent(messages: any[]): boolean {
-  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  const lastUser = getLastUserMessage(messages);
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
   const keywords = ["agendar", "agenda", "marcar reunião", "marcar uma reunião", "reunião com", "compromisso", "disponibilidade", "horário livre", "agende", "marca"];
@@ -57,7 +66,7 @@ function detectSchedulingIntent(messages: any[]): boolean {
 }
 
 function detectTaskIntent(messages: any[]): boolean {
-  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  const lastUser = getLastUserMessage(messages);
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
   const keywords = [
@@ -71,7 +80,7 @@ function detectTaskIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 function detectCutucadaIntent(messages: any[]): boolean {
-  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  const lastUser = getLastUserMessage(messages);
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
   const keywords = [
@@ -117,7 +126,6 @@ const MONTH_MAP: Record<string, number> = {
 function detectDateRangeInfoFromText(text: string): DateRangeInfo | null {
   const now = new Date();
 
-  // DD/MM a DD/MM pattern
   const rangeMatch = text.match(/(?:entre\s+)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|e|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?(?:\s+de\s+(\d{4}))?/i);
   if (rangeMatch) {
     const trailingYear = rangeMatch[7] || null;
@@ -135,7 +143,6 @@ function detectDateRangeInfoFromText(text: string): DateRangeInfo | null {
     };
   }
 
-  // "dia DD/MM" single day
   const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (singleDayMatch) {
     const explicitYear = !!singleDayMatch[3];
@@ -146,19 +153,16 @@ function detectDateRangeInfoFromText(text: string): DateRangeInfo | null {
     return toDateRangeInfo(date, date, explicitYear);
   }
 
-  // "hoje"
   if (/\bhoje\b/i.test(text)) {
     const d = fmtDate(now);
     return toDateRangeInfo(d, d);
   }
 
-  // "ontem"
   if (/\bontem\b/i.test(text)) {
     const d = fmtDate(new Date(now.getTime() - 86400000));
     return toDateRangeInfo(d, d);
   }
 
-  // "esta semana" / "essa semana" / "semana atual"
   if (/\b(esta|essa|nesta|nessa)\s+semana\b|\bsemana\s+atual\b/i.test(text)) {
     const dayOfWeek = now.getDay();
     const monday = new Date(now);
@@ -166,7 +170,6 @@ function detectDateRangeInfoFromText(text: string): DateRangeInfo | null {
     return toDateRangeInfo(fmtDate(monday), fmtDate(now));
   }
 
-  // "semana passada" / "última semana"
   if (/\bsemana\s+passada\b|\b[uú]ltima\s+semana\b/i.test(text)) {
     const dayOfWeek = now.getDay();
     const thisMonday = new Date(now);
@@ -178,20 +181,17 @@ function detectDateRangeInfoFromText(text: string): DateRangeInfo | null {
     return toDateRangeInfo(fmtDate(lastMonday), fmtDate(lastSunday));
   }
 
-  // "este mês" / "esse mês" / "mês atual"
   if (/\b(este|esse|neste|nesse)\s+m[eê]s\b|\bm[eê]s\s+atual\b/i.test(text)) {
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     return toDateRangeInfo(fmtDate(first), fmtDate(now));
   }
 
-  // "mês passado" / "último mês"
   if (/\bm[eê]s\s+passado\b|\b[uú]ltimo\s+m[eê]s\b/i.test(text)) {
     const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const last = new Date(now.getFullYear(), now.getMonth(), 0);
     return toDateRangeInfo(fmtDate(first), fmtDate(last));
   }
 
-  // "últimos N dias"
   const lastNDays = text.match(/[uú]ltimos?\s+(\d+)\s+dias?/i);
   if (lastNDays) {
     const n = parseInt(lastNDays[1]);
@@ -199,7 +199,6 @@ function detectDateRangeInfoFromText(text: string): DateRangeInfo | null {
     return toDateRangeInfo(fmtDate(start), fmtDate(now));
   }
 
-  // "em janeiro", "no mês de março", "em abril de 2025"
   const monthNameMatch = text.match(/(?:em|no\s+m[eê]s\s+de|de)\s+(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)(?:\s+(?:de\s+)?(\d{4}))?/i);
   if (monthNameMatch) {
     const monthName = monthNameMatch[1].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -217,7 +216,7 @@ function detectDateRangeInfoFromText(text: string): DateRangeInfo | null {
 }
 
 function detectDateRangeInfoFromMessages(messages: any[]): DateRangeInfo | null {
-  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  const lastUser = getLastUserMessage(messages);
   if (!lastUser) return null;
   return detectDateRangeInfoFromText(lastUser.content);
 }
@@ -228,7 +227,7 @@ function detectDateRangeFromMessages(messages: any[]): { since: string; until: s
 }
 
 function detectComplexQuery(messages: any[]): boolean {
-  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  const lastUser = getLastUserMessage(messages);
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
   const complexKeywords = [
@@ -241,7 +240,7 @@ function detectComplexQuery(messages: any[]): boolean {
 }
 
 function detectExactAdsSpendQuery(messages: any[]): boolean {
-  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  const lastUser = getLastUserMessage(messages);
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
   const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "valor", "quanto", "quanto foi", "total", "meta ads", "ads"].some((k) => text.includes(k));
@@ -366,6 +365,7 @@ Deno.serve(async (req) => {
     );
 
     const { messages, type, gestorFilter, groupId } = await req.json();
+    const safeMessages = Array.isArray(messages) ? messages : [];
 
     // Fetch groups (filtered by gestor if provided)
     let gruposQuery = supabase.from("whatsapp_grupos").select("*").order("nome");
@@ -425,7 +425,7 @@ Deno.serve(async (req) => {
     }
 
     // Detect date range from user messages for ads queries
-    const detectedDateRange = messages && Array.isArray(messages) ? detectDateRangeFromMessages(messages) : null;
+    const detectedDateRange = detectDateRangeFromMessages(safeMessages);
 
     // Fetch Meta Ads data for groups with linked ad accounts
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
@@ -599,10 +599,10 @@ ${coachHistoryContext}
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
 
-    if (detectExactAdsSpendQuery(messages)) {
-      const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+    if (detectExactAdsSpendQuery(safeMessages)) {
+      const lastUser = [...safeMessages].reverse().find((m: any) => m.role === "user");
       const userText = lastUser?.content?.toLowerCase() || "";
-      const dateRangeInfo = detectDateRangeInfoFromMessages(messages);
+      const dateRangeInfo = detectDateRangeInfoFromMessages(safeMessages);
       const normalizedUserText = normalizeGroupName(userText);
       const matchedGroup = grupos.find((g: any) => {
         const normalizedName = normalizeGroupName(g.nome || "");
@@ -777,7 +777,7 @@ REGRAS:
     };
 
     // Check for cutucada intent
-    const isCutucada = detectCutucadaIntent(messages);
+    const isCutucada = detectCutucadaIntent(safeMessages);
     if (isCutucada) {
       const cutucadaSystemPrompt = `${fullSystemPrompt}
 
@@ -807,7 +807,7 @@ Se não especificou para quem, pergunte antes de gerar o JSON.`;
         },
         body: JSON.stringify({
           model: "gpt-4o",
-          messages: [{ role: "system", content: cutucadaSystemPrompt }, ...messages],
+          messages: [{ role: "system", content: cutucadaSystemPrompt }, ...safeMessages],
         }),
       });
 
@@ -908,7 +908,7 @@ Se não especificou para quem, pergunte antes de gerar o JSON.`;
     }
 
     // Check for task creation intent
-    const isTaskCreation = detectTaskIntent(messages);
+    const isTaskCreation = detectTaskIntent(safeMessages);
     if (isTaskCreation) {
       const taskSystemPrompt = `${fullSystemPrompt}
 
@@ -953,7 +953,7 @@ A data de hoje é ${new Date().toISOString().split("T")[0]}.`;
         },
         body: JSON.stringify({
           model: "gpt-4o",
-          messages: [{ role: "system", content: taskSystemPrompt }, ...messages],
+          messages: [{ role: "system", content: taskSystemPrompt }, ...safeMessages],
         }),
       });
 
@@ -1005,7 +1005,7 @@ A data de hoje é ${new Date().toISOString().split("T")[0]}.`;
     }
 
     // Check for scheduling intent
-    const isScheduling = detectSchedulingIntent(messages);
+    const isScheduling = detectSchedulingIntent(safeMessages);
     if (isScheduling) {
       const schedulingSystemPrompt = `${SYSTEM_PROMPT}
 
@@ -1048,7 +1048,7 @@ ${dataContext}`;
         },
         body: JSON.stringify({
           model: "gpt-4o",
-          messages: [{ role: "system", content: schedulingSystemPrompt }, ...messages],
+          messages: [{ role: "system", content: schedulingSystemPrompt }, ...safeMessages],
         }),
       });
 
@@ -1108,7 +1108,7 @@ ${dataContext}`;
     }
 
     // Chat mode: choose model based on complexity or ads date queries
-    const isComplex = detectComplexQuery(messages);
+    const isComplex = detectComplexQuery(safeMessages);
     const hasDateRange = !!detectedDateRange;
     const model = (isComplex || hasDateRange) ? "gpt-4o" : "gpt-4o-mini";
     console.log(`Chat mode: using ${model} (complex=${isComplex}, dateRange=${hasDateRange})`);
@@ -1121,7 +1121,7 @@ ${dataContext}`;
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: "system", content: fullSystemPrompt }, ...messages],
+        messages: [{ role: "system", content: fullSystemPrompt }, ...safeMessages],
         stream: true,
       }),
     });
