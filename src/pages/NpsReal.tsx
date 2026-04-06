@@ -187,6 +187,7 @@ export default function NpsReal() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Comentário</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead>Ação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
