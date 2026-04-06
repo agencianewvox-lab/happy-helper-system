@@ -24,7 +24,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
   const { signOut } = useAuth();
-  const { isAdmin, gestorFilter, loading: profileLoading, profile } = useProfile();
+  const { isAdmin, isMaster, gestorFilter, loading: profileLoading, profile } = useProfile();
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
