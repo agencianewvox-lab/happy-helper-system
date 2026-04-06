@@ -983,7 +983,7 @@ Deno.serve(async (req) => {
           newDemandsToInsert.push({
             group_id: groupId,
             term: d.term,
-            requested_at: d.detected_at || new Date().toISOString(),
+            requested_at: d.requested_at || new Date().toISOString(),
             status: "pendente",
             resolved: false,
           });
