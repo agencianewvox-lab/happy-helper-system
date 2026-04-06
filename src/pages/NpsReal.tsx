@@ -35,6 +35,7 @@ interface GrupoInfo {
   nome: string;
   gestor_responsavel: string | null;
   categoria: string | null;
+  responsavel_master: string | null;
 }
 
 export default function NpsReal() {
