@@ -63,6 +63,12 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Load configurable prompts from DB
+    const { data: promptConfigs } = await supabase.from("ai_prompts_config").select("prompt_key, prompt_value");
+    const promptMap = new Map<string, string>();
+    for (const pc of (promptConfigs || [])) promptMap.set(pc.prompt_key, pc.prompt_value);
+    const DB_COACH_PROMPT = promptMap.get("cs_coach_nudge_prompt");
+
     // --- STEP 0: Load config ---
     const { data: configs } = await supabase.from("coach_config").select("*").limit(1);
     const config = configs?.[0];
