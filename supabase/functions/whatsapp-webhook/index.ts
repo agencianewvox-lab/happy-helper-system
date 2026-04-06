@@ -229,13 +229,31 @@ const AGENT_TOOLS = [
     type: "function",
     function: {
       name: "perguntar_detalhes",
-      description: "Envia uma pergunta de volta ao Alisson via WhatsApp para obter mais detalhes antes de executar uma ação. Use quando faltarem informações essenciais para completar uma tarefa.",
+      description: "Envia uma pergunta de volta ao usuário via WhatsApp para obter mais detalhes antes de executar uma ação. Use quando faltarem informações essenciais para completar uma tarefa.",
       parameters: {
         type: "object",
         properties: {
-          question: { type: "string", description: "A pergunta a ser enviada para o Alisson" }
+          question: { type: "string", description: "A pergunta a ser enviada" }
         },
         required: ["question"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "enviar_cutucada",
+      description: "Envia uma cutucada (nudge/lembrete) imediata para um membro da equipe via WhatsApp. Use quando pedirem para enviar cutucada, lembrar, cobrar, ou cutucar alguém da equipe. Pode ser sobre um cliente específico ou geral.",
+      parameters: {
+        type: "object",
+        properties: {
+          destinatario: { type: "string", description: "Nome do destinatário da cutucada (ex: Murilo Araújo, Netto Monge, Jader Costa, Priscilla)" },
+          mensagem_contexto: { type: "string", description: "Contexto ou motivo da cutucada (ex: 'tarefas pendentes', 'relatório atrasado', 'cliente esperando resposta')" },
+          group_name: { type: "string", description: "Nome do cliente/grupo relacionado (opcional)", nullable: true },
+          tipo: { type: "string", enum: ["pendencia_esquecida", "frt_alto", "grupo_parado", "geral", "tarefa_pendente"], description: "Tipo da cutucada" }
+        },
+        required: ["destinatario", "mensagem_contexto", "tipo"],
         additionalProperties: false,
       },
     },
@@ -278,12 +296,22 @@ async function handleAlissonAIReply(
       .select("*")
       .eq("resolved", false);
 
-    const [pendingResResult, ...conversasResults] = await Promise.all([
+    // Fetch recent coach messages for context about cutucadas
+    const coachMsgsPromise = supabase
+      .from("coach_messages")
+      .select("destinatario_nome, mensagem, tipo, group_id, enviada_em, resultado")
+      .eq("enviada", true)
+      .order("enviada_em", { ascending: false })
+      .limit(30);
+
+    const [pendingResResult, coachMsgsResult, ...conversasResults] = await Promise.all([
       pendingResPromise,
+      coachMsgsPromise,
       ...conversasPromises,
     ]);
 
     const pendingResolutions = pendingResResult.data || [];
+    const recentCoachMsgs = coachMsgsResult.data || [];
     const groupMsgsMap = new Map<string, any[]>();
     for (let i = 0; i < groupIds.length; i++) {
       groupMsgsMap.set(groupIds[i], conversasResults[i].data || []);
@@ -463,20 +491,28 @@ SUAS CAPACIDADES COMO AGENTE:
 
 8. RECOMENDAÇÕES PROATIVAS — Ações prioritárias com QUEM deve fazer, PARA QUAL cliente, e POR QUÊ.
 
+9. ENVIAR CUTUCADA — Quando Alisson pedir para cutucar, lembrar, cobrar ou enviar cutucada para alguém da equipe, use "enviar_cutucada". A cutucada será enviada IMEDIATAMENTE via WhatsApp para a pessoa.
+
 REGRAS:
 - Responda DIRETO e CONCISO (máximo 400 palavras) — é WhatsApp
 - Use emojis com moderação: 🔴 crítico, 🟡 atenção, 🟢 ok, ⚡ urgente, 📊 dados, 📋 tarefas
 - NUNCA invente dados. Se não tem, diga
 - Quando sugerir ações, diga QUEM da equipe deve fazer (use nomes)
 - Benchmarks: FRT ideal <30min, bom até 60, ruim >120. Churn <30 tranquilo, >60 ação necessária
-- Se Alisson der um COMANDO operacional explícito (ex: remover, excluir, apagar, limpar, criar, pausar), você DEVE executar a ação correspondente pela ferramenta correta em vez de reinterpretar como sugestão
+- Se Alisson der um COMANDO operacional explícito (ex: remover, excluir, apagar, limpar, criar, pausar, cutucar, cutucada), você DEVE executar a ação correspondente pela ferramenta correta em vez de reinterpretar como sugestão
 - Se Alisson pedir para remover algo do quadro, use remover_pendencias ou remover_tarefas; NÃO crie novos itens para simular a remoção
 - Se Alisson falar algo sem contexto claro, tente inferir ou pergunte usando a ferramenta
 - Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
+- Quando perguntarem sobre cutucadas (planejamento, histórico, próximas), consulte o histórico de cutucadas abaixo para responder com precisão
 
 DADOS DA OPERAÇÃO EM TEMPO REAL (${grupos.length} grupos, ${totalMsgs} mensagens, ${adsDataMap.size} contas de ads):
 
-${contextLines.join("\n\n")}`;
+${contextLines.join("\n\n")}
+
+HISTÓRICO DE CUTUCADAS RECENTES (últimas 30):
+${recentCoachMsgs.map((m: any) => `- [${m.enviada_em}] Para: ${m.destinatario_nome} | Tipo: ${m.tipo}${m.group_id ? ` | Cliente: ${grupos.find((g: any) => g.group_id === m.group_id)?.nome || m.group_id}` : ""} | Status: ${m.resultado || "enviada"} | Msg: "${m.mensagem?.slice(0, 80)}"`).join("\n") || "Nenhuma cutucada recente."}
+
+NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercial (08:30-17:30, seg-sex). Você também pode enviar cutucadas manuais sob demanda usando a ferramenta "enviar_cutucada".`;
 
     // Build messages array with conversation history
     const aiMessages: any[] = [
@@ -669,10 +705,89 @@ ${contextLines.join("\n\n")}`;
         aiReply = args.question;
         console.log("AI asking follow-up question:", args.question);
       }
+
+      if (fnName === "enviar_cutucada") {
+        // Find the webhook for the target person
+        const targetName = args.destinatario;
+        const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+          targetName.toLowerCase().includes(key.toLowerCase()) ||
+          key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
+        )?.[1];
+
+        if (!targetWebhookUrl) {
+          toolResults.push(`❌ Não encontrei webhook para "${targetName}". Pessoas disponíveis: ${Object.keys(TEAM_WEBHOOK_MAP).join(", ")}`);
+        } else {
+          // Find matched group if specified
+          let matchedGroup: any = null;
+          if (args.group_name) {
+            matchedGroup = grupos.find((g: any) =>
+              g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+              args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+            );
+          }
+
+          // Generate cutucada message with AI
+          const firstName = targetName.split(" ")[0];
+          const OPENAI_API_KEY_COACH = Deno.env.get("openai");
+          const lovableKeyCoach = Deno.env.get("LOVABLE_API_KEY");
+          const coachAiUrl = lovableKeyCoach
+            ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+            : "https://api.openai.com/v1/chat/completions";
+          const coachAiKey = lovableKeyCoach || OPENAI_API_KEY_COACH;
+
+          let cutucadaMsg = "";
+          try {
+            const coachResp = await fetch(coachAiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${coachAiKey}` },
+              body: JSON.stringify({
+                model: lovableKeyCoach ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                messages: [
+                  { role: "system", content: `Você é a Vox, coach de CS da agência New Vox. Gere uma mensagem curta e direta de cutucada para ${firstName} via WhatsApp. Tom de colega gente boa, informal, incentivador. Máximo 300 caracteres. Adicione "(responda 👍 se já fez)" no final.` },
+                  { role: "user", content: `Cutucada para ${firstName}: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
+                ],
+                max_tokens: 200,
+              }),
+            });
+            if (coachResp.ok) {
+              const coachData = await coachResp.json();
+              cutucadaMsg = coachData.choices?.[0]?.message?.content?.trim() || "";
+            }
+          } catch (e) {
+            console.error("Error generating cutucada:", e);
+          }
+
+          if (!cutucadaMsg) {
+            cutucadaMsg = `E aí ${firstName}! 👋 ${args.mensagem_contexto}${matchedGroup ? ` (${matchedGroup.nome})` : ""}. Bora resolver isso? (responda 👍 se já fez)`;
+          }
+
+          // Send via webhook
+          try {
+            const encodedMsg = encodeURIComponent(cutucadaMsg);
+            const sendResp = await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
+            console.log(`Cutucada sent to ${targetName}: ${sendResp.status}`);
+
+            // Save to coach_messages
+            await supabase.from("coach_messages").insert({
+              destinatario_nome: targetName,
+              mensagem: cutucadaMsg,
+              tipo: args.tipo || "geral",
+              group_id: matchedGroup?.group_id || null,
+              enviada: true,
+              enviada_em: new Date().toISOString(),
+            });
+
+            toolResults.push(`✅ Cutucada enviada para ${targetName}! Mensagem: "${cutucadaMsg.slice(0, 80)}..."`);
+          } catch (e) {
+            console.error(`Failed to send cutucada to ${targetName}:`, e);
+            toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
+          }
+        }
+      }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
@@ -948,8 +1063,9 @@ async function handleTeamCoachReply(
 SUAS CAPACIDADES COMO AGENTE:
 - Você pode CRIAR pendências e tarefas para qualquer membro da equipe quando ${firstName} pedir
 - Você pode REMOVER pendências e tarefas do quadro quando ${firstName} pedir
+- Você pode ENVIAR CUTUCADAS (nudges) para qualquer membro da equipe quando ${firstName} pedir — use "enviar_cutucada"
 - Se faltar informação, pergunte antes de agir
-- Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar), EXECUTE usando as ferramentas disponíveis`;
+- Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar, cutucar, cutucada, lembrar, cobrar), EXECUTE usando as ferramentas disponíveis`;
     }
 
     const systemPrompt = `Você é a Vox, analista sênior de CS da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp.
@@ -1110,10 +1226,72 @@ ${coachContext || "Nenhuma cutucada recente."}`;
         if (fnName === "perguntar_detalhes") {
           reply = args.question;
         }
+
+        if (fnName === "enviar_cutucada") {
+          const targetName = args.destinatario;
+          const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+            targetName.toLowerCase().includes(key.toLowerCase()) ||
+            key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
+          )?.[1];
+
+          if (!targetWebhookUrl) {
+            toolResults.push(`❌ Não encontrei webhook para "${targetName}".`);
+          } else {
+            let matchedGroup: any = null;
+            if (args.group_name) {
+              matchedGroup = allGroups.find((g: any) =>
+                g.nome.toLowerCase().includes(args.group_name.toLowerCase())
+              );
+            }
+
+            const targetFirstName = targetName.split(" ")[0];
+            let cutucadaMsg = "";
+            try {
+              const coachResp = await fetch(aiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
+                body: JSON.stringify({
+                  model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                  messages: [
+                    { role: "system", content: `Você é a Vox, coach de CS. Gere uma cutucada curta para ${targetFirstName}. Tom amigável. Máx 300 chars. Termine com "(responda 👍 se já fez)".` },
+                    { role: "user", content: `Cutucada: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
+                  ],
+                  max_tokens: 200,
+                }),
+              });
+              if (coachResp.ok) {
+                const coachData = await coachResp.json();
+                cutucadaMsg = coachData.choices?.[0]?.message?.content?.trim() || "";
+              }
+            } catch (e) {
+              console.error("Error generating cutucada:", e);
+            }
+
+            if (!cutucadaMsg) {
+              cutucadaMsg = `E aí ${targetFirstName}! 👋 ${args.mensagem_contexto}. Bora resolver? (responda 👍 se já fez)`;
+            }
+
+            try {
+              const encodedMsg = encodeURIComponent(cutucadaMsg);
+              await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
+              await supabase.from("coach_messages").insert({
+                destinatario_nome: targetName,
+                mensagem: cutucadaMsg,
+                tipo: args.tipo || "geral",
+                group_id: matchedGroup?.group_id || null,
+                enviada: true,
+                enviada_em: new Date().toISOString(),
+              });
+              toolResults.push(`✅ Cutucada enviada para ${targetName}!`);
+            } catch (e) {
+              toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
+            }
+          }
+        }
       }
 
       // Follow-up with tool results
-      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas"].includes(tc.function?.name))) {
+      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada"].includes(tc.function?.name))) {
         const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
           role: "tool",
           tool_call_id: tc.id,
