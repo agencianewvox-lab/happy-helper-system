@@ -403,10 +403,15 @@ Deno.serve(async (req) => {
       contextLines.push(line);
     }
 
+    const coachHistoryContext = recentCoachMsgs.length > 0
+      ? `\n\nHISTÓRICO DE CUTUCADAS RECENTES (últimas 30):\n${recentCoachMsgs.map((m: any) => `- [${m.enviada_em}] Para: ${m.destinatario_nome} | Tipo: ${m.tipo}${m.group_id ? ` | Cliente: ${grupos.find((g: any) => g.group_id === m.group_id)?.nome || m.group_id}` : ""} | Status: ${m.resultado || "enviada"} | Msg: "${m.mensagem?.slice(0, 80)}"`).join("\n")}\n\nNOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercial (08:30-17:30, seg-sex). Você também pode enviar cutucadas manuais sob demanda quando o usuário pedir.`
+      : "";
+
     const dataContext = `
 DADOS DA OPERAÇÃO (${grupos.length} grupos, ${totalMsgs} mensagens analisadas, ${adsDataMap.size} contas de ads com dados):
 
 ${contextLines.join("\n")}
+${coachHistoryContext}
 `;
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
