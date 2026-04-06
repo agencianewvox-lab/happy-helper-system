@@ -721,11 +721,11 @@ async function detectIntentWithAI(groupConversations: Map<string, any[]>, apiKey
     const batch = contextParts.slice(i, i + BATCH_SIZE);
     const conversationText = batch.map(b => b.text).join("\n\n");
     try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: INTENT_DETECTION_PROMPT },
             { role: "user", content: `Classifique a intenção de cada grupo:\n\n${conversationText}` },
