@@ -165,7 +165,7 @@ export default function Dashboard() {
   return (
     <SidebarProvider defaultOpen={false}>
       <div className="min-h-screen flex w-full bg-background">
-        <DashboardSidebar isAdmin={isAdmin} onSignOut={signOut} />
+        <DashboardSidebar isAdmin={isAdmin} isMaster={isMaster} onSignOut={signOut} />
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-40">
