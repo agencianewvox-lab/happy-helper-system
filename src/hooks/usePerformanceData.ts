@@ -164,9 +164,21 @@ export function usePerformanceData(period: string) {
       .map(([date, d]) => ({ date, score: Number((d.sum / d.count).toFixed(1)) }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Tasks
+    // Tasks - only count as completed by this gestor if they actually completed it
     const clientTasks = tasks.filter(t => clientIds.has(t.group_id));
-    const tasksCompleted = clientTasks.filter(t => t.status === "concluida" || t.status === "concluída").length;
+    const tasksCompleted = gestorName
+      ? clientTasks.filter(t => {
+          const isCompleted = t.status === "concluida" || t.status === "concluída" || t.status === "feito";
+          if (!isCompleted) return false;
+          // If completed_by is set, check if this gestor actually completed it
+          if (t.completed_by) {
+            const completedByGestor = userIdToGestorName[t.completed_by];
+            return completedByGestor === gestorName;
+          }
+          // Legacy: no completed_by, attribute to assigned person
+          return true;
+        }).length
+      : clientTasks.filter(t => t.status === "concluida" || t.status === "concluída" || t.status === "feito").length;
     const tasksTotal = clientTasks.length;
 
     // Tasks Evolution
@@ -175,16 +187,34 @@ export function usePerformanceData(period: string) {
       const date = t.created_at.substring(0, 10);
       const entry = taskDateMap.get(date) || { completed: 0, total: 0 };
       entry.total++;
-      if (t.status === "concluida" || t.status === "concluída") entry.completed++;
+      const isCompleted = t.status === "concluida" || t.status === "concluída" || t.status === "feito";
+      if (isCompleted) {
+        if (gestorName && t.completed_by) {
+          const completedByGestor = userIdToGestorName[t.completed_by];
+          if (completedByGestor === gestorName) entry.completed++;
+        } else if (!gestorName || !t.completed_by) {
+          entry.completed++;
+        }
+      }
       taskDateMap.set(date, entry);
     }
     const tasksEvolution = Array.from(taskDateMap.entries())
       .map(([date, d]) => ({ date, ...d }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Pending Demands
+    // Pending Demands - only count as resolved by this gestor if they actually resolved it
     const clientPending = pendingDemands.filter(p => clientIds.has(p.group_id));
-    const pendingResolved = clientPending.filter(p => p.resolved).length;
+    const pendingResolved = gestorName
+      ? clientPending.filter(p => {
+          if (!p.resolved) return false;
+          if (p.resolved_by) {
+            const resolvedByGestor = userIdToGestorName[p.resolved_by];
+            return resolvedByGestor === gestorName;
+          }
+          // Legacy: no resolved_by, attribute to assigned gestor
+          return true;
+        }).length
+      : clientPending.filter(p => p.resolved).length;
     const pendingTotal = clientPending.length;
 
     // Pending Evolution
