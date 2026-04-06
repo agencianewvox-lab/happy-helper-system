@@ -484,8 +484,6 @@ ${coachHistoryContext}
 
     const fullSystemPrompt = SYSTEM_PROMPT + "\n\n" + dataContext;
 
-    const detectedDateRange = detectDateRangeFromMessages(messages);
-
     if (detectExactAdsSpendQuery(messages) && detectedDateRange) {
       const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
       const userText = lastUser?.content?.toLowerCase() || "";
