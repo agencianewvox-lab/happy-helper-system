@@ -1472,6 +1472,8 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
     };
 
+    let aiData: any = null;
+
     const aiResp = await fetch(aiUrl, {
       method: "POST",
       headers: {
@@ -1481,10 +1483,12 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       body: JSON.stringify(requestBody),
     });
 
-    if (!aiResp.ok) {
+    if (aiResp.ok) {
+      aiData = await aiResp.json();
+    } else {
       const errText = await aiResp.text();
       console.error("AI error for team reply:", errText);
-      // Fallback to OpenAI if Lovable AI failed and OpenAI is available
+      // Fallback to OpenAI if Lovable AI failed
       if (lovableKey && openaiKey) {
         console.log(`Falling back to OpenAI for ${firstName}`);
         requestBody.model = "gpt-4o-mini";
@@ -1493,22 +1497,18 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
           body: JSON.stringify(requestBody),
         });
-        if (!fallbackResp.ok) {
+        if (fallbackResp.ok) {
+          aiData = await fallbackResp.json();
+        } else {
           console.error("OpenAI fallback also failed:", await fallbackResp.text());
           return;
         }
-        const fallbackData = await fallbackResp.json();
-        const fallbackChoice = fallbackData.choices?.[0];
-        if (!fallbackChoice) return;
-        // Continue with fallback data below
-        Object.assign(aiResp, { _fallbackData: fallbackData });
       } else {
         return;
       }
     }
 
-    const aiData = await aiResp.json();
-    const choice = aiData.choices?.[0];
+    const choice = aiData?.choices?.[0];
     if (!choice) return;
 
     let reply = choice.message?.content?.trim() || "";
