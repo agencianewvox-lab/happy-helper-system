@@ -327,6 +327,44 @@ async function fetchMetaAdsForAccount(accountId: string, token: string, datePres
   }
 }
 
+// Feedback analysis tools (available to ALL team members)
+const FEEDBACK_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "salvar_nota_cliente",
+      description: "Salva uma nota no card do cliente quando o membro da equipe relata algo relevante feito para aquele cliente (ex: subiu campanha nova, fez reunião, ajustou anúncios, resolveu problema). Use SEMPRE que a mensagem mencionar uma ação específica feita para um cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          group_name: { type: "string", description: "Nome do grupo/cliente mencionado" },
+          note_content: { type: "string", description: "Conteúdo da nota descrevendo o que foi feito. Escreva em terceira pessoa (ex: 'Priscilla subiu estrutura nova de anúncios')" },
+        },
+        required: ["group_name", "note_content"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_feedback",
+      description: "Registra um feedback ou informação do membro da equipe para contexto geral da Vox. Use para qualquer informação que não seja diretamente uma ação em um cliente mas que enriquece o contexto (ex: 'hoje foi corrido', 'estou focado em prospecção', comentários gerais sobre o dia).",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["acao_cliente", "feedback_dia", "insight", "geral"], description: "Categoria do feedback" },
+          message_summary: { type: "string", description: "Resumo do que foi dito" },
+          group_name: { type: "string", description: "Nome do cliente se mencionado (opcional)", nullable: true },
+          relevance: { type: "string", enum: ["low", "medium", "high"], description: "Relevância da informação" },
+        },
+        required: ["category", "message_summary", "relevance"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 // OpenAI tools for the WhatsApp agent
 const AGENT_TOOLS = [
   {
@@ -451,6 +489,8 @@ const AGENT_TOOLS = [
       },
     },
   },
+  // Include feedback tools in the agent tools too
+  ...FEEDBACK_TOOLS,
 ];
 
 /**
@@ -1015,10 +1055,48 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           }
         }
       }
+
+      // Handle salvar_nota_cliente
+      if (fnName === "salvar_nota_cliente") {
+        const matchedGroup = grupos.find((g: any) =>
+          g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+          args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+        );
+        if (matchedGroup) {
+          const { error: noteErr } = await supabase.from("client_notes").insert({
+            group_id: matchedGroup.group_id,
+            content: args.note_content,
+            author_name: "Vox (via feedback)",
+          });
+          if (!noteErr) {
+            toolResults.push(`✅ Nota salva no card de ${matchedGroup.nome}`);
+          } else {
+            toolResults.push(`❌ Erro ao salvar nota: ${noteErr.message}`);
+          }
+        } else {
+          toolResults.push(`⚠️ Cliente "${args.group_name}" não encontrado para salvar nota.`);
+        }
+      }
+
+      // Handle registrar_feedback
+      if (fnName === "registrar_feedback") {
+        const matchedGroup = args.group_name ? grupos.find((g: any) =>
+          g.nome.toLowerCase().includes(args.group_name.toLowerCase())
+        ) : null;
+        await supabase.from("team_feedback_log").insert({
+          member_name: "Alisson Lima",
+          message: args.message_summary,
+          category: args.category || "geral",
+          group_id: matchedGroup?.group_id || null,
+          group_name: matchedGroup?.nome || args.group_name || null,
+          relevance: args.relevance || "low",
+        });
+        toolResults.push(`✅ Feedback registrado.`);
+      }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
@@ -1311,21 +1389,43 @@ async function handleTeamCoachReply(
       ? "todos os clientes da agência (acesso total como sócia/proprietária)"
       : `seus clientes como gestor(a) (${allGroups.length} clientes)`;
 
-    // Priscilla (sócia) gets tool-calling capabilities like Alisson
+    // Priscilla (sócia) gets full agent capabilities like Alisson
     const isOwner = firstName.toLowerCase().startsWith("prisc");
 
-    let toolsPromptSection = "";
+    // Fetch recent team feedback for this member for context
+    const { data: recentFeedback } = await supabase
+      .from("team_feedback_log")
+      .select("message, category, group_name, created_at")
+      .eq("member_name", teamWebhook.name)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const feedbackContext = (recentFeedback || [])
+      .map((f: any) => `[${f.created_at?.slice(0, 10)}] ${f.category}: ${f.message}${f.group_name ? ` (${f.group_name})` : ""}`)
+      .reverse()
+      .join("\n");
+
+    let toolsPromptSection = `
+CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
+- Quando ${firstName} mencionar algo que FEZ para um cliente (subiu campanha, ajustou anúncio, fez reunião, resolveu problema, criou arte, etc.), use "salvar_nota_cliente" para registrar no card do cliente
+- Quando ${firstName} compartilhar informações gerais sobre o dia, contexto de trabalho, ou insights, use "registrar_feedback" para armazenar o contexto
+- Você pode usar AMBAS as ferramentas na mesma resposta se necessário
+- SEMPRE confirme o que registrou na resposta de forma natural`;
+
     if (isOwner) {
-      toolsPromptSection = `
-SUAS CAPACIDADES COMO AGENTE:
+      toolsPromptSection += `
 - Você pode CRIAR pendências e tarefas para qualquer membro da equipe quando ${firstName} pedir
 - Você pode REMOVER pendências e tarefas do quadro quando ${firstName} pedir
 - Você pode ENVIAR CUTUCADAS (nudges) para qualquer membro da equipe quando ${firstName} pedir — use "enviar_cutucada"
 - Se faltar informação, pergunte antes de agir
 - Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar, cutucar, cutucada, lembrar, cobrar), EXECUTE usando as ferramentas disponíveis`;
+    } else {
+      toolsPromptSection += `
+- ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa"
+- Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem`;
     }
 
-    const systemPrompt = `Você é a Vox, analista sênior de CS da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp.
+    const systemPrompt = `Você é a Vox, analista sênior de CS e assistente pessoal da equipe da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp. Você é uma colega de trabalho inteligente, prestativa e proativa.
 
 EQUIPE NEW VOX:
 - Jader Costa: Gestor de tráfego
@@ -1337,23 +1437,28 @@ EQUIPE NEW VOX:
 - Thais: Auxiliar de social media
 - Victor Botto: Design gráfico
 - Jiza Reis: Financeiro
+${toolsPromptSection}
 
 REGRAS:
-- Tom: colega de trabalho gente boa, profissional, direto
+- Tom: colega de trabalho gente boa, profissional, direto, informal
 - Respostas concisas (máx 500 caracteres) mas completas
 - Use emojis com moderação
 - Responda em português brasileiro natural
 - ${firstName} tem acesso a ${accessScope}
-- Responda APENAS sobre os clientes listados abaixo. Se perguntar sobre algo fora do escopo, diga que não tem acesso a esses dados.
-- IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO nos dados abaixo, use EXATAMENTE esses valores. NUNCA estime ou arredonde. Mencione o período exato na resposta.
+- Responda QUALQUER pergunta que ${firstName} fizer sobre os clientes, operação, dados, etc. Seja útil!
+- Se ${firstName} perguntar "algum outro grupo?" ou algo similar, entenda como "tem algum grupo/cliente que precisa de atenção?" e responda com dados reais
+- Quando ${firstName} contar como foi o dia ou o que fez, REGISTRE usando as ferramentas e RESPONDA de forma encorajadora
+- IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO, use EXATAMENTE esses valores
 - Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
-${toolsPromptSection}
 
 CONTEXTO DOS CLIENTES:
 ${contextLines.join("\n\n") || "Nenhum cliente encontrado."}
 
 CUTUCADAS RECENTES ENVIADAS:
-${coachContext || "Nenhuma cutucada recente."}`;
+${coachContext || "Nenhuma cutucada recente."}
+
+HISTÓRICO DE FEEDBACK DE ${firstName.toUpperCase()}:
+${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
     const aiMessages: any[] = [
       { role: "system", content: systemPrompt },
@@ -1363,15 +1468,9 @@ ${coachContext || "Nenhuma cutucada recente."}`;
     const requestBody: any = {
       model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
       messages: aiMessages,
-      max_tokens: isOwner ? 1500 : 400,
+      max_tokens: 1500,
+      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
     };
-
-    // Add tools for Priscilla
-    if (isOwner) {
-      requestBody.tools = AGENT_TOOLS;
-      // Use a more capable model for tool calling
-      requestBody.model = lovableKey ? "google/gemini-2.5-flash" : "gpt-4o";
-    }
 
     const aiResp = await fetch(aiUrl, {
       method: "POST",
@@ -1394,8 +1493,8 @@ ${coachContext || "Nenhuma cutucada recente."}`;
     let reply = choice.message?.content?.trim() || "";
     const toolCalls = choice.message?.tool_calls || [];
 
-    // Process tool calls for Priscilla (same logic as Alisson)
-    if (isOwner && toolCalls.length > 0) {
+    // Process tool calls for all team members
+    if (toolCalls.length > 0) {
       const toolResults: string[] = [];
       for (const tc of toolCalls) {
         const fnName = tc.function?.name;
@@ -1548,8 +1647,42 @@ ${coachContext || "Nenhuma cutucada recente."}`;
         }
       }
 
+      // Handle salvar_nota_cliente
+      if (fnName === "salvar_nota_cliente") {
+        const matchedGroup = allGroups.find((g: any) =>
+          g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+          args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+        );
+        if (matchedGroup) {
+          const { error: noteErr } = await supabase.from("client_notes").insert({
+            group_id: matchedGroup.group_id,
+            content: args.note_content,
+            author_name: `Vox (via ${firstName})`,
+          });
+          toolResults.push(noteErr ? `❌ Erro ao salvar nota: ${noteErr.message}` : `✅ Nota salva no card de ${matchedGroup.nome}`);
+        } else {
+          toolResults.push(`⚠️ Cliente "${args.group_name}" não encontrado para salvar nota.`);
+        }
+      }
+
+      // Handle registrar_feedback
+      if (fnName === "registrar_feedback") {
+        const matchedGroup = args.group_name ? allGroups.find((g: any) =>
+          g.nome.toLowerCase().includes(args.group_name.toLowerCase())
+        ) : null;
+        await supabase.from("team_feedback_log").insert({
+          member_name: teamWebhook.name,
+          message: args.message_summary,
+          category: args.category || "geral",
+          group_id: matchedGroup?.group_id || null,
+          group_name: matchedGroup?.nome || args.group_name || null,
+          relevance: args.relevance || "low",
+        });
+        toolResults.push(`✅ Feedback registrado.`);
+      }
+
       // Follow-up with tool results
-      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada"].includes(tc.function?.name))) {
+      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback"].includes(tc.function?.name))) {
         const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
           role: "tool",
           tool_call_id: tc.id,
