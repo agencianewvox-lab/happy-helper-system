@@ -595,6 +595,42 @@ export type Database = {
         }
         Relationships: []
       }
+      system_configs: {
+        Row: {
+          config_category: string
+          config_key: string
+          config_label: string
+          config_type: string
+          config_value: string
+          description: string | null
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config_category?: string
+          config_key: string
+          config_label: string
+          config_type?: string
+          config_value: string
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config_category?: string
+          config_key?: string
+          config_label?: string
+          config_type?: string
+          config_value?: string
+          description?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assigned_to: string

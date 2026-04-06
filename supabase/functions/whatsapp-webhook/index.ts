@@ -522,6 +522,22 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "editar_config_sistema",
+      description: "Edita uma configuração/regra do sistema (SLA, sentimento, churn, FRT, prioridade, filtros, equipe, etc). Use quando Alisson pedir para mudar qualquer parâmetro, limiar, peso, tempo, regra ou configuração operacional do sistema. Exemplos: mudar tempo de SLA, alterar peso de sentimento, mudar limiar de churn, adicionar palavras-chave, etc. SOMENTE Alisson pode usar.",
+      parameters: {
+        type: "object",
+        properties: {
+          config_key: { type: "string", description: "Chave da configuração (ex: sla_response_minutes, sentiment_critical_weight, churn_label_critico, frt_excellent_max, priority_churn_threshold, team_members, sentiment_critical_terms, etc). Se não souber a chave exata, use a mais próxima." },
+          new_value: { type: "string", description: "Novo valor da configuração" },
+        },
+        required: ["config_key", "new_value"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
@@ -1173,10 +1189,43 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           }
         }
       }
+
+      // Handle editar_config_sistema (ONLY for Alisson)
+      if (fnName === "editar_config_sistema") {
+        const { config_key, new_value } = args;
+        // Try to find and update config
+        const { data: existing } = await supabase
+          .from("system_configs")
+          .select("id, config_label")
+          .eq("config_key", config_key)
+          .maybeSingle();
+
+        if (existing) {
+          const { error: updateErr } = await supabase
+            .from("system_configs")
+            .update({
+              config_value: new_value,
+              updated_at: new Date().toISOString(),
+              updated_by: "Alisson Lima (via WhatsApp)",
+            })
+            .eq("config_key", config_key);
+
+          if (updateErr) {
+            toolResults.push(`❌ Erro ao editar config: ${updateErr.message}`);
+          } else {
+            toolResults.push(`✅ Configuração "${existing.config_label}" (${config_key}) atualizada para: ${new_value}`);
+          }
+        } else {
+          // List available keys to help
+          const { data: allKeys } = await supabase.from("system_configs").select("config_key, config_label").limit(50);
+          const keyList = (allKeys || []).map((k: any) => `${k.config_key} (${k.config_label})`).join(", ");
+          toolResults.push(`⚠️ Chave "${config_key}" não encontrada. Chaves disponíveis: ${keyList}`);
+        }
+      }
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "editar_prompt"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "editar_prompt", "editar_config_sistema"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
