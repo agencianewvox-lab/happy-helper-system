@@ -1389,21 +1389,43 @@ async function handleTeamCoachReply(
       ? "todos os clientes da agência (acesso total como sócia/proprietária)"
       : `seus clientes como gestor(a) (${allGroups.length} clientes)`;
 
-    // Priscilla (sócia) gets tool-calling capabilities like Alisson
+    // Priscilla (sócia) gets full agent capabilities like Alisson
     const isOwner = firstName.toLowerCase().startsWith("prisc");
 
-    let toolsPromptSection = "";
+    // Fetch recent team feedback for this member for context
+    const { data: recentFeedback } = await supabase
+      .from("team_feedback_log")
+      .select("message, category, group_name, created_at")
+      .eq("member_name", teamWebhook.name)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    const feedbackContext = (recentFeedback || [])
+      .map((f: any) => `[${f.created_at?.slice(0, 10)}] ${f.category}: ${f.message}${f.group_name ? ` (${f.group_name})` : ""}`)
+      .reverse()
+      .join("\n");
+
+    let toolsPromptSection = `
+CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
+- Quando ${firstName} mencionar algo que FEZ para um cliente (subiu campanha, ajustou anúncio, fez reunião, resolveu problema, criou arte, etc.), use "salvar_nota_cliente" para registrar no card do cliente
+- Quando ${firstName} compartilhar informações gerais sobre o dia, contexto de trabalho, ou insights, use "registrar_feedback" para armazenar o contexto
+- Você pode usar AMBAS as ferramentas na mesma resposta se necessário
+- SEMPRE confirme o que registrou na resposta de forma natural`;
+
     if (isOwner) {
-      toolsPromptSection = `
-SUAS CAPACIDADES COMO AGENTE:
+      toolsPromptSection += `
 - Você pode CRIAR pendências e tarefas para qualquer membro da equipe quando ${firstName} pedir
 - Você pode REMOVER pendências e tarefas do quadro quando ${firstName} pedir
 - Você pode ENVIAR CUTUCADAS (nudges) para qualquer membro da equipe quando ${firstName} pedir — use "enviar_cutucada"
 - Se faltar informação, pergunte antes de agir
 - Se ${firstName} der um COMANDO operacional (criar, remover, excluir, apagar, cutucar, cutucada, lembrar, cobrar), EXECUTE usando as ferramentas disponíveis`;
+    } else {
+      toolsPromptSection += `
+- ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa"
+- Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem`;
     }
 
-    const systemPrompt = `Você é a Vox, analista sênior de CS da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp.
+    const systemPrompt = `Você é a Vox, analista sênior de CS e assistente pessoal da equipe da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp. Você é uma colega de trabalho inteligente, prestativa e proativa.
 
 EQUIPE NEW VOX:
 - Jader Costa: Gestor de tráfego
@@ -1415,23 +1437,28 @@ EQUIPE NEW VOX:
 - Thais: Auxiliar de social media
 - Victor Botto: Design gráfico
 - Jiza Reis: Financeiro
+${toolsPromptSection}
 
 REGRAS:
-- Tom: colega de trabalho gente boa, profissional, direto
+- Tom: colega de trabalho gente boa, profissional, direto, informal
 - Respostas concisas (máx 500 caracteres) mas completas
 - Use emojis com moderação
 - Responda em português brasileiro natural
 - ${firstName} tem acesso a ${accessScope}
-- Responda APENAS sobre os clientes listados abaixo. Se perguntar sobre algo fora do escopo, diga que não tem acesso a esses dados.
-- IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO nos dados abaixo, use EXATAMENTE esses valores. NUNCA estime ou arredonde. Mencione o período exato na resposta.
+- Responda QUALQUER pergunta que ${firstName} fizer sobre os clientes, operação, dados, etc. Seja útil!
+- Se ${firstName} perguntar "algum outro grupo?" ou algo similar, entenda como "tem algum grupo/cliente que precisa de atenção?" e responda com dados reais
+- Quando ${firstName} contar como foi o dia ou o que fez, REGISTRE usando as ferramentas e RESPONDA de forma encorajadora
+- IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO, use EXATAMENTE esses valores
 - Formate para WhatsApp (texto simples, sem markdown complexo, use * para negrito)
-${toolsPromptSection}
 
 CONTEXTO DOS CLIENTES:
 ${contextLines.join("\n\n") || "Nenhum cliente encontrado."}
 
 CUTUCADAS RECENTES ENVIADAS:
-${coachContext || "Nenhuma cutucada recente."}`;
+${coachContext || "Nenhuma cutucada recente."}
+
+HISTÓRICO DE FEEDBACK DE ${firstName.toUpperCase()}:
+${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
     const aiMessages: any[] = [
       { role: "system", content: systemPrompt },
@@ -1441,15 +1468,9 @@ ${coachContext || "Nenhuma cutucada recente."}`;
     const requestBody: any = {
       model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
       messages: aiMessages,
-      max_tokens: isOwner ? 1500 : 400,
+      max_tokens: 1500,
+      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
     };
-
-    // Add tools for Priscilla
-    if (isOwner) {
-      requestBody.tools = AGENT_TOOLS;
-      // Use a more capable model for tool calling
-      requestBody.model = lovableKey ? "google/gemini-2.5-flash" : "gpt-4o";
-    }
 
     const aiResp = await fetch(aiUrl, {
       method: "POST",
