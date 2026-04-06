@@ -97,6 +97,135 @@ function shouldRespondToMessage(text: string): boolean {
   return true;
 }
 
+// ===== DATE RANGE DETECTION & DETERMINISTIC ADS RESPONSE =====
+
+type DateRangeInfo = {
+  since: string;
+  until: string;
+  explicitYear: boolean;
+  startDay: string;
+  startMonth: string;
+  endDay: string;
+  endMonth: string;
+};
+
+function buildDateRangeForYear(range: DateRangeInfo, year: number) {
+  return {
+    since: `${year}-${range.startMonth}-${range.startDay}`,
+    until: `${year}-${range.endMonth}-${range.endDay}`,
+  };
+}
+
+function detectDateRangeInfo(text: string): DateRangeInfo | null {
+  const rangeMatch = text.match(/(?:entre\s+)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|e|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (rangeMatch) {
+    const now = new Date();
+    const explicitYear = !!(rangeMatch[3] || rangeMatch[6]);
+    const resolvedYear1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
+    const resolvedYear2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
+    const startDay = rangeMatch[1].padStart(2, "0");
+    const startMonth = rangeMatch[2].padStart(2, "0");
+    const endDay = rangeMatch[4].padStart(2, "0");
+    const endMonth = rangeMatch[5].padStart(2, "0");
+    return {
+      since: `${resolvedYear1}-${startMonth}-${startDay}`,
+      until: `${resolvedYear2}-${endMonth}-${endDay}`,
+      explicitYear, startDay, startMonth, endDay, endMonth,
+    };
+  }
+
+  const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (singleDayMatch) {
+    const now = new Date();
+    const explicitYear = !!singleDayMatch[3];
+    const resolvedYear = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
+    const day = singleDayMatch[1].padStart(2, "0");
+    const month = singleDayMatch[2].padStart(2, "0");
+    const date = `${resolvedYear}-${month}-${day}`;
+    return { since: date, until: date, explicitYear, startDay: day, startMonth: month, endDay: day, endMonth: month };
+  }
+
+  if (/\bhoje\b/i.test(text)) {
+    const today = new Date().toISOString().split("T")[0];
+    const [, month, day] = today.split("-");
+    return { since: today, until: today, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
+  }
+  if (/\bontem\b/i.test(text)) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    const [, month, day] = yesterday.split("-");
+    return { since: yesterday, until: yesterday, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
+  }
+  return null;
+}
+
+function normalizeGroupName(value: string) {
+  return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^nv\s*-\s*/i, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function isExactAdsSpendQuery(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "valor", "quanto", "quanto foi", "total", "meta ads", "ads"].some(k => lower.includes(k));
+  return hasAdsIntent && !!detectDateRangeInfo(text);
+}
+
+/**
+ * Try to answer an exact ads spend query deterministically. Returns the reply string or null if not applicable.
+ */
+async function tryExactAdsReply(
+  messageText: string,
+  grupos: any[],
+  metaToken: string
+): Promise<string | null> {
+  if (!isExactAdsSpendQuery(messageText)) return null;
+  const dateRangeInfo = detectDateRangeInfo(messageText);
+  if (!dateRangeInfo) return null;
+
+  const normalizedUserText = normalizeGroupName(messageText);
+  const matchedGroup = grupos.find((g: any) => {
+    const normalizedName = normalizeGroupName(g.nome || "");
+    return normalizedUserText.includes(normalizedName);
+  });
+
+  if (!matchedGroup || !matchedGroup.ad_account_id) {
+    if (matchedGroup) return `${matchedGroup.nome.replace(/^NV\s*-\s*/i, "")} não possui conta de Meta Ads vinculada.`;
+    return null; // let AI handle it
+  }
+
+  const formatPeriod = (since: string, until: string) => {
+    const formatOne = (v: string) => { const [y, m, d] = v.split("-"); return `${d}/${m}/${y}`; };
+    return `${formatOne(since)} a ${formatOne(until)}`;
+  };
+
+  let resolvedAds: any = null;
+  let resolvedRange = { since: dateRangeInfo.since, until: dateRangeInfo.until };
+
+  if (!dateRangeInfo.explicitYear) {
+    const currentYear = new Date().getFullYear();
+    const currentRange = buildDateRangeForYear(dateRangeInfo, currentYear);
+    const previousRange = buildDateRangeForYear(dateRangeInfo, currentYear - 1);
+    const [currentAds, previousAds] = await Promise.all([
+      fetchMetaAdsForAccount(matchedGroup.ad_account_id, metaToken, undefined, currentRange.since, currentRange.until),
+      fetchMetaAdsForAccount(matchedGroup.ad_account_id, metaToken, undefined, previousRange.since, previousRange.until),
+    ]);
+    const hasCurrentData = !!currentAds && currentAds.spend > 0;
+    const hasPreviousData = !!previousAds && previousAds.spend > 0;
+    if (hasCurrentData && hasPreviousData) {
+      return `Encontrei dados para mais de um ano no intervalo ${dateRangeInfo.startDay}/${dateRangeInfo.startMonth} a ${dateRangeInfo.endDay}/${dateRangeInfo.endMonth}. Para te responder com precisão, me diga se você quer ${currentYear} ou ${currentYear - 1}.`;
+    }
+    if (hasCurrentData) { resolvedAds = currentAds; resolvedRange = currentRange; }
+    else if (hasPreviousData) { resolvedAds = previousAds; resolvedRange = previousRange; }
+  } else {
+    resolvedAds = await fetchMetaAdsForAccount(matchedGroup.ad_account_id, metaToken, undefined, dateRangeInfo.since, dateRangeInfo.until);
+    resolvedRange = { since: dateRangeInfo.since, until: dateRangeInfo.until };
+  }
+
+  const clientName = matchedGroup.nome.replace(/^NV\s*-\s*/i, "").trim();
+  if (resolvedAds) {
+    return `O gasto total do Meta Ads de ${clientName} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)} foi de R$${resolvedAds.spend.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. (${resolvedAds.impressions} impressões, ${resolvedAds.clicks} cliques, CTR ${resolvedAds.ctr.toFixed(2)}%, ${resolvedAds.leads} leads${resolvedAds.cpa ? `, CPA R$${resolvedAds.cpa.toFixed(2)}` : ""})`;
+  }
+  return `Não encontrei dados de Meta Ads para ${clientName} no período de ${formatPeriod(resolvedRange.since, resolvedRange.until)}.`;
+}
+
 const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
