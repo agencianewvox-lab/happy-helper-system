@@ -10,29 +10,39 @@ import { toast } from "sonner";
 const WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/03f12fb5-48ed-4f30-8aaa-02a8912768e3";
 const PUBLISHED_APP_URL = "https://happy-helper-system.lovable.app";
 
-const MSG_OPERACAO = `Olá, [Nome]! Tudo bem?
-Aqui é da equipe da [Nome da Agência]. Trabalhamos todos os dias para entregar os melhores resultados para o seu negócio, e a sua opinião é fundamental para continuarmos evoluindo.
-Preparamos uma pesquisa rápida (leva menos de 2 minutos) para entender como está sendo a sua experiência conosco.
-👉 [Link da pesquisa]
-Sua resposta é muito importante para nós. Contamos com você!
-Um abraço,
-Equipe [Nome da Agência]`;
+const MSG_OPERACAO = `Olá, Time! Tudo bem?
 
-const MSG_CLINICA = `Olá, Dr(a). [Nome]! Tudo bem?
-Aqui é da equipe da [Nome da Agência]. É muito importante para nós saber como está sendo a sua experiência com as estratégias de marketing que desenvolvemos para a sua clínica.
-Preparamos uma pesquisa rápida (menos de 2 minutos) para ouvir a sua opinião e continuar entregando resultados cada vez melhores para o seu consultório.
+Trabalhamos todos os dias para entregar os melhores resultados para o seu negócio, e a sua opinião é fundamental para continuarmos evoluindo.
+
+Preparamos uma pesquisa rápida (leva menos de 2 minutos) para entender como está sendo a sua experiência conosco.
+
 👉 [Link da pesquisa]
+
+Sua resposta é muito importante para nós. Contamos com você!
+Um abraço
+
+Equipe New Vox 🚀`;
+
+const MSG_CLINICA = `Olá, Dr(a). [Nome do Responsável Master]! Tudo bem?
+Aqui é da equipe da New Vox. É muito importante para nós saber como está sendo a sua experiência com as estratégias de marketing que desenvolvemos para a sua clínica.
+
+Preparamos uma pesquisa rápida (menos de 2 minutos) para ouvir a sua opinião e continuar entregando resultados cada vez melhores para o seu consultório.
+
+👉 [Link da pesquisa]
+
 Sua avaliação nos ajuda a evoluir. Contamos com você!
-Um abraço,
-Equipe [Nome da Agência]`;
+Um abraço.
+
+Equipe New Vox 🚀`;
 
 interface Props {
   groupId: string;
   groupName: string;
   categoria: string | null;
+  responsavelMaster?: string | null;
 }
 
-export function NpsSendDialog({ groupId, groupName, categoria }: Props) {
+export function NpsSendDialog({ groupId, groupName, categoria, responsavelMaster }: Props) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -40,16 +50,20 @@ export function NpsSendDialog({ groupId, groupName, categoria }: Props) {
   const surveyType = isClinica ? "clinica" : "operacao";
   const surveyLink = `${PUBLISHED_APP_URL}/pesquisa-nps/${encodeURIComponent(groupId)}/${surveyType}`;
 
-  const defaultMsg = (isClinica ? MSG_CLINICA : MSG_OPERACAO)
-    .replace(/\[Link da pesquisa\]/g, surveyLink);
+  const buildMessage = () => {
+    if (isClinica) {
+      return MSG_CLINICA
+        .replace(/\[Nome do Responsável Master\]/g, responsavelMaster || "Responsável")
+        .replace(/\[Link da pesquisa\]/g, surveyLink);
+    }
+    return MSG_OPERACAO.replace(/\[Link da pesquisa\]/g, surveyLink);
+  };
 
-  const [message, setMessage] = useState(defaultMsg);
+  const [message, setMessage] = useState(buildMessage());
 
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
-      const msg = (isClinica ? MSG_CLINICA : MSG_OPERACAO)
-        .replace(/\[Link da pesquisa\]/g, surveyLink);
-      setMessage(msg);
+      setMessage(buildMessage());
     }
     setOpen(isOpen);
   };

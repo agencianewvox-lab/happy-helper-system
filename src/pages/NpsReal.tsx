@@ -35,6 +35,7 @@ interface GrupoInfo {
   nome: string;
   gestor_responsavel: string | null;
   categoria: string | null;
+  responsavel_master: string | null;
 }
 
 export default function NpsReal() {
@@ -49,7 +50,7 @@ export default function NpsReal() {
       setLoading(true);
       const [surveyRes, gruposRes] = await Promise.all([
         supabase.from("nps_surveys").select("*").order("created_at", { ascending: false }),
-        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, categoria"),
+        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, categoria, responsavel_master"),
       ]);
       if (surveyRes.data) setSurveys(surveyRes.data as NpsSurveyRow[]);
       if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
@@ -235,6 +236,7 @@ export default function NpsReal() {
                               groupId={g.group_id}
                               groupName={g.nome?.replace(/\s*\(.*?\)/, "").substring(0, 30)}
                               categoria={g.categoria}
+                              responsavelMaster={g.responsavel_master}
                             />
                           </TableCell>
                         </TableRow>
