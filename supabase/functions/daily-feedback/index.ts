@@ -308,7 +308,7 @@ Regras da mensagem:
         // Fallback to Lovable AI if OpenAI failed
         if (!aiSuccess && lovableKey) {
           console.log(`Using Lovable AI fallback for ${member.name}`);
-          const lovableResp = await fetch("https://api.lovable.dev/v1/chat/completions", {
+          const lovableResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
