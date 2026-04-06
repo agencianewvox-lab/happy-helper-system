@@ -50,7 +50,7 @@ export default function NpsReal() {
       setLoading(true);
       const [surveyRes, gruposRes] = await Promise.all([
         supabase.from("nps_surveys").select("*").order("created_at", { ascending: false }),
-        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, categoria"),
+        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, categoria, responsavel_master"),
       ]);
       if (surveyRes.data) setSurveys(surveyRes.data as NpsSurveyRow[]);
       if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
