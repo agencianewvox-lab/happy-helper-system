@@ -409,6 +409,29 @@ async function handleAlissonAIReply(
     const { data: grupos } = await supabase.from("whatsapp_grupos").select("*").order("nome");
     if (!grupos?.length) return;
 
+    // === DETERMINISTIC ADS RESPONSE (before heavy context loading) ===
+    if (META_TOKEN && isExactAdsSpendQuery(messageText)) {
+      const exactReply = await tryExactAdsReply(messageText, grupos, META_TOKEN);
+      if (exactReply) {
+        console.log("Deterministic ads reply for Alisson:", exactReply.substring(0, 80));
+        await supabase.from("whatsapp_conversas").insert({
+          telefone: "5564992565779",
+          nome_contato: "Vox (IA)",
+          mensagem: exactReply,
+          group_id: groupId,
+          direcao: "saida",
+          status: "enviada",
+          recebido_em: new Date().toISOString(),
+        });
+        await fetch(ALISSON_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: "5564992565779", message: exactReply, groupId, type: "ai_response" }),
+        });
+        return;
+      }
+    }
+
     // Fetch last 50 messages per group for richer context
     const groupIds = grupos.map((g: any) => g.group_id);
     const conversasPromises = groupIds.map((gid: string) =>
@@ -451,14 +474,24 @@ async function handleAlissonAIReply(
     const adsDataMap = new Map<string, any>();
     const adsTodayMap = new Map<string, any>();
     const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Detect if user is asking about a specific date range
+    const detectedRange = detectDateRangeInfo(messageText);
+    const adsCustomRangeMap = new Map<string, any>();
+
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const [ads30d, adsToday] = await Promise.all([
+        const fetches: Promise<any>[] = [
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStr, todayStr),
-        ]);
-        if (ads30d) adsDataMap.set(g.group_id, ads30d);
-        if (adsToday) adsTodayMap.set(g.group_id, adsToday);
+        ];
+        if (detectedRange) {
+          fetches.push(fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, detectedRange.since, detectedRange.until));
+        }
+        const results = await Promise.all(fetches);
+        if (results[0]) adsDataMap.set(g.group_id, results[0]);
+        if (results[1]) adsTodayMap.set(g.group_id, results[1]);
+        if (detectedRange && results[2]) adsCustomRangeMap.set(g.group_id, results[2]);
       });
       await Promise.all(adsPromises);
     }
@@ -546,6 +579,10 @@ async function handleAlissonAIReply(
       }
       if (adsToday) {
         line += `\n  📊 META ADS (HOJE ${todayStr}): Gasto R$${adsToday.spend.toFixed(2)}, ${adsToday.impressions} impressões, ${adsToday.clicks} cliques, CTR ${adsToday.ctr.toFixed(2)}%, Leads ${adsToday.leads}${adsToday.cpa ? `, CPA R$${adsToday.cpa.toFixed(2)}` : ""}, Alcance ${adsToday.reach}`;
+      }
+      const adsCustom = adsCustomRangeMap.get(gid);
+      if (adsCustom && detectedRange) {
+        line += `\n  📊 META ADS (${detectedRange.since} a ${detectedRange.until}): Gasto R$${adsCustom.spend.toFixed(2)}, ${adsCustom.impressions} impressões, ${adsCustom.clicks} cliques, CTR ${adsCustom.ctr.toFixed(2)}%, Leads ${adsCustom.leads}${adsCustom.cpa ? `, CPA R$${adsCustom.cpa.toFixed(2)}` : ""}, Alcance ${adsCustom.reach}`;
       }
       if (ads) {
         line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
