@@ -26,6 +26,7 @@ import {
 import { MetaAdsTab } from "@/components/MetaAdsTab";
 import { NpsDetailPanel } from "@/components/NpsDetailPanel";
 import { NpsSurveyTab } from "@/components/NpsSurveyTab";
+import { ClientNotesTab } from "@/components/ClientNotesTab";
 
 interface Conversa {
   id: string;
