@@ -7,6 +7,7 @@ export interface Profile {
   user_id: string;
   full_name: string;
   role: "admin" | "gestor";
+  is_master?: boolean;
 }
 
 // Maps profile full_name to the gestor_responsavel value in whatsapp_grupos
@@ -55,7 +56,8 @@ export function useProfile() {
   }, [user]);
 
   const isAdmin = profile?.role === "admin";
+  const isMaster = (profile as any)?.is_master === true;
   const gestorFilter = profile ? GESTOR_NAME_MAP[profile.full_name] || null : null;
 
-  return { profile, loading, isAdmin, gestorFilter };
+  return { profile, loading, isAdmin, isMaster, gestorFilter };
 }

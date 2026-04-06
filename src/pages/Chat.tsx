@@ -20,7 +20,7 @@ export type Conversation = {
 export default function Chat() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { profile, isAdmin, gestorFilter } = useProfile();
+  const { profile, isAdmin, isMaster, gestorFilter } = useProfile();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,6 +93,8 @@ export default function Chat() {
           <ChatArea
             conversationId={activeConversationId}
             gestorFilter={isAdmin ? null : gestorFilter}
+            isMaster={isMaster}
+            userName={profile?.full_name}
             onTitleUpdate={(title) => {
               if (activeConversationId) updateConversationTitle(activeConversationId, title);
             }}
