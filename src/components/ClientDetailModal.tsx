@@ -585,8 +585,9 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
                     <Cake className="w-4 h-4 mt-2 text-pink-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <Label className="text-xs text-muted-foreground font-medium">Aniv. Cliente</Label>
+                      <Label className="text-xs text-muted-foreground font-medium">Aniv. Cliente <span className="text-pink-400">(Resp. Master)</span></Label>
                       <Input type="date" value={clientInfo.aniversario_cliente} onChange={(e) => setClientInfo(prev => ({ ...prev, aniversario_cliente: e.target.value }))} className="mt-1 h-8 text-sm bg-background/50" />
+                      {clientInfo.responsavel_master && <p className="text-[10px] text-muted-foreground mt-0.5">{clientInfo.responsavel_master}</p>}
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
