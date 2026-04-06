@@ -1483,15 +1483,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       const errText = await aiResp.text();
       console.error("AI error for team reply:", errText);
       // Retry not possible - OpenAI is the only provider
-      if (false) {
-          aiData = await fallbackResp.json();
-        } else {
-          console.error("OpenAI fallback also failed:", await fallbackResp.text());
-          return;
-        }
-      } else {
-        return;
-      }
+      return;
     }
 
     const choice = aiData?.choices?.[0];
