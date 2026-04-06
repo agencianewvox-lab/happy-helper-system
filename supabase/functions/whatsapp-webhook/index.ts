@@ -116,10 +116,25 @@ function buildDateRangeForYear(range: DateRangeInfo, year: number) {
   };
 }
 
+function pad2(n: number): string { return String(n).padStart(2, "0"); }
+function fmtDate(d: Date): string { return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function toDateRangeInfo(since: string, until: string, explicit = true): DateRangeInfo {
+  const [,sm,sd] = since.split("-");
+  const [,em,ed] = until.split("-");
+  return { since, until, explicitYear: explicit, startDay: sd, startMonth: sm, endDay: ed, endMonth: em };
+}
+
+const MONTH_MAP: Record<string, number> = {
+  janeiro: 0, fevereiro: 1, "março": 2, marco: 2, abril: 3, maio: 4, junho: 5,
+  julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11,
+  jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5, jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11,
+};
+
 function detectDateRangeInfo(text: string): DateRangeInfo | null {
+  const now = new Date();
+
   const rangeMatch = text.match(/(?:entre\s+)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|e|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?(?:\s+de\s+(\d{4}))?/i);
   if (rangeMatch) {
-    const now = new Date();
     const trailingYear = rangeMatch[7] || null;
     const explicitYear = !!(rangeMatch[3] || rangeMatch[6] || trailingYear);
     const resolvedYear1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : (trailingYear || String(now.getFullYear()));
@@ -137,25 +152,73 @@ function detectDateRangeInfo(text: string): DateRangeInfo | null {
 
   const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (singleDayMatch) {
-    const now = new Date();
     const explicitYear = !!singleDayMatch[3];
     const resolvedYear = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
     const day = singleDayMatch[1].padStart(2, "0");
     const month = singleDayMatch[2].padStart(2, "0");
     const date = `${resolvedYear}-${month}-${day}`;
-    return { since: date, until: date, explicitYear, startDay: day, startMonth: month, endDay: day, endMonth: month };
+    return toDateRangeInfo(date, date, explicitYear);
   }
 
   if (/\bhoje\b/i.test(text)) {
-    const today = new Date().toISOString().split("T")[0];
-    const [, month, day] = today.split("-");
-    return { since: today, until: today, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
+    const d = fmtDate(now);
+    return toDateRangeInfo(d, d);
   }
+
   if (/\bontem\b/i.test(text)) {
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    const [, month, day] = yesterday.split("-");
-    return { since: yesterday, until: yesterday, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
+    const d = fmtDate(new Date(now.getTime() - 86400000));
+    return toDateRangeInfo(d, d);
   }
+
+  if (/\b(esta|essa|nesta|nessa)\s+semana\b|\bsemana\s+atual\b/i.test(text)) {
+    const dayOfWeek = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    return toDateRangeInfo(fmtDate(monday), fmtDate(now));
+  }
+
+  if (/\bsemana\s+passada\b|\b[uú]ltima\s+semana\b/i.test(text)) {
+    const dayOfWeek = now.getDay();
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+    const lastSunday = new Date(thisMonday);
+    lastSunday.setDate(thisMonday.getDate() - 1);
+    return toDateRangeInfo(fmtDate(lastMonday), fmtDate(lastSunday));
+  }
+
+  if (/\b(este|esse|neste|nesse)\s+m[eê]s\b|\bm[eê]s\s+atual\b/i.test(text)) {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return toDateRangeInfo(fmtDate(first), fmtDate(now));
+  }
+
+  if (/\bm[eê]s\s+passado\b|\b[uú]ltimo\s+m[eê]s\b/i.test(text)) {
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    return toDateRangeInfo(fmtDate(first), fmtDate(last));
+  }
+
+  const lastNDays = text.match(/[uú]ltimos?\s+(\d+)\s+dias?/i);
+  if (lastNDays) {
+    const n = parseInt(lastNDays[1]);
+    const start = new Date(now.getTime() - n * 86400000);
+    return toDateRangeInfo(fmtDate(start), fmtDate(now));
+  }
+
+  const monthNameMatch = text.match(/(?:em|no\s+m[eê]s\s+de|de)\s+(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)(?:\s+(?:de\s+)?(\d{4}))?/i);
+  if (monthNameMatch) {
+    const monthName = monthNameMatch[1].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const monthIdx = MONTH_MAP[monthName];
+    if (monthIdx !== undefined) {
+      const year = monthNameMatch[2] ? parseInt(monthNameMatch[2]) : now.getFullYear();
+      const first = new Date(year, monthIdx, 1);
+      const last = new Date(year, monthIdx + 1, 0);
+      const until = last > now ? now : last;
+      return toDateRangeInfo(fmtDate(first), fmtDate(until));
+    }
+  }
+
   return null;
 }
 
