@@ -1,0 +1,1 @@
+UPDATE public.tasks SET status = 'feito', updated_at = now() WHERE id IN ('eb270ef1-d317-48f1-b862-5179549e120d', '0e14ceb7-2b17-4132-8545-57b1813dd9d8');
