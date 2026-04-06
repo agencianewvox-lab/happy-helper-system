@@ -135,7 +135,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const fetchClientInfo = useCallback(async () => {
     if (!grupo?.id) return;
     const { data } = await supabase.from("whatsapp_grupos")
-      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento")
+      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, responsavel_master, responsavel_socio")
       .eq("id", grupo.id).single();
     if (data) {
       setClientInfo({
