@@ -1700,6 +1700,62 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           });
           toolResults.push(`✅ Feedback registrado.`);
         }
+
+        // Handle resolver_pendencia
+        if (fnName === "resolver_pendencia") {
+          const matchedGroup = allGroups.find((g: any) =>
+            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
+            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
+          );
+          if (matchedGroup) {
+            let query = supabase
+              .from("pending_demand_resolutions")
+              .select("id, term")
+              .eq("group_id", matchedGroup.group_id)
+              .eq("resolved", false);
+
+            const { data: unresolvedDemands } = await query;
+
+            if (!unresolvedDemands || unresolvedDemands.length === 0) {
+              toolResults.push(`⚠️ Não encontrei pendências abertas para ${matchedGroup.nome}.`);
+            } else {
+              // If term_hint provided, try to match specific demand
+              let toResolve = unresolvedDemands;
+              if (args.term_hint) {
+                const hint = args.term_hint.toLowerCase();
+                const filtered = unresolvedDemands.filter((d: any) => d.term.toLowerCase().includes(hint));
+                if (filtered.length > 0) toResolve = filtered;
+              }
+
+              const profileName = matchTeamProfileName(teamWebhook.name);
+              let resolvedByUserId: string | null = null;
+              if (profileName) {
+                const { data: profile } = await supabase.from("profiles").select("user_id").eq("full_name", profileName).maybeSingle();
+                if (profile) resolvedByUserId = profile.user_id;
+              }
+
+              const ids = toResolve.map((d: any) => d.id);
+              const { error: resolveErr } = await supabase
+                .from("pending_demand_resolutions")
+                .update({
+                  resolved: true,
+                  status: "feito",
+                  resolved_at: new Date().toISOString(),
+                  resolved_by: resolvedByUserId,
+                })
+                .in("id", ids);
+
+              if (resolveErr) {
+                toolResults.push(`❌ Erro ao resolver: ${resolveErr.message}`);
+              } else {
+                const terms = toResolve.map((d: any) => `"${d.term}"`).join(", ");
+                toolResults.push(`✅ ${toResolve.length} pendência(s) resolvida(s) de ${matchedGroup.nome}: ${terms}`);
+              }
+            }
+          } else {
+            toolResults.push(`❌ Cliente "${args.group_name}" não encontrado.`);
+          }
+        }
       }
 
       // Follow-up with tool results
