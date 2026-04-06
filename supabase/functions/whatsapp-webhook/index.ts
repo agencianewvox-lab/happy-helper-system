@@ -1583,8 +1583,79 @@ ${coachContext || "Nenhuma cutucada recente."}`;
     console.error("Error in team coach reply:", err);
   }
 }
+// Map team member contact names to profile full_name for resolved_by attribution
+const TEAM_NAME_TO_PROFILE: Record<string, string> = {
+  "murilo": "Murillo",
+  "murillo": "Murillo",
+  "netto": "Netto",
+  "jader": "Jader",
+  "priscila": "Priscilla",
+  "priscilla": "Priscilla",
+  "alisson": "Alisson",
+  "thais": "Thais",
+  "jiza": "Jiza",
+  "victor": "Victor",
+};
 
-// Nomes do time New Vox — mensagens desses contatos são "saida"
+function matchTeamProfileName(contactName: string): string | null {
+  const normalized = normalizeName(contactName);
+  for (const [key, profileName] of Object.entries(TEAM_NAME_TO_PROFILE)) {
+    if (normalized.includes(key)) return profileName;
+  }
+  return null;
+}
+
+async function autoResolvePendingDemands(groupId: string, contactName: string, supabase: any) {
+  try {
+    // Find unresolved pending demands for this group
+    const { data: unresolvedDemands, error } = await supabase
+      .from("pending_demand_resolutions")
+      .select("id, term")
+      .eq("group_id", groupId)
+      .eq("resolved", false);
+
+    if (error || !unresolvedDemands || unresolvedDemands.length === 0) return;
+
+    // Find the profile user_id for this team member
+    const profileName = matchTeamProfileName(contactName);
+    let resolvedByUserId: string | null = null;
+
+    if (profileName) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("full_name", profileName)
+        .maybeSingle();
+      if (profile) resolvedByUserId = profile.user_id;
+    }
+
+    // Auto-resolve all pending demands for this group
+    const updateData: any = {
+      resolved: true,
+      status: "feito",
+      resolved_at: new Date().toISOString(),
+    };
+    if (resolvedByUserId) {
+      updateData.resolved_by = resolvedByUserId;
+    }
+
+    const ids = unresolvedDemands.map((d: any) => d.id);
+    const { error: updateError } = await supabase
+      .from("pending_demand_resolutions")
+      .update(updateData)
+      .in("id", ids);
+
+    if (updateError) {
+      console.error("Error auto-resolving demands:", updateError);
+    } else {
+      console.log(`Auto-resolved ${ids.length} pending demand(s) for group ${groupId} by ${contactName} (profile: ${profileName || "unknown"}, user_id: ${resolvedByUserId || "none"})`);
+    }
+  } catch (err) {
+    console.error("autoResolvePendingDemands error:", err);
+  }
+}
+
+
 const TEAM_MEMBERS = [
   "jader", "jader costa",
   "alisson", "alisson lima",
@@ -1840,7 +1911,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ===== ALISSON AI AUTO-REPLY =====
+      // ===== AUTO-RESOLVE PENDING DEMANDS WHEN TEAM RESPONDS IN GROUP =====
+      if (isAllowedSource && direction === "saida" && groupId) {
+        autoResolvePendingDemands(groupId, contactName, supabase).catch((err) =>
+          console.error("Auto-resolve pending demands error:", err)
+        );
+      }
+
       console.log("Phone:", phone, "| isAlisson:", isAlisson, "| isTeamMember:", isTeamMember, "| Message:", messageText?.substring(0, 50));
       if (isAlisson && messageText && shouldRespondToMessage(messageText)) {
         console.log("Alisson message detected, triggering AI reply...");
