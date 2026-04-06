@@ -174,6 +174,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
       estrelas_dificuldade: clientInfo.estrelas_dificuldade ? Number(clientInfo.estrelas_dificuldade) : null,
       estrelas_financeiro: clientInfo.estrelas_financeiro ? Number(clientInfo.estrelas_financeiro) : null,
       estrelas_temperamento: clientInfo.estrelas_temperamento ? Number(clientInfo.estrelas_temperamento) : null,
+      responsavel_master: clientInfo.responsavel_master || null,
+      responsavel_socio: clientInfo.responsavel_socio || null,
     } as any).eq("id", grupo.id);
     setSavingInfo(false);
     if (!error) { setInfoSaved(true); setTimeout(() => setInfoSaved(false), 2000); }
