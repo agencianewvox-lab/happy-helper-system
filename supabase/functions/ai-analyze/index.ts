@@ -425,7 +425,7 @@ Deno.serve(async (req) => {
     }
 
     // Detect date range from user messages for ads queries
-    const detectedDateRange = detectDateRangeFromMessages(messages);
+    const detectedDateRange = messages && Array.isArray(messages) ? detectDateRangeFromMessages(messages) : null;
 
     // Fetch Meta Ads data for groups with linked ad accounts
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
