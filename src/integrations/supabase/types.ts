@@ -73,6 +73,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_prompts_config: {
+        Row: {
+          description: string | null
+          id: string
+          prompt_category: string
+          prompt_key: string
+          prompt_label: string
+          prompt_value: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          prompt_category?: string
+          prompt_key: string
+          prompt_label: string
+          prompt_value: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          prompt_category?: string
+          prompt_key?: string
+          prompt_label?: string
+          prompt_value?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           color: string | null
