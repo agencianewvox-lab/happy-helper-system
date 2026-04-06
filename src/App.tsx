@@ -14,6 +14,7 @@ import NpsReal from "./pages/NpsReal";
 import Agenda from "./pages/Agenda";
 import PesquisaNps from "./pages/PesquisaNps";
 import PainelAdmin from "./pages/PainelAdmin";
+import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
