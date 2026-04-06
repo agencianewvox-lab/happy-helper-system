@@ -367,6 +367,16 @@ Deno.serve(async (req) => {
     const { messages, type, gestorFilter, groupId, isMaster, userName } = await req.json();
     const safeMessages = Array.isArray(messages) ? messages : [];
 
+    // Load configurable prompts from DB
+    const { data: promptConfigs } = await supabase.from("ai_prompts_config").select("prompt_key, prompt_value");
+    const promptMap = new Map<string, string>();
+    for (const pc of (promptConfigs || [])) promptMap.set(pc.prompt_key, pc.prompt_value);
+
+    const DB_SYSTEM_PROMPT = promptMap.get("vox_chat_system_prompt");
+    const DB_MASTER_PROMPT = promptMap.get("vox_master_prompt");
+    const DB_EQUIPE = promptMap.get("equipe_info");
+    const DB_REGRAS = promptMap.get("regras_negocio");
+
     // Fetch groups (filtered by gestor if provided)
     let gruposQuery = supabase.from("whatsapp_grupos").select("*").order("nome");
     if (gestorFilter) {
