@@ -489,6 +489,103 @@ REGRAS:
       });
     }
 
+    // Check for task creation intent
+    const isTaskCreation = detectTaskIntent(messages);
+    if (isTaskCreation) {
+      const taskSystemPrompt = `${fullSystemPrompt}
+
+CAPACIDADE ADICIONAL - CRIAÇÃO DE TAREFAS:
+Quando o usuário pedir para criar uma tarefa, você DEVE extrair as informações e responder com um JSON entre as tags <CREATE_TASK> e </CREATE_TASK>.
+
+Formato:
+<CREATE_TASK>
+{
+  "title": "título claro e objetivo da tarefa",
+  "description": "descrição detalhada do que precisa ser feito",
+  "assigned_to": "Nome do responsável",
+  "priority": "alta|media|baixa",
+  "due_date": "YYYY-MM-DD",
+  "group_id": "group_id do cliente se aplicável, ou null"
+}
+</CREATE_TASK>
+
+EQUIPE DISPONÍVEL para atribuição: Alisson, Priscilla, Jader Costa, Murilo Araújo (Murillo), Netto Monge, Joel, Thais, Daniella, Victor Botto, Jiza.
+
+Se o usuário não especificar:
+- Responsável: infira baseado na função e no cliente mencionado
+- Prioridade: infira pela urgência ("urgente"/"até sexta" = alta, normal = media)  
+- Prazo: se mencionou "até sexta", calcule a data. Se não disse, sugira um prazo razoável
+- group_id: se mencionou um cliente, use o group_id correspondente dos dados
+
+Após o JSON, escreva uma confirmação amigável da tarefa com detalhes formatados:
+📋 **Tarefa:** título
+**O QUE fazer:** descrição
+**PARA QUEM:** cliente
+**QUEM da equipe deve fazer:** responsável
+**POR QUE é importante:** justificativa
+**PRAZO sugerido:** data
+
+A data de hoje é ${new Date().toISOString().split("T")[0]}.`;
+
+      const taskResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: \`Bearer \${OPENAI_API_KEY}\`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [{ role: "system", content: taskSystemPrompt }, ...messages],
+        }),
+      });
+
+      if (!taskResponse.ok) {
+        return new Response(JSON.stringify({ error: "Erro ao processar criação de tarefa" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const taskData = await taskResponse.json();
+      let content = taskData.choices?.[0]?.message?.content || "";
+
+      // Extract and process task
+      const taskMatch = content.match(/<CREATE_TASK>([\s\S]*?)<\/CREATE_TASK>/);
+      if (taskMatch) {
+        try {
+          const taskInfo = JSON.parse(taskMatch[1].trim());
+          
+          const { error: insertError } = await supabase.from("tasks").insert({
+            title: taskInfo.title,
+            description: taskInfo.description || null,
+            assigned_to: taskInfo.assigned_to || "Joel",
+            priority: taskInfo.priority || "media",
+            due_date: taskInfo.due_date || null,
+            group_id: taskInfo.group_id || null,
+            status: "todo",
+            created_by: "Vox (IA)",
+          });
+
+          if (insertError) {
+            console.error("Error inserting task:", insertError);
+            content = content.replace(/<CREATE_TASK>[\s\S]*?<\/CREATE_TASK>/, "");
+            content += "\n\n⚠️ Houve um erro ao salvar a tarefa. Tente novamente.";
+          } else {
+            content = content.replace(/<CREATE_TASK>[\s\S]*?<\/CREATE_TASK>/, "");
+            content += "\n\n✅ **Tarefa salva no Quadro de Tarefas!** Acesse a aba Tarefas para visualizar.";
+          }
+        } catch (parseErr) {
+          console.error("Error parsing task:", parseErr);
+        }
+      }
+
+      // Return as SSE stream format
+      const encoder = new TextEncoder();
+      const sseData = \`data: \${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n\`;
+      return new Response(encoder.encode(sseData), {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
     // Check for scheduling intent
     const isScheduling = detectSchedulingIntent(messages);
     if (isScheduling) {
