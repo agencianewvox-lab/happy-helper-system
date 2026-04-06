@@ -1174,7 +1174,7 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "editar_prompt"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",

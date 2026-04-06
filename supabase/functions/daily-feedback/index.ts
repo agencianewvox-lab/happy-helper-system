@@ -296,7 +296,7 @@ Lembre: máximo 500 caracteres. Uma mensagem de WhatsApp curta e pessoal.`;
             body: JSON.stringify({
               model: "gpt-4o-mini",
               messages: [
-                { role: "system", content: systemPrompt },
+              { role: "system", content: fullSystemPrompt },
                 { role: "user", content: userPrompt },
               ],
               max_tokens: 300,

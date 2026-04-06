@@ -148,7 +148,7 @@ ${(feedbackYesterday || []).map((f: any) => `- ${f.member_name}: ${f.feedback_me
         messages: [
           {
             role: "system",
-            content: `Você é a Vox, consultora estratégica da agência New Vox. Gere um briefing executivo matinal para Alisson e Priscilla (donos da agência). O briefing deve ser objetivo, estratégico e acionável.
+            content: DB_BRIEFING_PROMPT || `Você é a Vox, consultora estratégica da agência New Vox. Gere um briefing executivo matinal para Alisson e Priscilla (donos da agência). O briefing deve ser objetivo, estratégico e acionável.
 
 FORMATO (máximo 1200 caracteres, é uma mensagem de WhatsApp):
 
