@@ -499,6 +499,42 @@ export type Database = {
         }
         Relationships: []
       }
+      team_feedback_log: {
+        Row: {
+          category: string
+          created_at: string
+          extracted_action: string | null
+          group_id: string | null
+          group_name: string | null
+          id: string
+          member_name: string
+          message: string
+          relevance: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          extracted_action?: string | null
+          group_id?: string | null
+          group_name?: string | null
+          id?: string
+          member_name: string
+          message: string
+          relevance?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          extracted_action?: string | null
+          group_id?: string | null
+          group_name?: string | null
+          id?: string
+          member_name?: string
+          message?: string
+          relevance?: string
+        }
+        Relationships: []
+      }
       whatsapp_conversas: {
         Row: {
           created_at: string
