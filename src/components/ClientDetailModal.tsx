@@ -597,6 +597,22 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                     </div>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Responsável Master</Label>
+                      <Input value={clientInfo.responsavel_master} onChange={(e) => setClientInfo(prev => ({ ...prev, responsavel_master: e.target.value }))} placeholder="Nome do responsável master" className="mt-1 h-8 text-sm bg-background/50" />
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Responsável Sócio/Supervisor</Label>
+                      <Input value={clientInfo.responsavel_socio} onChange={(e) => setClientInfo(prev => ({ ...prev, responsavel_socio: e.target.value }))} placeholder="Nome do sócio/supervisor" className="mt-1 h-8 text-sm bg-background/50" />
+                    </div>
+                  </div>
+                </div>
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
                   <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
                   <div className="flex-1 min-w-0">
