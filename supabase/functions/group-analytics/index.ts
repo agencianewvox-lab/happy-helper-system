@@ -554,10 +554,41 @@ function buildCandidateContext(candidates: CandidateMessage[]): string {
   return parts.join("\n\n");
 }
 
+// ─── LOCAL FALLBACK: detect pendencies without AI ───
+function detectPendingLocally(allCandidates: CandidateMessage[]): AIPendingItem[] {
+  const items: AIPendingItem[] = [];
+  for (const c of allCandidates) {
+    const text = c.mensagem.toLowerCase();
+    const hasQuestion = text.includes("?");
+    const hasRequest = REQUEST_KEYWORDS.some(kw => text.includes(kw));
+    const hasDemand = DEMAND_KEYWORDS.some(kw => text.includes(kw));
+    const isUrgent = c.is_urgent || c.hours_waiting >= 2;
+
+    if (hasQuestion || hasRequest || hasDemand) {
+      const type = hasDemand ? "Demanda" : "Pergunta sem resposta";
+      const priority = isUrgent ? "urgente" : c.hours_waiting >= 1 ? "normal" : "baixa";
+      const confidence = (hasQuestion && c.hours_waiting >= 0.5) || hasDemand ? "alta" : "media";
+      items.push({
+        group_id: c.group_id,
+        client_name: c.nome_contato,
+        message: c.mensagem.slice(0, 200),
+        type,
+        priority,
+        timestamp: c.created_at,
+        suggested_action: `Responder ${c.nome_contato} — esperando há ${c.hours_waiting}h`,
+        hours_waiting: c.hours_waiting,
+        confidence,
+      });
+    }
+  }
+  return items;
+}
+
 async function detectPendingWithAI(allCandidates: CandidateMessage[], apiKey: string): Promise<AIPendingItem[]> {
   if (allCandidates.length === 0) return [];
   const BATCH_SIZE = 15;
   const allItems: AIPendingItem[] = [];
+  let aiFailed = false;
   for (let i = 0; i < allCandidates.length; i += BATCH_SIZE) {
     const batch = allCandidates.slice(i, i + BATCH_SIZE);
     const conversationText = buildCandidateContext(batch);
@@ -608,7 +639,11 @@ async function detectPendingWithAI(allCandidates: CandidateMessage[], apiKey: st
           tool_choice: { type: "function", function: { name: "report_pending_demands" } },
         }),
       });
-      if (!response.ok) { console.error("AI pending error:", response.status); continue; }
+      if (!response.ok) {
+        console.error("AI pending error:", response.status, "- falling back to local detection");
+        aiFailed = true;
+        break;
+      }
       const data = await response.json();
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall?.function?.arguments) {
@@ -617,7 +652,16 @@ async function detectPendingWithAI(allCandidates: CandidateMessage[], apiKey: st
           if (Array.isArray(parsed.pendencias)) allItems.push(...parsed.pendencias);
         } catch { /* ignore */ }
       }
-    } catch (err) { console.error("AI fetch error:", err); }
+    } catch (err) {
+      console.error("AI fetch error:", err, "- falling back to local detection");
+      aiFailed = true;
+      break;
+    }
+  }
+  // Fallback: if AI failed, use local keyword-based detection
+  if (aiFailed && allItems.length === 0) {
+    console.info("Using LOCAL fallback for pending detection");
+    return detectPendingLocally(allCandidates);
   }
   return allItems;
 }
