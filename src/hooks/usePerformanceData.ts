@@ -112,6 +112,24 @@ export function usePerformanceData(period: string) {
     return Array.from(set).sort();
   }, [grupos]);
 
+  // Map user_id to gestor_responsavel name
+  const PROFILE_TO_GESTOR: Record<string, string> = {
+    "Murillo": "Murilo Araújo",
+    "Netto": "Netto Monge",
+    "Jader": "Jader Costa",
+    "Priscilla": "Priscilla Borges",
+    "Alisson": "Alisson Lima",
+  };
+
+  const userIdToGestorName = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of profiles) {
+      const gestorName = PROFILE_TO_GESTOR[p.full_name];
+      if (gestorName) map[p.user_id] = gestorName;
+    }
+    return map;
+  }, [profiles]);
+
   const gruposMap = useMemo(() => {
     const map: Record<string, GrupoInfo> = {};
     for (const g of grupos) map[g.group_id] = g;
