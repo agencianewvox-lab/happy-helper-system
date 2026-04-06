@@ -1225,10 +1225,72 @@ ${coachContext || "Nenhuma cutucada recente."}`;
         if (fnName === "perguntar_detalhes") {
           reply = args.question;
         }
+
+        if (fnName === "enviar_cutucada") {
+          const targetName = args.destinatario;
+          const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+            targetName.toLowerCase().includes(key.toLowerCase()) ||
+            key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
+          )?.[1];
+
+          if (!targetWebhookUrl) {
+            toolResults.push(`❌ Não encontrei webhook para "${targetName}".`);
+          } else {
+            let matchedGroup: any = null;
+            if (args.group_name) {
+              matchedGroup = allGroups.find((g: any) =>
+                g.nome.toLowerCase().includes(args.group_name.toLowerCase())
+              );
+            }
+
+            const targetFirstName = targetName.split(" ")[0];
+            let cutucadaMsg = "";
+            try {
+              const coachResp = await fetch(aiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${aiKey}` },
+                body: JSON.stringify({
+                  model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+                  messages: [
+                    { role: "system", content: `Você é a Vox, coach de CS. Gere uma cutucada curta para ${targetFirstName}. Tom amigável. Máx 300 chars. Termine com "(responda 👍 se já fez)".` },
+                    { role: "user", content: `Cutucada: ${args.mensagem_contexto}${matchedGroup ? ` (cliente: ${matchedGroup.nome})` : ""}` },
+                  ],
+                  max_tokens: 200,
+                }),
+              });
+              if (coachResp.ok) {
+                const coachData = await coachResp.json();
+                cutucadaMsg = coachData.choices?.[0]?.message?.content?.trim() || "";
+              }
+            } catch (e) {
+              console.error("Error generating cutucada:", e);
+            }
+
+            if (!cutucadaMsg) {
+              cutucadaMsg = `E aí ${targetFirstName}! 👋 ${args.mensagem_contexto}. Bora resolver? (responda 👍 se já fez)`;
+            }
+
+            try {
+              const encodedMsg = encodeURIComponent(cutucadaMsg);
+              await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
+              await supabase.from("coach_messages").insert({
+                destinatario_nome: targetName,
+                mensagem: cutucadaMsg,
+                tipo: args.tipo || "geral",
+                group_id: matchedGroup?.group_id || null,
+                enviada: true,
+                enviada_em: new Date().toISOString(),
+              });
+              toolResults.push(`✅ Cutucada enviada para ${targetName}!`);
+            } catch (e) {
+              toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
+            }
+          }
+        }
       }
 
       // Follow-up with tool results
-      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas"].includes(tc.function?.name))) {
+      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada"].includes(tc.function?.name))) {
         const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
           role: "tool",
           tool_call_id: tc.id,
