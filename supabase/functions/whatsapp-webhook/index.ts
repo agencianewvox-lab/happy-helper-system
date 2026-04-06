@@ -327,6 +327,44 @@ async function fetchMetaAdsForAccount(accountId: string, token: string, datePres
   }
 }
 
+// Feedback analysis tools (available to ALL team members)
+const FEEDBACK_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "salvar_nota_cliente",
+      description: "Salva uma nota no card do cliente quando o membro da equipe relata algo relevante feito para aquele cliente (ex: subiu campanha nova, fez reunião, ajustou anúncios, resolveu problema). Use SEMPRE que a mensagem mencionar uma ação específica feita para um cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          group_name: { type: "string", description: "Nome do grupo/cliente mencionado" },
+          note_content: { type: "string", description: "Conteúdo da nota descrevendo o que foi feito. Escreva em terceira pessoa (ex: 'Priscilla subiu estrutura nova de anúncios')" },
+        },
+        required: ["group_name", "note_content"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "registrar_feedback",
+      description: "Registra um feedback ou informação do membro da equipe para contexto geral da Vox. Use para qualquer informação que não seja diretamente uma ação em um cliente mas que enriquece o contexto (ex: 'hoje foi corrido', 'estou focado em prospecção', comentários gerais sobre o dia).",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["acao_cliente", "feedback_dia", "insight", "geral"], description: "Categoria do feedback" },
+          message_summary: { type: "string", description: "Resumo do que foi dito" },
+          group_name: { type: "string", description: "Nome do cliente se mencionado (opcional)", nullable: true },
+          relevance: { type: "string", enum: ["low", "medium", "high"], description: "Relevância da informação" },
+        },
+        required: ["category", "message_summary", "relevance"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 // OpenAI tools for the WhatsApp agent
 const AGENT_TOOLS = [
   {
@@ -451,6 +489,8 @@ const AGENT_TOOLS = [
       },
     },
   },
+  // Include feedback tools in the agent tools too
+  ...FEEDBACK_TOOLS,
 ];
 
 /**
