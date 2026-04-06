@@ -176,8 +176,8 @@ export default function Agenda() {
       toast.error("Preencha título e data");
       return;
     }
-    const startISO = `${formDate}T${formStartTime}:00`;
-    const endISO = `${formDate}T${formEndTime}:00`;
+    const startISO = `${formDate}T${formStartTime}:00-03:00`;
+    const endISO = `${formDate}T${formEndTime}:00-03:00`;
     const color = EVENT_TYPES.find(t => t.value === formType)?.color || "#3b82f6";
 
     if (editingEvent) {
