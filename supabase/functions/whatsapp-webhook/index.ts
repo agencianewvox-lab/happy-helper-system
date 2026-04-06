@@ -1460,7 +1460,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
     ];
 
     const requestBody: any = {
-      model: lovableKey ? "google/gemini-2.5-flash" : "gpt-4o-mini",
+      model: "gpt-4o-mini",
       messages: aiMessages,
       max_tokens: 1500,
       tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!],
