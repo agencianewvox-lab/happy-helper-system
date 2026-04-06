@@ -1085,6 +1085,19 @@ async function handleTeamCoachReply(
     const { data: grupos } = await gruposQuery;
     const allGroups = grupos || [];
 
+    // === DETERMINISTIC ADS RESPONSE (before heavy context loading) ===
+    if (META_TOKEN && isExactAdsSpendQuery(messageText)) {
+      // For gestors, also check all groups (not just filtered) so they can ask about any client
+      const { data: allGrupos } = await supabase.from("whatsapp_grupos").select("*");
+      const exactReply = await tryExactAdsReply(messageText, allGrupos || allGroups, META_TOKEN);
+      if (exactReply) {
+        console.log(`Deterministic ads reply for ${firstName}:`, exactReply.substring(0, 80));
+        const encodedReply = encodeURIComponent(exactReply);
+        await fetch(`${teamWebhook.url}?message=${encodedReply}`);
+        return;
+      }
+    }
+
     // --- Fetch recent messages, pending, ads in parallel ---
     const groupIds = allGroups.map((g: any) => g.group_id);
 
@@ -1138,14 +1151,23 @@ async function handleTeamCoachReply(
     const adsTodayMapTeam = new Map<string, any>();
     const todayStrTeam = new Date().toISOString().slice(0, 10);
     const groupsWithAds = allGroups.filter((g: any) => g.ad_account_id);
+
+    const detectedRangeTeam = detectDateRangeInfo(messageText);
+    const adsCustomRangeMapTeam = new Map<string, any>();
+
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const [ads30d, adsToday] = await Promise.all([
+        const fetches: Promise<any>[] = [
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN),
           fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, todayStrTeam, todayStrTeam),
-        ]);
-        if (ads30d) adsDataMap.set(g.group_id, ads30d);
-        if (adsToday) adsTodayMapTeam.set(g.group_id, adsToday);
+        ];
+        if (detectedRangeTeam) {
+          fetches.push(fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN, undefined, detectedRangeTeam.since, detectedRangeTeam.until));
+        }
+        const results = await Promise.all(fetches);
+        if (results[0]) adsDataMap.set(g.group_id, results[0]);
+        if (results[1]) adsTodayMapTeam.set(g.group_id, results[1]);
+        if (detectedRangeTeam && results[2]) adsCustomRangeMapTeam.set(g.group_id, results[2]);
       });
       await Promise.all(adsPromises);
     }
@@ -1195,6 +1217,10 @@ async function handleTeamCoachReply(
       }
       if (adsToday) {
         line += `\n  📊 Ads HOJE: R$${adsToday.spend.toFixed(2)} gasto, ${adsToday.clicks} cliques, ${adsToday.leads} leads`;
+      }
+      const adsCustomTeam = adsCustomRangeMapTeam.get(gid);
+      if (adsCustomTeam && detectedRangeTeam) {
+        line += `\n  📊 Ads (${detectedRangeTeam.since} a ${detectedRangeTeam.until}): R$${adsCustomTeam.spend.toFixed(2)} gasto, ${adsCustomTeam.clicks} cliques, ${adsCustomTeam.leads} leads${adsCustomTeam.cpa ? `, CPA R$${adsCustomTeam.cpa.toFixed(2)}` : ""}`;
       }
       if (ads) {
         line += `\n  📊 Ads 30d: R$${ads.spend.toFixed(0)} gasto, ${ads.leads} leads, ${ads.cpa ? `CPA R$${ads.cpa.toFixed(2)}` : ""}, CTR ${ads.ctr.toFixed(2)}%`;
