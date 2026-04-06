@@ -51,6 +51,21 @@ function detectSchedulingIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 
+function detectTaskIntent(messages: any[]): boolean {
+  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUser) return false;
+  const text = lastUser.content.toLowerCase();
+  const keywords = [
+    "criar tarefa", "crie uma tarefa", "cria uma tarefa", "nova tarefa", "tarefa para",
+    "deixa uma tarefa", "deixe uma tarefa", "colocar tarefa", "coloca tarefa",
+    "adicionar tarefa", "adicione tarefa", "fazer tarefa", "faça uma tarefa",
+    "tarefa a fazer", "tarefa pra", "task para", "to do para", "todo para",
+    "delegar tarefa", "delegue tarefa", "passa uma tarefa", "passe uma tarefa",
+    "designar tarefa", "designe tarefa", "atribuir tarefa", "atribua tarefa",
+  ];
+  return keywords.some(k => text.includes(k));
+}
+
 function detectComplexQuery(messages: any[]): boolean {
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return false;
