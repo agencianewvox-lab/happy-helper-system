@@ -229,13 +229,31 @@ const AGENT_TOOLS = [
     type: "function",
     function: {
       name: "perguntar_detalhes",
-      description: "Envia uma pergunta de volta ao Alisson via WhatsApp para obter mais detalhes antes de executar uma ação. Use quando faltarem informações essenciais para completar uma tarefa.",
+      description: "Envia uma pergunta de volta ao usuário via WhatsApp para obter mais detalhes antes de executar uma ação. Use quando faltarem informações essenciais para completar uma tarefa.",
       parameters: {
         type: "object",
         properties: {
-          question: { type: "string", description: "A pergunta a ser enviada para o Alisson" }
+          question: { type: "string", description: "A pergunta a ser enviada" }
         },
         required: ["question"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "enviar_cutucada",
+      description: "Envia uma cutucada (nudge/lembrete) imediata para um membro da equipe via WhatsApp. Use quando pedirem para enviar cutucada, lembrar, cobrar, ou cutucar alguém da equipe. Pode ser sobre um cliente específico ou geral.",
+      parameters: {
+        type: "object",
+        properties: {
+          destinatario: { type: "string", description: "Nome do destinatário da cutucada (ex: Murilo Araújo, Netto Monge, Jader Costa, Priscilla)" },
+          mensagem_contexto: { type: "string", description: "Contexto ou motivo da cutucada (ex: 'tarefas pendentes', 'relatório atrasado', 'cliente esperando resposta')" },
+          group_name: { type: "string", description: "Nome do cliente/grupo relacionado (opcional)", nullable: true },
+          tipo: { type: "string", enum: ["pendencia_esquecida", "frt_alto", "grupo_parado", "geral", "tarefa_pendente"], description: "Tipo da cutucada" }
+        },
+        required: ["destinatario", "mensagem_contexto", "tipo"],
         additionalProperties: false,
       },
     },
