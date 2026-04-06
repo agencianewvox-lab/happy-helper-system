@@ -580,7 +580,7 @@ A data de hoje é ${new Date().toISOString().split("T")[0]}.`;
 
       // Return as SSE stream format
       const encoder = new TextEncoder();
-      const sseData = \`data: \${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n\`;
+      const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
       return new Response(encoder.encode(sseData), {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
       });
