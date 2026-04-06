@@ -83,44 +83,87 @@ function detectCutucadaIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 
-function detectDateRangeFromMessages(messages: any[]): { since: string; until: string } | null {
+type DateRangeInfo = {
+  since: string;
+  until: string;
+  explicitYear: boolean;
+  startDay: string;
+  startMonth: string;
+  endDay: string;
+  endMonth: string;
+};
+
+function buildDateRangeForYear(range: DateRangeInfo, year: number) {
+  return {
+    since: `${year}-${range.startMonth}-${range.startDay}`,
+    until: `${year}-${range.endMonth}-${range.endDay}`,
+  };
+}
+
+function detectDateRangeInfoFromMessages(messages: any[]): DateRangeInfo | null {
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return null;
   const text = lastUser.content;
 
-  // Match patterns like "01/04 a 06/04", "01/04 até 06/04", "de 01/04 a 06/04"
   const rangeMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (rangeMatch) {
     const now = new Date();
-    const year1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
-    const year2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
-    const since = `${year1}-${rangeMatch[2].padStart(2, "0")}-${rangeMatch[1].padStart(2, "0")}`;
-    const until = `${year2}-${rangeMatch[5].padStart(2, "0")}-${rangeMatch[4].padStart(2, "0")}`;
-    return { since, until };
+    const explicitYear = !!(rangeMatch[3] || rangeMatch[6]);
+    const resolvedYear1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
+    const resolvedYear2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
+    const startDay = rangeMatch[1].padStart(2, "0");
+    const startMonth = rangeMatch[2].padStart(2, "0");
+    const endDay = rangeMatch[4].padStart(2, "0");
+    const endMonth = rangeMatch[5].padStart(2, "0");
+
+    return {
+      since: `${resolvedYear1}-${startMonth}-${startDay}`,
+      until: `${resolvedYear2}-${endMonth}-${endDay}`,
+      explicitYear,
+      startDay,
+      startMonth,
+      endDay,
+      endMonth,
+    };
   }
 
-  // Match "dia 01/04" or "no dia 06/04/2025"
   const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (singleDayMatch) {
     const now = new Date();
-    const year = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
-    const date = `${year}-${singleDayMatch[2].padStart(2, "0")}-${singleDayMatch[1].padStart(2, "0")}`;
-    return { since: date, until: date };
+    const explicitYear = !!singleDayMatch[3];
+    const resolvedYear = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
+    const day = singleDayMatch[1].padStart(2, "0");
+    const month = singleDayMatch[2].padStart(2, "0");
+    const date = `${resolvedYear}-${month}-${day}`;
+    return {
+      since: date,
+      until: date,
+      explicitYear,
+      startDay: day,
+      startMonth: month,
+      endDay: day,
+      endMonth: month,
+    };
   }
 
-  // "hoje"
   if (/\bhoje\b/i.test(text)) {
     const today = new Date().toISOString().split("T")[0];
-    return { since: today, until: today };
+    const [year, month, day] = today.split("-");
+    return { since: today, until: today, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
   }
 
-  // "ontem"
   if (/\bontem\b/i.test(text)) {
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    return { since: yesterday, until: yesterday };
+    const [year, month, day] = yesterday.split("-");
+    return { since: yesterday, until: yesterday, explicitYear: true, startDay: day, startMonth: month, endDay: day, endMonth: month };
   }
 
   return null;
+}
+
+function detectDateRangeFromMessages(messages: any[]): { since: string; until: string } | null {
+  const info = detectDateRangeInfoFromMessages(messages);
+  return info ? { since: info.since, until: info.until } : null;
 }
 
 function detectComplexQuery(messages: any[]): boolean {
@@ -131,7 +174,7 @@ function detectComplexQuery(messages: any[]): boolean {
     "comparar", "comparação", "todos os grupos", "análise geral", "visão geral",
     "panorama", "ranking", "equipe", "performance da equipe", "tendência",
     "evolução", "upsell", "oportunidades", "quem posso", "investimento",
-    "gasto", "meta ads", "ads", "período", "periodo",
+    "gasto", "meta ads", "ads", "período", "periodo", "valor", "quanto",
   ];
   return complexKeywords.some(k => text.includes(k));
 }
@@ -140,8 +183,8 @@ function detectExactAdsSpendQuery(messages: any[]): boolean {
   const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
   if (!lastUser) return false;
   const text = lastUser.content.toLowerCase();
-  const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "meta ads", "ads"].some((k) => text.includes(k));
-  const hasDateIntent = !!detectDateRangeFromMessages(messages);
+  const hasAdsIntent = ["investimento", "gasto", "gastou", "valor investido", "valor", "quanto", "quanto foi", "total", "meta ads", "ads"].some((k) => text.includes(k));
+  const hasDateIntent = !!detectDateRangeInfoFromMessages(messages);
   return hasAdsIntent && hasDateIntent;
 }
 
