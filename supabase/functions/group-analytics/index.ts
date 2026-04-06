@@ -966,6 +966,47 @@ Deno.serve(async (req) => {
       if (validated.length > 0) validatedByGroup.set(groupId, validated.slice(0, 5));
     }
 
+    // Step 4b: Auto-insert new pending demands into the database
+    const newDemandsToInsert: { group_id: string; term: string; requested_at: string; status: string; resolved: boolean }[] = [];
+    for (const [groupId, details] of validatedByGroup) {
+      for (const d of details) {
+        // Check it's not already in the resolved set (by group_id + term)
+        let alreadyExists = false;
+        for (const rk of resolvedSet) {
+          const parts = rk.split("|");
+          if (parts[0] === groupId && parts[1] === d.term) {
+            alreadyExists = true;
+            break;
+          }
+        }
+        if (!alreadyExists) {
+          newDemandsToInsert.push({
+            group_id: groupId,
+            term: d.term,
+            requested_at: d.requested_at || new Date().toISOString(),
+            status: "pendente",
+            resolved: false,
+          });
+        }
+      }
+    }
+    if (newDemandsToInsert.length > 0) {
+      // Check existing unresolved demands to avoid duplicates
+      const { data: existingUnresolved } = await supabase
+        .from("pending_demand_resolutions")
+        .select("group_id, term")
+        .eq("resolved", false);
+      const existingKeys = new Set((existingUnresolved || []).map((e: any) => `${e.group_id}|${e.term}`));
+      const truly_new = newDemandsToInsert.filter(d => !existingKeys.has(`${d.group_id}|${d.term}`));
+      if (truly_new.length > 0) {
+        const { error: insertError } = await supabase
+          .from("pending_demand_resolutions")
+          .insert(truly_new);
+        if (insertError) console.error("Error inserting new demands:", insertError);
+        else console.log(`Inserted ${truly_new.length} new pending demands`);
+      }
+    }
+
     // Step 5: Merge into final analytics with new churn + priority
     const analytics: Record<string, GroupAnalytics> = {};
     for (const [groupId, partial] of partialData) {
