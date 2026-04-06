@@ -9,11 +9,15 @@ const corsHeaders = {
 const META_API_VERSION = "v21.0";
 const META_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
-async function fetchMetaAdsForAccount(accountId: string, token: string): Promise<any | null> {
+async function fetchMetaAdsForAccount(accountId: string, token: string, since?: string, until?: string): Promise<any | null> {
   try {
     const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
     const fields = "spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type,reach,frequency";
-    const url = `${META_BASE}/${actId}/insights?fields=${fields}&date_preset=last_30d&access_token=${token}`;
+    let dateFilter = "&date_preset=last_30d";
+    if (since && until) {
+      dateFilter = `&time_range={"since":"${since}","until":"${until}"}`;
+    }
+    const url = `${META_BASE}/${actId}/insights?fields=${fields}${dateFilter}&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.error || !data.data?.length) return null;
@@ -36,6 +40,7 @@ async function fetchMetaAdsForAccount(accountId: string, token: string): Promise
       leads: parseInt(leads),
       purchases: parseInt(purchases),
       cpa: cpa ? parseFloat(cpa) : null,
+      date_range: since && until ? `${since} a ${until}` : "últimos 30 dias",
     };
   } catch (e) {
     console.error("Meta Ads fetch error for", accountId, e);
@@ -76,6 +81,46 @@ function detectCutucadaIntent(messages: any[]): boolean {
     "cutuca o", "cutuca a", "dá uma cutucada",
   ];
   return keywords.some(k => text.includes(k));
+}
+
+function detectDateRangeFromMessages(messages: any[]): { since: string; until: string } | null {
+  const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+  if (!lastUser) return null;
+  const text = lastUser.content;
+
+  // Match patterns like "01/04 a 06/04", "01/04 até 06/04", "de 01/04 a 06/04"
+  const rangeMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*(?:a|até|ate|ao|à)\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (rangeMatch) {
+    const now = new Date();
+    const year1 = rangeMatch[3] ? (rangeMatch[3].length === 2 ? `20${rangeMatch[3]}` : rangeMatch[3]) : String(now.getFullYear());
+    const year2 = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : String(now.getFullYear());
+    const since = `${year1}-${rangeMatch[2].padStart(2, "0")}-${rangeMatch[1].padStart(2, "0")}`;
+    const until = `${year2}-${rangeMatch[5].padStart(2, "0")}-${rangeMatch[4].padStart(2, "0")}`;
+    return { since, until };
+  }
+
+  // Match "dia 01/04" or "no dia 06/04/2025"
+  const singleDayMatch = text.match(/dia\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (singleDayMatch) {
+    const now = new Date();
+    const year = singleDayMatch[3] ? (singleDayMatch[3].length === 2 ? `20${singleDayMatch[3]}` : singleDayMatch[3]) : String(now.getFullYear());
+    const date = `${year}-${singleDayMatch[2].padStart(2, "0")}-${singleDayMatch[1].padStart(2, "0")}`;
+    return { since: date, until: date };
+  }
+
+  // "hoje"
+  if (/\bhoje\b/i.test(text)) {
+    const today = new Date().toISOString().split("T")[0];
+    return { since: today, until: today };
+  }
+
+  // "ontem"
+  if (/\bontem\b/i.test(text)) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    return { since: yesterday, until: yesterday };
+  }
+
+  return null;
 }
 
 function detectComplexQuery(messages: any[]): boolean {
@@ -144,6 +189,8 @@ REGRAS GERAIS:
 - Pergunta vaga = inferir do contexto ou oferecer opções.
 - Respostas entre 200-500 palavras. Dado simples = 1-2 linhas. Análise complexa = até 500. Nunca >600 palavras.
 - Quando perguntarem sobre cutucadas (planejamento, histórico, próximas), consulte o histórico de cutucadas nos dados para responder com precisão.
+- IMPORTANTE: Os dados de META ADS fornecidos já estão filtrados para o período EXATO solicitado pelo usuário. Quando o usuário perguntar valores de investimento ou métricas de um período específico (ex: "01/04 a 06/04"), os dados que você recebeu JÁ SÃO desse período. Reporte os valores EXATAMENTE como recebidos, sem arredondar ou estimar. Sempre mencione o período exato dos dados na resposta.
+- Se o usuário pedir dados de ads de um período específico e os dados mostrarem "sem dados no período", informe que não há dados disponíveis para aquele intervalo exato.
 
 13. ENVIO DE CUTUCADA — Quando o usuário pedir para enviar cutucada, cutucar, lembrar ou cobrar alguém da equipe, você pode fazer isso. Basta o usuário pedir e a cutucada será enviada imediatamente via WhatsApp para a pessoa.
 
@@ -252,13 +299,19 @@ Deno.serve(async (req) => {
       groupMsgsMap.set(groupIds[i], msgs);
     }
 
+    // Detect date range from user messages for ads queries
+    const detectedDateRange = detectDateRangeFromMessages(messages);
+
     // Fetch Meta Ads data for groups with linked ad accounts
     const groupsWithAds = grupos.filter((g: any) => g.ad_account_id);
     const adsDataMap = new Map<string, any>();
 
     if (META_TOKEN && groupsWithAds.length > 0) {
       const adsPromises = groupsWithAds.map(async (g: any) => {
-        const adsData = await fetchMetaAdsForAccount(g.ad_account_id, META_TOKEN);
+        const adsData = await fetchMetaAdsForAccount(
+          g.ad_account_id, META_TOKEN,
+          detectedDateRange?.since, detectedDateRange?.until
+        );
         if (adsData) adsDataMap.set(g.group_id, adsData);
       });
       await Promise.all(adsPromises);
@@ -367,9 +420,11 @@ Deno.serve(async (req) => {
       // Ads data
       const ads = adsDataMap.get(gid);
       if (ads) {
-        line += `\n  📊 META ADS (30d): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
+        const periodLabel = ads.date_range || "últimos 30 dias";
+        line += `\n  📊 META ADS (${periodLabel}): Gasto R$${ads.spend.toFixed(2)}, ${ads.impressions} impressões, ${ads.clicks} cliques, CTR ${ads.ctr.toFixed(2)}%, CPC R$${ads.cpc.toFixed(2)}, Leads ${ads.leads}${ads.cpa ? `, CPA R$${ads.cpa.toFixed(2)}` : ""}, Alcance ${ads.reach}`;
       } else if (g.ad_account_id) {
-        line += `\n  📊 META ADS: Conta vinculada mas sem dados nos últimos 30 dias`;
+        const periodLabel = detectedDateRange ? `${detectedDateRange.since} a ${detectedDateRange.until}` : "últimos 30 dias";
+        line += `\n  📊 META ADS: Conta vinculada mas sem dados no período (${periodLabel})`;
       }
 
       // NPS Real surveys
@@ -859,10 +914,11 @@ ${dataContext}`;
       });
     }
 
-    // Chat mode: choose model based on complexity
+    // Chat mode: choose model based on complexity or ads date queries
     const isComplex = detectComplexQuery(messages);
-    const model = isComplex ? "gpt-4o" : "gpt-4o-mini";
-    console.log(`Chat mode: using ${model} (complex=${isComplex})`);
+    const hasDateRange = !!detectedDateRange;
+    const model = (isComplex || hasDateRange) ? "gpt-4o" : "gpt-4o-mini";
+    console.log(`Chat mode: using ${model} (complex=${isComplex}, dateRange=${hasDateRange})`);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
