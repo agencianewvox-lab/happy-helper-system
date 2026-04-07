@@ -769,8 +769,10 @@ export type Database = {
           group_id: string
           id: string
           investimento_ads: number | null
+          investimento_google_ads: number | null
           nome: string
           plano: string | null
+          plataforma_ads: string | null
           responsavel_master: string | null
           responsavel_socio: string | null
         }
@@ -791,8 +793,10 @@ export type Database = {
           group_id: string
           id?: string
           investimento_ads?: number | null
+          investimento_google_ads?: number | null
           nome: string
           plano?: string | null
+          plataforma_ads?: string | null
           responsavel_master?: string | null
           responsavel_socio?: string | null
         }
@@ -813,8 +817,10 @@ export type Database = {
           group_id?: string
           id?: string
           investimento_ads?: number | null
+          investimento_google_ads?: number | null
           nome?: string
           plano?: string | null
+          plataforma_ads?: string | null
           responsavel_master?: string | null
           responsavel_socio?: string | null
         }
