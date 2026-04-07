@@ -1141,6 +1141,75 @@ A data de hoje é ${new Date().toISOString().split("T")[0]}.`;
       });
     }
 
+    // Check for note intent
+    const isNoteCreation = detectNoteIntent(safeMessages);
+    if (isNoteCreation) {
+      const noteSystemPrompt = `${fullSystemPrompt}
+
+CAPACIDADE ADICIONAL - ADICIONAR NOTA:
+Quando o usuário pedir para adicionar uma nota, observação ou anotação no card de um cliente, extraia as informações e responda com um JSON entre as tags <ADD_NOTE> e </ADD_NOTE>.
+
+Formato:
+<ADD_NOTE>
+{
+  "group_id": "group_id do cliente",
+  "content": "conteúdo da nota",
+  "author_name": "nome de quem solicitou"
+}
+</ADD_NOTE>
+
+Se o usuário não especificar o autor, use "${userName || "Sistema"}".
+Se mencionou o nome de um cliente, identifique o group_id correspondente.
+Após o JSON, confirme amigavelmente que a nota foi adicionada.`;
+
+      const noteResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [{ role: "system", content: noteSystemPrompt }, ...safeMessages],
+        }),
+      });
+
+      if (!noteResponse.ok) {
+        return new Response(JSON.stringify({ error: "Erro ao processar nota" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const noteData = await noteResponse.json();
+      let content = noteData.choices?.[0]?.message?.content || "";
+
+      const noteMatch = content.match(/<ADD_NOTE>([\s\S]*?)<\/ADD_NOTE>/);
+      if (noteMatch) {
+        try {
+          const noteInfo = JSON.parse(noteMatch[1].trim());
+          const { error: insertError } = await supabase.from("client_notes").insert({
+            group_id: noteInfo.group_id,
+            content: noteInfo.content,
+            author_name: noteInfo.author_name || userName || "Vox (IA)",
+          });
+
+          if (insertError) {
+            console.error("Error inserting note:", insertError);
+            content = content.replace(/<ADD_NOTE>[\s\S]*?<\/ADD_NOTE>/, "");
+            content += "\n\n⚠️ Erro ao salvar a nota. Tente novamente.";
+          } else {
+            content = content.replace(/<ADD_NOTE>[\s\S]*?<\/ADD_NOTE>/, "");
+            content += "\n\n✅ **Nota adicionada ao card do cliente!**";
+          }
+        } catch (parseErr) {
+          console.error("Error parsing note:", parseErr);
+        }
+      }
+
+      const encoder = new TextEncoder();
+      const sseData = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+      return new Response(encoder.encode(sseData), {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
     // Check for scheduling intent
     const isScheduling = detectSchedulingIntent(safeMessages);
     if (isScheduling) {
