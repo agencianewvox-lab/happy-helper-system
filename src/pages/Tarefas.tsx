@@ -45,6 +45,9 @@ interface GrupoOption {
   gestor_responsavel: string | null;
 }
 
+// Drag state helper
+let draggedTaskId: string | null = null;
+
 const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bg: string; icon: typeof ListTodo }> = {
   pendente: { label: "A Fazer", color: "text-orange-500", bg: "bg-orange-500/10 border-orange-500/30", icon: ListTodo },
   fazendo: { label: "Fazendo", color: "text-blue-500", bg: "bg-blue-500/10 border-blue-500/30", icon: Clock },
