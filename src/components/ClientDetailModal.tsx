@@ -169,6 +169,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
     const { error } = await supabase.from("whatsapp_grupos").update({
       plano: clientInfo.plano || null,
       investimento_ads: clientInfo.investimento_ads ? Number(clientInfo.investimento_ads) : null,
+      investimento_google_ads: clientInfo.investimento_google_ads ? Number(clientInfo.investimento_google_ads) : null,
+      plataforma_ads: clientInfo.plataforma_ads || null,
       data_entrada: clientInfo.data_entrada || null,
       data_ciclo_ads: clientInfo.data_ciclo_ads || null,
       aniversario_cliente: clientInfo.aniversario_cliente || null,
