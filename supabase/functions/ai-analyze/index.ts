@@ -92,7 +92,21 @@ function detectCutucadaIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 
-type DateRangeInfo = {
+function detectNoteIntent(messages: any[]): boolean {
+  const lastUser = getLastUserMessage(messages);
+  if (!lastUser) return false;
+  const text = lastUser.content.toLowerCase();
+  const keywords = [
+    "adicionar nota", "adicione nota", "adiciona nota", "nova nota",
+    "registrar nota", "registre nota", "anotar", "anote",
+    "inserir nota", "insira nota", "nota no card", "nota para",
+    "observação para", "observação no", "incluir nota", "inclua nota",
+    "adicionar observação", "adicione observação",
+  ];
+  return keywords.some(k => text.includes(k));
+}
+
+
   since: string;
   until: string;
   explicitYear: boolean;
