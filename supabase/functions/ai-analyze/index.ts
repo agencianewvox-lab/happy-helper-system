@@ -433,16 +433,30 @@ Deno.serve(async (req) => {
       .order("enviada_em", { ascending: false })
       .limit(30);
 
-    const [pendingResResult, npsSurveysResult, coachMsgsResult, ...conversasResults] = await Promise.all([
+    const clientNotesPromise = supabase
+      .from("client_notes")
+      .select("group_id, content, author_name, created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    const npsPredictionsPromise = supabase
+      .from("nps_predictions")
+      .select("group_id, nps_score, nps_categoria, confianca, fator_principal, recomendacao, tendencia, dimension_scores, calculated_at");
+
+    const [pendingResResult, npsSurveysResult, coachMsgsResult, clientNotesResult, npsPredResult, ...conversasResults] = await Promise.all([
       pendingResPromise,
       npsSurveysPromise,
       coachMsgsPromise,
+      clientNotesPromise,
+      npsPredictionsPromise,
       ...conversasPromises,
     ]);
 
     const pendingResolutions = pendingResResult.data || [];
     const allNpsSurveys = npsSurveysResult.data || [];
     const recentCoachMsgs = coachMsgsResult.data || [];
+    const allClientNotes = clientNotesResult.data || [];
+    const allNpsPredictions = npsPredResult.data || [];
 
     // Build per-group message map
     const groupMsgsMap = new Map<string, any[]>();
