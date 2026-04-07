@@ -86,7 +86,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [loadingConversas, setLoadingConversas] = useState(false);
   const [clientInfo, setClientInfo] = useState({
-    plano: "", investimento_ads: "", data_entrada: "", data_ciclo_ads: "",
+    plano: "", investimento_ads: "", investimento_google_ads: "", plataforma_ads: "", data_entrada: "", data_ciclo_ads: "",
     aniversario_cliente: "", aniversario_empresa: "", acessos_cliente: "",
     gestor_responsavel: "", briefing: "", estrelas_dificuldade: "", estrelas_financeiro: "", estrelas_temperamento: "",
     responsavel_master: "", responsavel_socio: "",
