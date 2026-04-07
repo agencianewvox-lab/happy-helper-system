@@ -497,38 +497,36 @@ export default function Tarefas() {
                           )}
 
                           {/* Client name as main title */}
-                          {item.grupo_nome && (
-                            <p className="text-sm font-bold leading-tight">📁 {item.grupo_nome}</p>
-                          )}
-                          {!item.grupo_nome && (
-                            <p className="text-sm font-bold leading-tight">{item.title}</p>
-                          )}
+                          <p className="text-sm font-bold leading-tight">
+                            {item.grupo_nome ? `📁 ${item.grupo_nome}` : "📁 Sem cliente vinculado"}
+                          </p>
 
-                          {/* Task description (title as fallback + description) */}
-                          {item.grupo_nome && (
-                            <p className="text-xs font-medium text-foreground/80">{item.title}</p>
-                          )}
-                          {item.description && (
-                            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 bg-muted/30 rounded p-2">
-                              {item.description}
+                          {/* Task description */}
+                          <div className="space-y-1">
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Descrição da tarefa</p>
+                            <p className="text-xs leading-relaxed rounded p-2 bg-muted/30 text-foreground">
+                              {item.description?.trim() || item.title}
                             </p>
-                          )}
+                          </div>
 
                           {/* Due date + Assigned */}
-                          <div className="flex items-center justify-between gap-2 pt-0.5">
-                            <Badge variant="outline" className="text-[10px] gap-1">
-                              <User className="w-2.5 h-2.5" />
-                              {item.assigned_to.split(" ")[0]}
-                            </Badge>
+                          <div className="flex flex-col gap-2 pt-0.5">
                             {item.due_date && (
-                              <span className={cn(
-                                "text-[10px] flex items-center gap-1 font-medium",
-                                isOverdue ? "text-red-500 font-bold" : "text-muted-foreground"
+                              <p className={cn(
+                                "text-[11px] font-medium",
+                                isOverdue ? "text-destructive" : "text-muted-foreground"
                               )}>
-                                📅 Entrega: {new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                                {isOverdue && " ⚠️"}
-                              </span>
+                                <span className="text-foreground">Data de entrega:</span>{" "}
+                                {new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                                {isOverdue && " • atrasada"}
+                              </p>
                             )}
+                            <div className="flex items-center justify-between gap-2">
+                              <Badge variant="outline" className="text-[10px] gap-1 w-fit">
+                                <User className="w-2.5 h-2.5" />
+                                {item.assigned_to.split(" ")[0]}
+                              </Badge>
+                            </div>
                           </div>
 
                           {/* Status move buttons + delete */}
