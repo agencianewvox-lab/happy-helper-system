@@ -497,6 +497,19 @@ Deno.serve(async (req) => {
       npsByGroup.get(s.group_id)!.push(s);
     }
 
+    // Client notes grouped by group_id
+    const notesByGroup = new Map<string, any[]>();
+    for (const n of allClientNotes) {
+      if (!notesByGroup.has(n.group_id)) notesByGroup.set(n.group_id, []);
+      notesByGroup.get(n.group_id)!.push(n);
+    }
+
+    // NPS predictions by group_id
+    const npsPredByGroup = new Map<string, any>();
+    for (const p of allNpsPredictions) {
+      npsPredByGroup.set(p.group_id, p);
+    }
+
     // Build enriched context for each group
     const contextLines: string[] = [];
     let totalMsgs = 0;
