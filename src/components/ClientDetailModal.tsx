@@ -144,6 +144,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
       setClientInfo({
         plano: (data as any).plano || "",
         investimento_ads: (data as any).investimento_ads != null ? String((data as any).investimento_ads) : "",
+        investimento_google_ads: (data as any).investimento_google_ads != null ? String((data as any).investimento_google_ads) : "",
+        plataforma_ads: (data as any).plataforma_ads || "",
         data_entrada: (data as any).data_entrada || "",
         data_ciclo_ads: (data as any).data_ciclo_ads || "",
         aniversario_cliente: (data as any).aniversario_cliente || "",
