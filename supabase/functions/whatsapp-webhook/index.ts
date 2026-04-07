@@ -1544,6 +1544,8 @@ async function handleTeamCoachReply(
     let toolsPromptSection = `
 CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
 - Quando ${firstName} mencionar algo que FEZ para um cliente (subiu campanha, ajustou anúncio, fez reunião, resolveu problema, criou arte, etc.), use "salvar_nota_cliente" para registrar no card do cliente
+- ${firstName} também pode PEDIR para adicionar uma nota específica em um card de cliente — use "salvar_nota_cliente"
+- IMPORTANTE: ${firstName} só pode adicionar notas nos cards dos SEUS clientes (os que aparecem nos dados). Se pedir para adicionar nota em um cliente que não é dele(a), informe que não tem permissão.
 - Quando ${firstName} compartilhar informações gerais sobre o dia, contexto de trabalho, ou insights, use "registrar_feedback" para armazenar o contexto
 - Você pode usar AMBAS as ferramentas na mesma resposta se necessário
 - SEMPRE confirme o que registrou na resposta de forma natural`;
