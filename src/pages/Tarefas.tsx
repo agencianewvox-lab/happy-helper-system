@@ -415,7 +415,25 @@ export default function Tarefas() {
             const items = columnTasks[status];
             const Icon = config.icon;
             return (
-              <div key={status} className={cn("rounded-xl border p-4 flex flex-col", config.bg)}>
+              <div
+                key={status}
+                className={cn("rounded-xl border p-4 flex flex-col transition-all", config.bg)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.add("ring-2", "ring-primary/40");
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.classList.remove("ring-2", "ring-primary/40");
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove("ring-2", "ring-primary/40");
+                  if (draggedTaskId) {
+                    updateStatus(draggedTaskId, status);
+                    draggedTaskId = null;
+                  }
+                }}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Icon className={cn("w-5 h-5", config.color)} />
@@ -435,48 +453,72 @@ export default function Tarefas() {
                     {items.map((item) => {
                       const isUpdating = updating === item.id;
                       const isOverdue = item.due_date && new Date(item.due_date + "T23:59:59") < new Date() && item.status !== "feito";
+                      const daysLeft = item.due_date && item.status !== "feito"
+                        ? Math.ceil((new Date(item.due_date + "T23:59:59").getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                        : null;
                       return (
                         <div
                           key={item.id}
-                          className="bg-card border border-border/40 rounded-lg p-3 space-y-2 shadow-sm hover:shadow-md transition-shadow"
+                          draggable
+                          onDragStart={() => { draggedTaskId = item.id; }}
+                          onDragEnd={() => { draggedTaskId = null; }}
+                          className={cn(
+                            "bg-card border rounded-lg p-3.5 space-y-2.5 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing active:opacity-70",
+                            item.priority === "urgente" ? "border-red-500/50 bg-red-500/5" : "border-border/40",
+                            isOverdue && "border-red-500/60"
+                          )}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold">{item.title}</p>
-                              {item.grupo_nome && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">📁 {item.grupo_nome}</p>
+                          {/* Priority + Due date header bar */}
+                          {(item.priority === "urgente" || item.due_date) && (
+                            <div className="flex items-center justify-between gap-2">
+                              {item.priority === "urgente" ? (
+                                <Badge className="text-[10px] bg-red-500/20 text-red-400 border-red-500/40 gap-1">
+                                  🔴 Urgente
+                                </Badge>
+                              ) : item.priority === "baixa" ? (
+                                <Badge className="text-[10px] bg-muted text-muted-foreground">Baixa</Badge>
+                              ) : <span />}
+                              {item.due_date && (
+                                <span className={cn(
+                                  "text-[10px] flex items-center gap-1 font-medium px-1.5 py-0.5 rounded",
+                                  isOverdue
+                                    ? "text-red-500 bg-red-500/10 font-bold"
+                                    : daysLeft !== null && daysLeft <= 2
+                                    ? "text-amber-500 bg-amber-500/10"
+                                    : "text-muted-foreground"
+                                )}>
+                                  <CalendarIcon className="w-3 h-3" />
+                                  {new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                                  {isOverdue && " (atrasado)"}
+                                  {!isOverdue && daysLeft !== null && daysLeft <= 2 && ` (${daysLeft}d)`}
+                                </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {priorityBadge(item.priority)}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5 text-muted-foreground hover:text-destructive"
-                                onClick={() => deleteTask(item.id)}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                          {item.description && (
-                            <p className="text-[10px] text-muted-foreground line-clamp-2">{item.description}</p>
                           )}
-                          <div className="flex items-center justify-between">
-                            <Badge variant="outline" className="text-[9px]">
-                              <User className="w-2.5 h-2.5 mr-1" />
+
+                          {/* Title */}
+                          <p className="text-sm font-semibold leading-tight">{item.title}</p>
+
+                          {/* Description */}
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 bg-muted/30 rounded p-2">
+                              {item.description}
+                            </p>
+                          )}
+
+                          {/* Client + Assigned */}
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <Badge variant="outline" className="text-[10px] gap-1">
+                              <User className="w-2.5 h-2.5" />
                               {item.assigned_to.split(" ")[0]}
                             </Badge>
-                            {item.due_date && (
-                              <span className={cn("text-[10px] flex items-center gap-1", isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground")}>
-                                <CalendarIcon className="w-3 h-3" />
-                                {new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                                {isOverdue && " ⚠️"}
-                              </span>
+                            {item.grupo_nome && (
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">📁 {item.grupo_nome}</span>
                             )}
                           </div>
-                          {/* Status move buttons */}
-                          <div className="flex gap-1.5 pt-1">
+
+                          {/* Status move buttons + delete */}
+                          <div className="flex items-center gap-1.5 pt-1 border-t border-border/20">
                             {status !== "pendente" && (
                               <Button
                                 size="sm"
@@ -505,6 +547,14 @@ export default function Tarefas() {
                                 {STATUS_CONFIG[COLUMNS[COLUMNS.indexOf(status) + 1]]?.label} →
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                              onClick={() => deleteTask(item.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
                           </div>
                         </div>
                       );
