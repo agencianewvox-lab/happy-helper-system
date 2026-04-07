@@ -415,18 +415,18 @@ const AGENT_TOOLS = [
     type: "function",
     function: {
       name: "criar_tarefa",
-      description: "Cria uma tarefa geral (não vinculada necessariamente a um cliente) para um membro da equipe. Use para tarefas do dia a dia, comandos operacionais, ou qualquer ação que não seja uma pendência de cliente específico.",
+      description: "Cria uma tarefa para um membro da equipe. SEMPRE tente identificar o cliente mencionado na mensagem e preencha group_name com o nome EXATO do grupo/cliente no sistema. O title deve ser o nome do cliente (ex: 'MKT NV - ORALCENTER CATALÃO'). A description deve conter a tarefa em si (ex: 'Recriar campanha no Google Ads').",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Título curto da tarefa" },
-          description: { type: "string", description: "Descrição detalhada (opcional)", nullable: true },
+          title: { type: "string", description: "Nome do cliente/grupo no sistema (ex: 'MKT NV - ORALCENTER CATALÃO'). Se não houver cliente, use um título descritivo curto." },
+          description: { type: "string", description: "Descrição detalhada da tarefa a ser realizada (ex: 'Recriar campanha no Google Ads', 'Agendar reunião de alinhamento')" },
           assigned_to: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge, Priscilla Borges, Joel, Thais, Daniella, Victor Botto, Jiza Reis)" },
-          group_name: { type: "string", description: "Nome do cliente associado (opcional)", nullable: true },
+          group_name: { type: "string", description: "Nome do cliente/grupo associado — SEMPRE preencha se mencionarem um cliente, mesmo parcialmente (ex: 'oral center', 'idonea', 'reabilis'). Busque o nome mais próximo da lista de grupos disponíveis.", nullable: true },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
           priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" }
         },
-        required: ["title", "assigned_to", "priority"],
+        required: ["title", "assigned_to", "priority", "description"],
         additionalProperties: false,
       },
     },
@@ -805,7 +805,12 @@ SUAS CAPACIDADES COMO AGENTE:
 
 3. CRIAR PENDÊNCIAS — Quando Alisson pedir para designar pendências de CLIENTE, use "criar_pendencia". Sempre confirme os detalhes na resposta.
 
-4. CRIAR TAREFAS — Para tarefas gerais do dia a dia (não necessariamente vinculadas a cliente), use "criar_tarefa". Exemplos: "pede pro Victor fazer um banner", "fala pro Joel organizar reunião". Pode ou não vincular a um cliente.
+4. CRIAR TAREFAS — Para tarefas do dia a dia, use "criar_tarefa". REGRA IMPORTANTE: Quando a mensagem mencionar um cliente (mesmo parcialmente, ex: "oral center", "reabilis", "idonea"), você DEVE:
+   a) Preencher "group_name" com o nome do cliente mencionado
+   b) Usar o NOME COMPLETO do grupo/cliente no campo "title" (ex: "MKT NV - ORALCENTER CATALÃO")
+   c) Colocar a AÇÃO/TAREFA no campo "description" (ex: "Recriar campanha no Google Ads")
+   d) Buscar na lista de grupos o nome mais próximo do que foi mencionado
+   Se NÃO houver cliente, use um título descritivo e a tarefa na descrição.
 
 5. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
 
@@ -961,16 +966,24 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
 
       if (fnName === "criar_tarefa") {
         let matchedGroupId: string | null = null;
+        let matchedGroupName: string | null = null;
         if (args.group_name) {
-          const matchedGroup = grupos.find((g: any) =>
-            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
-            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
-          );
+          const searchTerm = args.group_name.toLowerCase().trim();
+          const matchedGroup = grupos.find((g: any) => {
+            const nome = g.nome.toLowerCase();
+            const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+            return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm) ||
+              searchTerm.split(/\s+/).every((w: string) => nome.includes(w));
+          });
           matchedGroupId = matchedGroup?.group_id || null;
+          matchedGroupName = matchedGroup?.nome || null;
         }
 
+        // Use the matched group name as title if found, otherwise use provided title
+        const taskTitle = matchedGroupName || args.title;
+
         const { error: insertErr } = await supabase.from("tasks").insert({
-          title: args.title,
+          title: taskTitle,
           description: args.description || null,
           assigned_to: args.assigned_to,
           group_id: matchedGroupId,
@@ -984,7 +997,7 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           console.error("Error creating task:", insertErr);
           toolResults.push(`❌ Erro ao criar tarefa: ${insertErr.message}`);
         } else {
-          toolResults.push(`✅ Tarefa criada: "${args.title}" para ${args.assigned_to}${args.group_name ? ` (cliente: ${args.group_name})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}`);
+          toolResults.push(`✅ Tarefa criada: "${taskTitle}" para ${args.assigned_to}${matchedGroupName ? ` (cliente: ${matchedGroupName})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}\n📝 ${args.description || ""}`);
         }
       }
 
@@ -1560,7 +1573,7 @@ CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
     } else {
       toolsPromptSection += `
 - ${firstName} pode RESOLVER pendências dos seus clientes — quando disser que resolveu/fez/completou algo, use "resolver_pendencia"
-- ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa"
+- ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa". SEMPRE identifique o cliente mencionado e use o nome completo do grupo como título, com a ação na descrição.
 - Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem
 - IMPORTANTE: Se ${firstName} confirmar que resolveu/fez/tratou uma pendência (mesmo com "joia", "feito", "já resolvi"), SEMPRE use resolver_pendencia para marcar como feito no sistema`;
     }
@@ -1691,12 +1704,21 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
         if (fnName === "criar_tarefa") {
           let matchedGroupId: string | null = null;
+          let matchedGroupName: string | null = null;
           if (args.group_name) {
-            const mg = allGroups.find((g: any) => g.nome.toLowerCase().includes(args.group_name.toLowerCase()));
+            const searchTerm = args.group_name.toLowerCase().trim();
+            const mg = allGroups.find((g: any) => {
+              const nome = g.nome.toLowerCase();
+              const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+              return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm) ||
+                searchTerm.split(/\s+/).every((w: string) => nome.includes(w));
+            });
             matchedGroupId = mg?.group_id || null;
+            matchedGroupName = mg?.nome || null;
           }
+          const taskTitle = matchedGroupName || args.title;
           const { error: insertErr } = await supabase.from("tasks").insert({
-            title: args.title,
+            title: taskTitle,
             description: args.description || null,
             assigned_to: args.assigned_to,
             group_id: matchedGroupId,
@@ -1705,7 +1727,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
             created_by: `${firstName} (via WhatsApp)`,
             status: "pendente",
           });
-          toolResults.push(insertErr ? `❌ Erro: ${insertErr.message}` : `✅ Tarefa criada: "${args.title}" para ${args.assigned_to}`);
+          toolResults.push(insertErr ? `❌ Erro: ${insertErr.message}` : `✅ Tarefa criada: "${taskTitle}" para ${args.assigned_to}\n📝 ${args.description || ""}`);
         }
 
         if (fnName === "remover_tarefas") {
