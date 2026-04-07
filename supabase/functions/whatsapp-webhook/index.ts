@@ -1704,12 +1704,21 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
         if (fnName === "criar_tarefa") {
           let matchedGroupId: string | null = null;
+          let matchedGroupName: string | null = null;
           if (args.group_name) {
-            const mg = allGroups.find((g: any) => g.nome.toLowerCase().includes(args.group_name.toLowerCase()));
+            const searchTerm = args.group_name.toLowerCase().trim();
+            const mg = allGroups.find((g: any) => {
+              const nome = g.nome.toLowerCase();
+              const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+              return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm) ||
+                searchTerm.split(/\s+/).every((w: string) => nome.includes(w));
+            });
             matchedGroupId = mg?.group_id || null;
+            matchedGroupName = mg?.nome || null;
           }
+          const taskTitle = matchedGroupName || args.title;
           const { error: insertErr } = await supabase.from("tasks").insert({
-            title: args.title,
+            title: taskTitle,
             description: args.description || null,
             assigned_to: args.assigned_to,
             group_id: matchedGroupId,
@@ -1718,7 +1727,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
             created_by: `${firstName} (via WhatsApp)`,
             status: "pendente",
           });
-          toolResults.push(insertErr ? `❌ Erro: ${insertErr.message}` : `✅ Tarefa criada: "${args.title}" para ${args.assigned_to}`);
+          toolResults.push(insertErr ? `❌ Erro: ${insertErr.message}` : `✅ Tarefa criada: "${taskTitle}" para ${args.assigned_to}\n📝 ${args.description || ""}`);
         }
 
         if (fnName === "remover_tarefas") {
