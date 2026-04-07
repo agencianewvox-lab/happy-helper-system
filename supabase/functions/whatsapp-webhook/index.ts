@@ -719,6 +719,7 @@ async function handleAlissonAIReply(
       line += `\n  Responsável CS: ${g.gestor_responsavel || "Não definido"}`;
       line += `\n  Plano: ${g.plano || "N/A"} | Investimento ads: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
       line += `\n  Categoria: ${g.categoria || "Sem categoria"}`;
+      if (g.acessos_cliente) line += `\n  🔑 Acessos do cliente: ${g.acessos_cliente}`;
       if (g.data_entrada) line += `\n  Cliente desde: ${g.data_entrada} (${mesesCliente})`;
       line += `\n  Mensagens recentes: ${msgs.length} total (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
       if (frtMinutes !== null) {
