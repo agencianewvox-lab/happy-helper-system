@@ -106,7 +106,7 @@ function detectNoteIntent(messages: any[]): boolean {
   return keywords.some(k => text.includes(k));
 }
 
-
+type DateRangeInfo = {
   since: string;
   until: string;
   explicitYear: boolean;
