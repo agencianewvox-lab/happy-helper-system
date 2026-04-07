@@ -415,18 +415,18 @@ const AGENT_TOOLS = [
     type: "function",
     function: {
       name: "criar_tarefa",
-      description: "Cria uma tarefa geral (não vinculada necessariamente a um cliente) para um membro da equipe. Use para tarefas do dia a dia, comandos operacionais, ou qualquer ação que não seja uma pendência de cliente específico.",
+      description: "Cria uma tarefa para um membro da equipe. SEMPRE tente identificar o cliente mencionado na mensagem e preencha group_name com o nome EXATO do grupo/cliente no sistema. O title deve ser o nome do cliente (ex: 'MKT NV - ORALCENTER CATALÃO'). A description deve conter a tarefa em si (ex: 'Recriar campanha no Google Ads').",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Título curto da tarefa" },
-          description: { type: "string", description: "Descrição detalhada (opcional)", nullable: true },
+          title: { type: "string", description: "Nome do cliente/grupo no sistema (ex: 'MKT NV - ORALCENTER CATALÃO'). Se não houver cliente, use um título descritivo curto." },
+          description: { type: "string", description: "Descrição detalhada da tarefa a ser realizada (ex: 'Recriar campanha no Google Ads', 'Agendar reunião de alinhamento')" },
           assigned_to: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge, Priscilla Borges, Joel, Thais, Daniella, Victor Botto, Jiza Reis)" },
-          group_name: { type: "string", description: "Nome do cliente associado (opcional)", nullable: true },
+          group_name: { type: "string", description: "Nome do cliente/grupo associado — SEMPRE preencha se mencionarem um cliente, mesmo parcialmente (ex: 'oral center', 'idonea', 'reabilis'). Busque o nome mais próximo da lista de grupos disponíveis.", nullable: true },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
           priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" }
         },
-        required: ["title", "assigned_to", "priority"],
+        required: ["title", "assigned_to", "priority", "description"],
         additionalProperties: false,
       },
     },
