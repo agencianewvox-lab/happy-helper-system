@@ -496,24 +496,38 @@ export default function Tarefas() {
                             </div>
                           )}
 
-                          {/* Title */}
-                          <p className="text-sm font-semibold leading-tight">{item.title}</p>
+                          {/* Client name as main title */}
+                          {item.grupo_nome && (
+                            <p className="text-sm font-bold leading-tight">📁 {item.grupo_nome}</p>
+                          )}
+                          {!item.grupo_nome && (
+                            <p className="text-sm font-bold leading-tight">{item.title}</p>
+                          )}
 
-                          {/* Description */}
+                          {/* Task description (title as fallback + description) */}
+                          {item.grupo_nome && (
+                            <p className="text-xs font-medium text-foreground/80">{item.title}</p>
+                          )}
                           {item.description && (
                             <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 bg-muted/30 rounded p-2">
                               {item.description}
                             </p>
                           )}
 
-                          {/* Client + Assigned */}
+                          {/* Due date + Assigned */}
                           <div className="flex items-center justify-between gap-2 pt-0.5">
                             <Badge variant="outline" className="text-[10px] gap-1">
                               <User className="w-2.5 h-2.5" />
                               {item.assigned_to.split(" ")[0]}
                             </Badge>
-                            {item.grupo_nome && (
-                              <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">📁 {item.grupo_nome}</span>
+                            {item.due_date && (
+                              <span className={cn(
+                                "text-[10px] flex items-center gap-1 font-medium",
+                                isOverdue ? "text-red-500 font-bold" : "text-muted-foreground"
+                              )}>
+                                📅 Entrega: {new Date(item.due_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                                {isOverdue && " ⚠️"}
+                              </span>
                             )}
                           </div>
 
