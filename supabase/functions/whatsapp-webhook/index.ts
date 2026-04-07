@@ -966,16 +966,24 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
 
       if (fnName === "criar_tarefa") {
         let matchedGroupId: string | null = null;
+        let matchedGroupName: string | null = null;
         if (args.group_name) {
-          const matchedGroup = grupos.find((g: any) =>
-            g.nome.toLowerCase().includes(args.group_name.toLowerCase()) ||
-            args.group_name.toLowerCase().includes(g.nome.toLowerCase().replace("nv-mkt ", "").replace("nv - ", "").replace("mkt nv - ", "").replace("nv ", ""))
-          );
+          const searchTerm = args.group_name.toLowerCase().trim();
+          const matchedGroup = grupos.find((g: any) => {
+            const nome = g.nome.toLowerCase();
+            const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+            return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm) ||
+              searchTerm.split(/\s+/).every((w: string) => nome.includes(w));
+          });
           matchedGroupId = matchedGroup?.group_id || null;
+          matchedGroupName = matchedGroup?.nome || null;
         }
 
+        // Use the matched group name as title if found, otherwise use provided title
+        const taskTitle = matchedGroupName || args.title;
+
         const { error: insertErr } = await supabase.from("tasks").insert({
-          title: args.title,
+          title: taskTitle,
           description: args.description || null,
           assigned_to: args.assigned_to,
           group_id: matchedGroupId,
@@ -989,7 +997,7 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           console.error("Error creating task:", insertErr);
           toolResults.push(`❌ Erro ao criar tarefa: ${insertErr.message}`);
         } else {
-          toolResults.push(`✅ Tarefa criada: "${args.title}" para ${args.assigned_to}${args.group_name ? ` (cliente: ${args.group_name})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}`);
+          toolResults.push(`✅ Tarefa criada: "${taskTitle}" para ${args.assigned_to}${matchedGroupName ? ` (cliente: ${matchedGroupName})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}\n📝 ${args.description || ""}`);
         }
       }
 
