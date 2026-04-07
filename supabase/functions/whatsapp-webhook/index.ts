@@ -1123,7 +1123,7 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           const { error: noteErr } = await supabase.from("client_notes").insert({
             group_id: matchedGroup.group_id,
             content: args.note_content,
-            author_name: "Vox (via feedback)",
+            author_name: `Vox (via Alisson)`,
           });
           if (!noteErr) {
             toolResults.push(`✅ Nota salva no card de ${matchedGroup.nome}`);
