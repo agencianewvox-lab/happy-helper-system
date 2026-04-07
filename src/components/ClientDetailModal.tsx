@@ -86,7 +86,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [loadingConversas, setLoadingConversas] = useState(false);
   const [clientInfo, setClientInfo] = useState({
-    plano: "", investimento_ads: "", data_entrada: "", data_ciclo_ads: "",
+    plano: "", investimento_ads: "", investimento_google_ads: "", plataforma_ads: "", data_entrada: "", data_ciclo_ads: "",
     aniversario_cliente: "", aniversario_empresa: "", acessos_cliente: "",
     gestor_responsavel: "", briefing: "", estrelas_dificuldade: "", estrelas_financeiro: "", estrelas_temperamento: "",
     responsavel_master: "", responsavel_socio: "",
@@ -138,12 +138,14 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const fetchClientInfo = useCallback(async () => {
     if (!grupo?.id) return;
     const { data } = await supabase.from("whatsapp_grupos")
-      .select("plano, investimento_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, responsavel_master, responsavel_socio")
+      .select("plano, investimento_ads, investimento_google_ads, plataforma_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, responsavel_master, responsavel_socio")
       .eq("id", grupo.id).single();
     if (data) {
       setClientInfo({
         plano: (data as any).plano || "",
         investimento_ads: (data as any).investimento_ads != null ? String((data as any).investimento_ads) : "",
+        investimento_google_ads: (data as any).investimento_google_ads != null ? String((data as any).investimento_google_ads) : "",
+        plataforma_ads: (data as any).plataforma_ads || "",
         data_entrada: (data as any).data_entrada || "",
         data_ciclo_ads: (data as any).data_ciclo_ads || "",
         aniversario_cliente: (data as any).aniversario_cliente || "",
@@ -167,6 +169,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
     const { error } = await supabase.from("whatsapp_grupos").update({
       plano: clientInfo.plano || null,
       investimento_ads: clientInfo.investimento_ads ? Number(clientInfo.investimento_ads) : null,
+      investimento_google_ads: clientInfo.investimento_google_ads ? Number(clientInfo.investimento_google_ads) : null,
+      plataforma_ads: clientInfo.plataforma_ads || null,
       data_entrada: clientInfo.data_entrada || null,
       data_ciclo_ads: clientInfo.data_ciclo_ads || null,
       aniversario_cliente: clientInfo.aniversario_cliente || null,
@@ -562,16 +566,47 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                     <Input value={clientInfo.plano} onChange={(e) => setClientInfo(prev => ({ ...prev, plano: e.target.value }))} placeholder="Ex: SM + Tráfego Pago" className="mt-1 h-8 text-sm bg-background/50" />
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                  <DollarSign className="w-4 h-4 mt-2 text-emerald-500 shrink-0" />
+                {/* Plataforma de Ads */}
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                  <Megaphone className="w-4 h-4 mt-2 text-blue-500 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <Label className="text-xs text-muted-foreground font-medium">Investimento em Ads</Label>
-                    <div className="relative mt-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-                      <Input type="number" value={clientInfo.investimento_ads} onChange={(e) => setClientInfo(prev => ({ ...prev, investimento_ads: e.target.value }))} placeholder="0,00" className="h-8 text-sm pl-9 bg-background/50" />
-                    </div>
+                    <Label className="text-xs text-muted-foreground font-medium">Plataforma de Ads</Label>
+                    <Select value={clientInfo.plataforma_ads} onValueChange={(val) => setClientInfo(prev => ({ ...prev, plataforma_ads: val }))}>
+                      <SelectTrigger className="mt-1 h-8 text-sm bg-background/50"><SelectValue placeholder="Selecione a plataforma" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="meta">Meta Ads</SelectItem>
+                        <SelectItem value="google">Google Ads</SelectItem>
+                        <SelectItem value="meta_e_google">Meta + Google Ads</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+                {/* Investimento Meta Ads */}
+                {(clientInfo.plataforma_ads === "meta" || clientInfo.plataforma_ads === "meta_e_google") && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                    <DollarSign className="w-4 h-4 mt-2 text-emerald-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Investimento Meta Ads</Label>
+                      <div className="relative mt-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                        <Input type="number" value={clientInfo.investimento_ads} onChange={(e) => setClientInfo(prev => ({ ...prev, investimento_ads: e.target.value }))} placeholder="0,00" className="h-8 text-sm pl-9 bg-background/50" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Investimento Google Ads */}
+                {(clientInfo.plataforma_ads === "google" || clientInfo.plataforma_ads === "meta_e_google") && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                    <DollarSign className="w-4 h-4 mt-2 text-red-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground font-medium">Investimento Google Ads</Label>
+                      <div className="relative mt-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
+                        <Input type="number" value={clientInfo.investimento_google_ads} onChange={(e) => setClientInfo(prev => ({ ...prev, investimento_google_ads: e.target.value }))} placeholder="0,00" className="h-8 text-sm pl-9 bg-background/50" />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
                   <CalendarDays className="w-4 h-4 mt-2 text-blue-500 shrink-0" />
                   <div className="flex-1 min-w-0">

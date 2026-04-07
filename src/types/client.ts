@@ -100,6 +100,8 @@ export interface Grupo {
   /** Minutes of delay beyond the 30-min SLA threshold */
   sla_delay_minutes: number;
   investimento_ads: number | null;
+  investimento_google_ads: number | null;
+  plataforma_ads: string | null;
   data_ciclo_ads: string | null;
   gestor_responsavel: string | null;
   estrelas_dificuldade: number | null;
