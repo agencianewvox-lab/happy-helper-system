@@ -297,6 +297,8 @@ SUAS CAPACIDADES:
 
 10. PERGUNTAS SOBRE DADOS — Responda de forma direta e numérica. Se não tiver o dado, diga claramente. NUNCA invente números.
 
+14. CONSULTA DE ACESSOS — Quando alguém da equipe perguntar sobre acessos, login, senha, credenciais, hospedagem ou domínio de um cliente, verifique o campo "Acessos do cliente" nos dados do grupo. Se a informação estiver disponível, envie IMEDIATAMENTE e de forma completa (login, senha, links, tudo que constar). Se não houver dados de acesso cadastrados, informe que o campo de acessos do cliente está vazio e sugira que seja preenchido na aba Informações do card do cliente.
+
 11. ANÁLISE DE NPS REAL — Analise os feedbacks reais coletados por pesquisa NPS direta. Compare com o NPS preditivo, identifique discrepâncias, destaque feedbacks críticos e indicações recebidas. Use esses dados para calibrar todas as outras análises e recomendações.
 
 REGRAS GERAIS:
@@ -535,6 +537,7 @@ Deno.serve(async (req) => {
       line += `\n  Responsável CS: ${g.gestor_responsavel || "Não definido"}`;
       line += `\n  Plano: ${g.plano || "N/A"} | Investimento ads: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
       line += `\n  Categoria: ${g.categoria || "Sem categoria"}`;
+      if (g.acessos_cliente) line += `\n  🔑 Acessos do cliente: ${g.acessos_cliente}`;
       if (g.data_entrada) line += `\n  Cliente desde: ${g.data_entrada} (${mesesCliente})`;
       line += `\n  Mensagens recentes: ${msgs.length} total (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
       if (frtMinutes !== null) {

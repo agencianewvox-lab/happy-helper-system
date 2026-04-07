@@ -719,6 +719,7 @@ async function handleAlissonAIReply(
       line += `\n  Responsável CS: ${g.gestor_responsavel || "Não definido"}`;
       line += `\n  Plano: ${g.plano || "N/A"} | Investimento ads: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
       line += `\n  Categoria: ${g.categoria || "Sem categoria"}`;
+      if (g.acessos_cliente) line += `\n  🔑 Acessos do cliente: ${g.acessos_cliente}`;
       if (g.data_entrada) line += `\n  Cliente desde: ${g.data_entrada} (${mesesCliente})`;
       line += `\n  Mensagens recentes: ${msgs.length} total (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
       if (frtMinutes !== null) {
@@ -813,6 +814,8 @@ SUAS CAPACIDADES COMO AGENTE:
 6. ANÁLISE DE ADS — Métricas de anúncios Meta por cliente: gasto, leads, CPA, CTR, alcance.
 
 7. ALERTAS E URGÊNCIAS — Pendências abertas, clientes inativos, sentimento piorando, SLA violado.
+
+12. CONSULTA DE ACESSOS — Quando alguém perguntar sobre acessos, login, senha, credenciais, hospedagem ou domínio de um cliente, verifique o campo "Acessos do cliente" nos dados. Se a informação estiver disponível, envie IMEDIATAMENTE e completa. Se não houver, informe que o campo está vazio e sugira preencher na aba Informações do card do cliente.
 
 8. RECOMENDAÇÕES PROATIVAS — Ações prioritárias com QUEM deve fazer, PARA QUAL cliente, e POR QUÊ.
 
@@ -1483,6 +1486,7 @@ async function handleTeamCoachReply(
 
       let line = `### ${g.nome}`;
       line += `\n  Responsável: ${g.gestor_responsavel || "N/A"} | Plano: ${g.plano || "N/A"} | Investimento: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
+      if (g.acessos_cliente) line += `\n  🔑 Acessos: ${g.acessos_cliente}`;
       if (g.data_entrada) line += ` | Cliente há ${mesesCliente}`;
       line += `\n  Msgs recentes: ${msgs.length} (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
       if (frtMin !== null) line += ` | FRT: ${frtMin}min`;
@@ -1580,6 +1584,7 @@ REGRAS:
 - Responda em português brasileiro natural
 - ${firstName} tem acesso a ${accessScope}
 - Responda QUALQUER pergunta que ${firstName} fizer sobre os clientes, operação, dados, etc. Seja útil!
+- CONSULTA DE ACESSOS: Quando ${firstName} perguntar sobre acessos, login, senha, credenciais, hospedagem ou domínio de um cliente, verifique o campo "Acessos" nos dados do grupo. Se a informação existir, envie IMEDIATAMENTE e completa. Se não existir, diga que o campo está vazio e sugira preencher na aba Informações do card do cliente.
 - Se ${firstName} perguntar "algum outro grupo?" ou algo similar, entenda como "tem algum grupo/cliente que precisa de atenção?" e responda com dados reais
 - Quando ${firstName} contar como foi o dia ou o que fez, REGISTRE usando as ferramentas e RESPONDA de forma encorajadora
 - IMPORTANTE: Quando houver dados de Meta Ads para um PERÍODO ESPECÍFICO, use EXATAMENTE esses valores
