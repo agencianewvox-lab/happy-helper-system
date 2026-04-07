@@ -577,10 +577,27 @@ Deno.serve(async (req) => {
       let line = `\n### ${g.nome}`;
       line += `\n  Group ID: ${gid}`;
       line += `\n  Responsável CS: ${g.gestor_responsavel || "Não definido"}`;
-      line += `\n  Plano: ${g.plano || "N/A"} | Investimento ads: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
+      if (g.responsavel_master) line += ` | Resp. Master: ${g.responsavel_master}`;
+      if (g.responsavel_socio) line += ` | Resp. Sócio: ${g.responsavel_socio}`;
+      line += `\n  Plano: ${g.plano || "N/A"}`;
+      line += ` | Plataforma Ads: ${g.plataforma_ads || "N/A"}`;
+      if (g.investimento_ads) line += ` | Investimento Meta Ads: R$${g.investimento_ads}`;
+      if (g.investimento_google_ads) line += ` | Investimento Google Ads: R$${g.investimento_google_ads}`;
+      if (!g.investimento_ads && !g.investimento_google_ads) line += ` | Investimento ads: N/A`;
       line += `\n  Categoria: ${g.categoria || "Sem categoria"}`;
-      if (g.acessos_cliente) line += `\n  🔑 Acessos do cliente: ${g.acessos_cliente}`;
+      if (g.data_ciclo_ads) line += ` | Data Ciclo Ads: ${g.data_ciclo_ads}`;
       if (g.data_entrada) line += `\n  Cliente desde: ${g.data_entrada} (${mesesCliente})`;
+      if (g.aniversario_cliente) line += `\n  🎂 Aniversário do cliente (Resp. Master): ${g.aniversario_cliente}`;
+      if (g.aniversario_empresa) line += ` | Aniversário da empresa: ${g.aniversario_empresa}`;
+      if (g.briefing) line += `\n  📄 Briefing: ${g.briefing.slice(0, 300)}`;
+      if (g.acessos_cliente) line += `\n  🔑 Acessos do cliente: ${g.acessos_cliente}`;
+      // Stars ratings
+      const stars: string[] = [];
+      if (g.estrelas_dificuldade) stars.push(`Dificuldade: ${"⭐".repeat(g.estrelas_dificuldade)}`);
+      if (g.estrelas_financeiro) stars.push(`Financeiro: ${"⭐".repeat(g.estrelas_financeiro)}`);
+      if (g.estrelas_temperamento) stars.push(`Temperamento: ${"⭐".repeat(g.estrelas_temperamento)}`);
+      if (stars.length > 0) line += `\n  Classificação: ${stars.join(" | ")}`;
+      
       line += `\n  Mensagens recentes: ${msgs.length} total (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
       if (frtMinutes !== null) {
         const frtStatus = frtMinutes <= 30 ? "✅ excelente" : frtMinutes <= 60 ? "🟡 bom" : frtMinutes <= 120 ? "🟠 aceitável" : "🔴 ruim";
@@ -595,6 +612,15 @@ Deno.serve(async (req) => {
         for (const p of urgentPending.slice(0, 3)) {
           line += `\n    - "${p.term}" (desde ${p.created_at})${p.due_date ? ` prazo: ${p.due_date}` : ""}`;
         }
+      }
+
+      // NPS Preditivo
+      const npsPred = npsPredByGroup.get(gid);
+      if (npsPred) {
+        const catEmoji = npsPred.nps_categoria === "promotor" ? "🟢" : npsPred.nps_categoria === "detrator" ? "🔴" : "🟡";
+        line += `\n  📈 NPS PREDITIVO: ${npsPred.nps_score}/10 ${catEmoji} ${npsPred.nps_categoria} (confiança ${npsPred.confianca}%, tendência ${npsPred.tendencia || "estável"})`;
+        if (npsPred.fator_principal) line += `\n    Fator principal: ${npsPred.fator_principal}`;
+        if (npsPred.recomendacao) line += `\n    Recomendação: ${npsPred.recomendacao.slice(0, 150)}`;
       }
 
       // Ads data
@@ -613,17 +639,24 @@ Deno.serve(async (req) => {
         const avgNpsReal = (groupSurveys.reduce((s: number, sv: any) => s + sv.score, 0) / groupSurveys.length).toFixed(1);
         const lastSurveyDate = groupSurveys[0].created_at?.substring(0, 10) || "N/A";
         line += `\n  📋 NPS REAL: Média ${avgNpsReal}/10 (${groupSurveys.length} respostas, última em ${lastSurveyDate})`;
-        // Include last 3 comments
         const withComments = groupSurveys.filter((sv: any) => sv.comment).slice(0, 3);
         for (const sv of withComments) {
           line += `\n    Nota ${sv.score}: "${(sv.comment || "").slice(0, 100)}"`;
           if (sv.quality_rating) line += ` | Qualidade: ${sv.quality_rating}`;
           if (sv.results_rating) line += ` | Resultados: ${sv.results_rating}`;
         }
-        // Referrals
         const withReferrals = groupSurveys.filter((sv: any) => sv.referral_1_name);
         if (withReferrals.length > 0) {
           line += `\n    💡 ${withReferrals.length} resposta(s) com indicações de novos clientes`;
+        }
+      }
+
+      // Client notes (last 5)
+      const groupNotes = notesByGroup.get(gid) || [];
+      if (groupNotes.length > 0) {
+        line += `\n  📝 NOTAS INTERNAS (${groupNotes.length} total, últimas 5):`;
+        for (const n of groupNotes.slice(0, 5)) {
+          line += `\n    - [${n.created_at?.substring(0, 10)}] ${n.author_name}: "${n.content.slice(0, 120)}"`;
         }
       }
 
