@@ -1160,6 +1160,7 @@ Formato:
 
 Se o usuário não especificar o autor, use "${userName || "Sistema"}".
 Se mencionou o nome de um cliente, identifique o group_id correspondente.
+${!isMaster && gestorFilter ? `IMPORTANTE: Este usuário é gestor e só pode adicionar notas nos cards dos SEUS clientes. Se o cliente não estiver na lista de dados, recuse educadamente informando que ele não tem permissão para esse card.` : ""}
 Após o JSON, confirme amigavelmente que a nota foi adicionada.`;
 
       const noteResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1184,19 +1185,30 @@ Após o JSON, confirme amigavelmente que a nota foi adicionada.`;
       if (noteMatch) {
         try {
           const noteInfo = JSON.parse(noteMatch[1].trim());
-          const { error: insertError } = await supabase.from("client_notes").insert({
-            group_id: noteInfo.group_id,
-            content: noteInfo.content,
-            author_name: noteInfo.author_name || userName || "Vox (IA)",
-          });
-
-          if (insertError) {
-            console.error("Error inserting note:", insertError);
-            content = content.replace(/<ADD_NOTE>[\s\S]*?<\/ADD_NOTE>/, "");
-            content += "\n\n⚠️ Erro ao salvar a nota. Tente novamente.";
+          
+          // Access control: non-master users can only add notes to their own groups
+          if (!isMaster && gestorFilter) {
+            const allowedGroup = grupos.find((g: any) => g.group_id === noteInfo.group_id);
+            if (!allowedGroup) {
+              content = content.replace(/<ADD_NOTE>[\s\S]*?<\/ADD_NOTE>/, "");
+              content += "\n\n⚠️ Você não tem permissão para adicionar notas nesse cliente. Apenas nos seus clientes vinculados.";
+            } else {
+              const { error: insertError } = await supabase.from("client_notes").insert({
+                group_id: noteInfo.group_id,
+                content: noteInfo.content,
+                author_name: noteInfo.author_name || userName || "Vox (IA)",
+              });
+              content = content.replace(/<ADD_NOTE>[\s\S]*?<\/ADD_NOTE>/, "");
+              content += insertError ? "\n\n⚠️ Erro ao salvar a nota. Tente novamente." : "\n\n✅ **Nota adicionada ao card do cliente!**";
+            }
           } else {
+            const { error: insertError } = await supabase.from("client_notes").insert({
+              group_id: noteInfo.group_id,
+              content: noteInfo.content,
+              author_name: noteInfo.author_name || userName || "Vox (IA)",
+            });
             content = content.replace(/<ADD_NOTE>[\s\S]*?<\/ADD_NOTE>/, "");
-            content += "\n\n✅ **Nota adicionada ao card do cliente!**";
+            content += insertError ? "\n\n⚠️ Erro ao salvar a nota. Tente novamente." : "\n\n✅ **Nota adicionada ao card do cliente!**";
           }
         } catch (parseErr) {
           console.error("Error parsing note:", parseErr);
