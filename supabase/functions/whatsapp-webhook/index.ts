@@ -805,7 +805,12 @@ SUAS CAPACIDADES COMO AGENTE:
 
 3. CRIAR PENDÊNCIAS — Quando Alisson pedir para designar pendências de CLIENTE, use "criar_pendencia". Sempre confirme os detalhes na resposta.
 
-4. CRIAR TAREFAS — Para tarefas gerais do dia a dia (não necessariamente vinculadas a cliente), use "criar_tarefa". Exemplos: "pede pro Victor fazer um banner", "fala pro Joel organizar reunião". Pode ou não vincular a um cliente.
+4. CRIAR TAREFAS — Para tarefas do dia a dia, use "criar_tarefa". REGRA IMPORTANTE: Quando a mensagem mencionar um cliente (mesmo parcialmente, ex: "oral center", "reabilis", "idonea"), você DEVE:
+   a) Preencher "group_name" com o nome do cliente mencionado
+   b) Usar o NOME COMPLETO do grupo/cliente no campo "title" (ex: "MKT NV - ORALCENTER CATALÃO")
+   c) Colocar a AÇÃO/TAREFA no campo "description" (ex: "Recriar campanha no Google Ads")
+   d) Buscar na lista de grupos o nome mais próximo do que foi mencionado
+   Se NÃO houver cliente, use um título descritivo e a tarefa na descrição.
 
 5. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
 
