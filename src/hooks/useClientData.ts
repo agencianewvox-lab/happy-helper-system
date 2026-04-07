@@ -161,6 +161,8 @@ export function useClientData() {
           sla_violated,
           sla_delay_minutes,
           investimento_ads: g.investimento_ads ?? null,
+          investimento_google_ads: g.investimento_google_ads ?? null,
+          plataforma_ads: g.plataforma_ads ?? null,
           data_ciclo_ads: g.data_ciclo_ads ?? null,
           gestor_responsavel: g.gestor_responsavel ?? null,
           estrelas_dificuldade: g.estrelas_dificuldade ?? null,
