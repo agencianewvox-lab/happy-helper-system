@@ -1484,6 +1484,7 @@ async function handleTeamCoachReply(
 
       let line = `### ${g.nome}`;
       line += `\n  Responsável: ${g.gestor_responsavel || "N/A"} | Plano: ${g.plano || "N/A"} | Investimento: ${g.investimento_ads ? `R$${g.investimento_ads}` : "N/A"}`;
+      if (g.acessos_cliente) line += `\n  🔑 Acessos: ${g.acessos_cliente}`;
       if (g.data_entrada) line += ` | Cliente há ${mesesCliente}`;
       line += `\n  Msgs recentes: ${msgs.length} (${clientMsgs.length} cliente, ${teamMsgs.length} equipe)`;
       if (frtMin !== null) line += ` | FRT: ${frtMin}min`;
