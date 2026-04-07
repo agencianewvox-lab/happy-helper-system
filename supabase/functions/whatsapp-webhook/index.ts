@@ -815,6 +815,8 @@ SUAS CAPACIDADES COMO AGENTE:
 
 7. ALERTAS E URGÊNCIAS — Pendências abertas, clientes inativos, sentimento piorando, SLA violado.
 
+12. CONSULTA DE ACESSOS — Quando alguém perguntar sobre acessos, login, senha, credenciais, hospedagem ou domínio de um cliente, verifique o campo "Acessos do cliente" nos dados. Se a informação estiver disponível, envie IMEDIATAMENTE e completa. Se não houver, informe que o campo está vazio e sugira preencher na aba Informações do card do cliente.
+
 8. RECOMENDAÇÕES PROATIVAS — Ações prioritárias com QUEM deve fazer, PARA QUAL cliente, e POR QUÊ.
 
 9. ENVIAR CUTUCADA — Quando Alisson pedir para cutucar, lembrar, cobrar ou enviar cutucada para alguém da equipe, use "enviar_cutucada". A cutucada será enviada IMEDIATAMENTE via WhatsApp para a pessoa.
