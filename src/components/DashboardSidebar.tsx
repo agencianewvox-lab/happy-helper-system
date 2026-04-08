@@ -26,6 +26,7 @@ const navItems = [
   { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
   { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false, masterOnly: false, badgeKey: "agenda" as const },
   { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false, masterOnly: false, badgeKey: "pendencias" as const },
+  { title: "Escritório", url: "/escritorio", icon: Monitor, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "NPS Preditivo", url: "/nps", icon: Heart, adminOnly: true, masterOnly: false, badgeKey: null },
   { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: true, masterOnly: false, badgeKey: null },
   { title: "Painel Admin", url: "/admin", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },

@@ -57,6 +57,7 @@ const App = () => (
           <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
           <Route path="/nps-real" element={<ProtectedRoute><NpsReal /></ProtectedRoute>} />
           <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
+          <Route path="/escritorio" element={<ProtectedRoute><Escritorio /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
           <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
