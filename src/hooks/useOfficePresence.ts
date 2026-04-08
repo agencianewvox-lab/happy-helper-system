@@ -29,6 +29,8 @@ export interface OfficeRoom {
   voz_ativa_padrao: boolean | null;
   ordem: number | null;
   ativo: boolean | null;
+  locked_by: string | null;
+  locked_by_name: string | null;
 }
 
 export function useOfficePresence() {
