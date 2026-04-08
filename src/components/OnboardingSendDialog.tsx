@@ -8,7 +8,7 @@ import { Send, Loader2, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-const PUBLISHED_APP_URL = "https://happy-helper-system.lovable.app";
+const PUBLISHED_APP_URL = "https://paineldecontrolenv.lovable.app";
 
 const MSG_CLINICA = `Olá, Dr(a). [Nome do Responsável]! Tudo bem?
 
