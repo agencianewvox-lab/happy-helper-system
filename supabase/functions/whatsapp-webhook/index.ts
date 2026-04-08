@@ -1001,6 +1001,27 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           });
           matchedGroupId = matchedGroup?.group_id || null;
           matchedGroupName = matchedGroup?.nome || null;
+        }
+
+        const taskTitle = matchedGroupName || args.title;
+
+        const { error: insertErr } = await supabase.from("tasks").insert({
+          title: taskTitle,
+          description: args.description || null,
+          assigned_to: args.assigned_to,
+          group_id: matchedGroupId,
+          priority: args.priority || "normal",
+          due_date: args.due_date || null,
+          created_by: "Alisson Lima (via WhatsApp)",
+          status: "pendente",
+        });
+
+        if (insertErr) {
+          console.error("Error creating task:", insertErr);
+          toolResults.push(`❌ Erro ao criar tarefa: ${insertErr.message}`);
+        } else {
+          toolResults.push(`✅ Tarefa criada: "${taskTitle}" para ${args.assigned_to}${matchedGroupName ? ` (cliente: ${matchedGroupName})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}\n📝 ${args.description || ""}`);
+        }
       }
 
       if (fnName === "agendar_evento") {
@@ -1039,27 +1060,6 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
         }
       }
 
-        // Use the matched group name as title if found, otherwise use provided title
-        const taskTitle = matchedGroupName || args.title;
-
-        const { error: insertErr } = await supabase.from("tasks").insert({
-          title: taskTitle,
-          description: args.description || null,
-          assigned_to: args.assigned_to,
-          group_id: matchedGroupId,
-          priority: args.priority || "normal",
-          due_date: args.due_date || null,
-          created_by: "Alisson Lima (via WhatsApp)",
-          status: "pendente",
-        });
-
-        if (insertErr) {
-          console.error("Error creating task:", insertErr);
-          toolResults.push(`❌ Erro ao criar tarefa: ${insertErr.message}`);
-        } else {
-          toolResults.push(`✅ Tarefa criada: "${taskTitle}" para ${args.assigned_to}${matchedGroupName ? ` (cliente: ${matchedGroupName})` : ""}${args.due_date ? ` prazo: ${args.due_date}` : ""}\n📝 ${args.description || ""}`);
-        }
-      }
 
       if (fnName === "remover_tarefas") {
         const responsibles = Array.isArray(args.responsibles) ? args.responsibles.filter(Boolean) : [];

@@ -402,61 +402,108 @@ export default function NpsReal() {
               </SelectContent>
             </Select>
           </div>
-          <Card className="bg-card border-border/40">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Gestor</TableHead>
-                    <TableHead>Nota</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Comentário</TableHead>
-                    <TableHead>Data</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSurveys.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        Nenhuma resposta recebida ainda
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredSurveys.map((s) => {
-                      const grupo = gruposMap[s.group_id];
-                      return (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-medium text-foreground">
-                            {grupo?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 25) || s.group_id.substring(0, 12)}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {grupo?.gestor_responsavel || "—"}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-lg font-bold ${getScoreColor(s.score)}`}>{s.score}</span>
-                          </TableCell>
-                          <TableCell>{getScoreBadge(s.score)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {s.survey_type === "clinica" ? "Clínica" : "Operação"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="max-w-[250px] truncate text-sm text-muted-foreground">
-                            {s.comment || "—"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                            {format(new Date(s.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            {filteredSurveys.length === 0 ? (
+              <Card className="bg-card border-border/40">
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  Nenhuma resposta recebida ainda
+                </CardContent>
+              </Card>
+            ) : (
+              filteredSurveys.map((s) => {
+                const grupo = gruposMap[s.group_id];
+                const clientName = grupo?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 30) || s.group_id.substring(0, 12);
+                return (
+                  <Card key={s.id} className="bg-card border-border/40">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-2xl font-bold ${getScoreColor(s.score)}`}>{s.score}</span>
+                          {getScoreBadge(s.score)}
+                          <Badge variant="outline" className="text-[10px]">
+                            {s.survey_type === "clinica" ? "Clínica" : "Operação"}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(s.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="font-medium text-foreground">{clientName}</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-muted-foreground">{grupo?.gestor_responsavel || "—"}</span>
+                      </div>
+
+                      {(s.respondent_name || s.respondent_email) && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Respondente:</span> {s.respondent_name || "—"} {s.respondent_email ? `(${s.respondent_email})` : ""}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {s.quality_rating && (
+                          <div className="bg-muted/30 rounded p-2">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Qualidade</span>
+                            <span className="text-xs font-medium text-foreground">{s.quality_rating}</span>
+                          </div>
+                        )}
+                        {s.results_rating && (
+                          <div className="bg-muted/30 rounded p-2">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Resultados</span>
+                            <span className="text-xs font-medium text-foreground">{s.results_rating}</span>
+                          </div>
+                        )}
+                        {s.communication_rating && (
+                          <div className="bg-muted/30 rounded p-2">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Comunicação</span>
+                            <span className="text-xs font-medium text-foreground">{s.communication_rating}</span>
+                          </div>
+                        )}
+                        {s.manager_rating && (
+                          <div className="bg-muted/30 rounded p-2">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Gestor</span>
+                            <span className="text-xs font-medium text-foreground">{s.manager_rating}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {s.comment && (
+                        <div className="bg-muted/30 rounded p-2">
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Comentário</span>
+                          <span className="text-xs text-foreground">{s.comment}</span>
+                        </div>
+                      )}
+
+                      {s.improvement_comment && (
+                        <div className="bg-muted/30 rounded p-2">
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Sugestão de melhoria</span>
+                          <span className="text-xs text-foreground">{s.improvement_comment}</span>
+                        </div>
+                      )}
+
+                      {(s.referral_1_name || s.referral_2_name || s.referral_3_name) && (
+                        <div className="bg-muted/30 rounded p-2 space-y-1">
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Indicações</span>
+                          {[1, 2, 3].map((i) => {
+                            const name = s[`referral_${i}_name` as keyof NpsSurveyRow] as string | null;
+                            const company = s[`referral_${i}_company` as keyof NpsSurveyRow] as string | null;
+                            const contact = s[`referral_${i}_contact` as keyof NpsSurveyRow] as string | null;
+                            if (!name) return null;
+                            return (
+                              <div key={i} className="text-xs text-foreground">
+                                <span className="font-medium">{i}.</span> {name}{company ? ` — ${company}` : ""}{contact ? ` (${contact})` : ""}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 
