@@ -1634,6 +1634,7 @@ CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
       toolsPromptSection += `
 - ${firstName} pode RESOLVER pendências dos seus clientes — quando disser que resolveu/fez/completou algo, use "resolver_pendencia"
 - ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa". SEMPRE identifique o cliente mencionado e use o nome completo do grupo como título, com a ação na descrição.
+- ${firstName} pode AGENDAR eventos/reuniões/compromissos na agenda — use "agendar_evento" (NÃO use criar_tarefa para compromissos com data/hora).
 - Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem
 - IMPORTANTE: Se ${firstName} confirmar que resolveu/fez/tratou uma pendência (mesmo com "joia", "feito", "já resolvi"), SEMPRE use resolver_pendencia para marcar como feito no sistema`;
     }
