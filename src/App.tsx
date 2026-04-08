@@ -16,6 +16,7 @@ import PesquisaNps from "./pages/PesquisaNps";
 import OnboardingClinica from "./pages/OnboardingClinica";
 import PainelAdmin from "./pages/PainelAdmin";
 import Configuracoes from "./pages/Configuracoes";
+import Escritorio from "./pages/Escritorio";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
