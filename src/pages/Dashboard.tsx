@@ -11,7 +11,8 @@ import { TVModeButton, TVModeOverlay } from "@/components/TVMode";
 import { Grupo } from "@/types/client";
 import { Badge } from "@/components/ui/badge";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, Moon, Flame, ShieldAlert } from "lucide-react";
+import { Activity, Users, MessageSquare, AlertTriangle, TrendingUp, Timer, AlertCircle, Moon, Flame, ShieldAlert, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,21 +29,33 @@ export default function Dashboard() {
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
+  const [gestorFilterOverride, setGestorFilterOverride] = useState<string | null>(null);
   const { predictionsMap, npsGlobal } = useNpsPredictions();
+
+  // Extract unique gestors for admin filter
+  const availableGestors = useMemo(() => {
+    const gestors = new Set<string>();
+    allGrupos.forEach(g => { if (g.gestor_responsavel) gestors.add(g.gestor_responsavel); });
+    return [...gestors].sort();
+  }, [allGrupos]);
 
   const roleGrupos = useMemo(() => {
     if (profileLoading) return [];
-    if (isAdmin) return grupos;
-    if (!gestorFilter) return [];
-    return grupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [grupos, isAdmin, gestorFilter, profileLoading]);
+    let base = isAdmin ? grupos : (!gestorFilter ? [] : grupos.filter(g => g.gestor_responsavel === gestorFilter));
+    if (isAdmin && gestorFilterOverride) {
+      base = base.filter(g => g.gestor_responsavel === gestorFilterOverride);
+    }
+    return base;
+  }, [grupos, isAdmin, gestorFilter, gestorFilterOverride, profileLoading]);
 
   const roleAllGrupos = useMemo(() => {
     if (profileLoading) return [];
-    if (isAdmin) return allGrupos;
-    if (!gestorFilter) return [];
-    return allGrupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [allGrupos, isAdmin, gestorFilter, profileLoading]);
+    let base = isAdmin ? allGrupos : (!gestorFilter ? [] : allGrupos.filter(g => g.gestor_responsavel === gestorFilter));
+    if (isAdmin && gestorFilterOverride) {
+      base = base.filter(g => g.gestor_responsavel === gestorFilterOverride);
+    }
+    return base;
+  }, [allGrupos, isAdmin, gestorFilter, gestorFilterOverride, profileLoading]);
 
   // Sound alert for pending demands
   const pendingCount = useMemo(
@@ -238,15 +251,39 @@ export default function Dashboard() {
         </div>
 
         {/* Filters + Birthday Alerts */}
-        <div className="flex items-center justify-between">
-          <DashboardFilters
-            categorias={categorias}
-            activeFilter={categoriaFilter}
-            onFilterChange={(f) => { setCategoriaFilter(f); setMetricFilter(null); }}
-            onPriorityFilter={() => setMetricFilter(metricFilter === "priority" ? null : "priority")}
-            isPriorityActive={metricFilter === "priority"}
-          />
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <DashboardFilters
+              categorias={categorias}
+              activeFilter={categoriaFilter}
+              onFilterChange={(f) => { setCategoriaFilter(f); setMetricFilter(null); }}
+              onPriorityFilter={() => setMetricFilter(metricFilter === "priority" ? null : "priority")}
+              isPriorityActive={metricFilter === "priority"}
+            />
+            {isAdmin && availableGestors.length > 0 && (
+              <Select
+                value={gestorFilterOverride || "all"}
+                onValueChange={(v) => setGestorFilterOverride(v === "all" ? null : v)}
+              >
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="Gestor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os gestores</SelectItem>
+                  {availableGestors.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <div className="flex items-center gap-2">
+            {gestorFilterOverride && (
+              <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setGestorFilterOverride(null)}>
+                {gestorFilterOverride} ✕
+              </Badge>
+            )}
             {metricFilter && (
               <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setMetricFilter(null)}>
                 {metricLabels[metricFilter]} ✕
