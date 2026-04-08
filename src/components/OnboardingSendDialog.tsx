@@ -44,7 +44,7 @@ export function OnboardingSendDialog({ groupId, groupName, categoria, responsave
 
   const isClinica = categoria?.toLowerCase() === "clínicas";
   const surveyType = isClinica ? "clinica" : "generico";
-  const onboardingLink = `${PUBLISHED_APP_URL}/onboarding/${encodeURIComponent(groupId)}/${surveyType}`;
+  const onboardingLink = `${PUBLISHED_APP_URL}/onboardingnv/${encodeURIComponent(groupId)}/${surveyType}`;
 
   const buildMessage = () => {
     const template = isClinica ? MSG_CLINICA : MSG_GENERICO;
