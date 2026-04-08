@@ -251,15 +251,39 @@ export default function Dashboard() {
         </div>
 
         {/* Filters + Birthday Alerts */}
-        <div className="flex items-center justify-between">
-          <DashboardFilters
-            categorias={categorias}
-            activeFilter={categoriaFilter}
-            onFilterChange={(f) => { setCategoriaFilter(f); setMetricFilter(null); }}
-            onPriorityFilter={() => setMetricFilter(metricFilter === "priority" ? null : "priority")}
-            isPriorityActive={metricFilter === "priority"}
-          />
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <DashboardFilters
+              categorias={categorias}
+              activeFilter={categoriaFilter}
+              onFilterChange={(f) => { setCategoriaFilter(f); setMetricFilter(null); }}
+              onPriorityFilter={() => setMetricFilter(metricFilter === "priority" ? null : "priority")}
+              isPriorityActive={metricFilter === "priority"}
+            />
+            {isAdmin && availableGestors.length > 0 && (
+              <Select
+                value={gestorFilterOverride || "all"}
+                onValueChange={(v) => setGestorFilterOverride(v === "all" ? null : v)}
+              >
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="Gestor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os gestores</SelectItem>
+                  {availableGestors.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <div className="flex items-center gap-2">
+            {gestorFilterOverride && (
+              <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setGestorFilterOverride(null)}>
+                {gestorFilterOverride} ✕
+              </Badge>
+            )}
             {metricFilter && (
               <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => setMetricFilter(null)}>
                 {metricLabels[metricFilter]} ✕
