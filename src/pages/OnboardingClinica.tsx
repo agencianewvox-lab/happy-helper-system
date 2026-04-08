@@ -178,8 +178,8 @@ export default function OnboardingClinica() {
               { key: "state", label: "Estado" },
               { key: "service_area", label: "Região / Bairros de Atendimento" },
               { key: "max_radius_km", label: "Raio máximo de atendimento (km)", type: "number" },
-            ].map(({ key, label, type }) => (
-              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
+            ].map(({ key, label, type, placeholder }) => (
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} placeholder={placeholder} />
             ))}
           </div>
         );
