@@ -12,6 +12,14 @@ import { CheckCircle2, ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 
+const RESPONSIBLE_ROLES = [
+  "Proprietário(a)",
+  "Cirurgião(ã)-Dentista",
+  "Gestor(a) / Administrador(a)",
+  "Sócio(a)",
+  "Outro",
+];
+
 const SPECIALTIES = [
   "Implantes", "Protocolo", "Prótese", "Ortodontia", "Alinhador",
   "Facetas", "Clareamento", "Canal", "Gengiva", "Odontopediatria",
@@ -133,6 +141,34 @@ export default function OnboardingClinica() {
         responses: form,
       } as any);
       if (error) throw error;
+
+      // If role is Proprietário or Sócio, auto-fill client card
+      const role = form.responsible_role || "";
+      const isOwnerOrPartner = role === "Proprietário(a)" || role === "Sócio(a)";
+      if (isOwnerOrPartner) {
+        const updateData: Record<string, any> = {};
+        if (form.responsible_name) updateData.responsavel_master = form.responsible_name;
+        if (form.responsible_birthday) updateData.aniversario_cliente = form.responsible_birthday;
+
+        if (Object.keys(updateData).length > 0) {
+          await supabase
+            .from("whatsapp_grupos")
+            .update(updateData)
+            .eq("group_id", groupId);
+        }
+
+        // Lookup CNPJ for company birthday
+        if (form.cnpj) {
+          try {
+            await supabase.functions.invoke("cnpj-lookup", {
+              body: { cnpj: form.cnpj, group_id: groupId },
+            });
+          } catch (cnpjErr) {
+            console.error("CNPJ lookup failed:", cnpjErr);
+          }
+        }
+      }
+
       setSubmitted(true);
     } catch (err) {
       console.error(err);
@@ -168,7 +204,40 @@ export default function OnboardingClinica() {
               { key: "cnpj", label: "CNPJ" },
               { key: "responsible_name", label: "Nome do Responsável / Dentista Principal" },
               { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
-              { key: "responsible_role", label: "Cargo do Responsável" },
+            ].map(({ key, label, placeholder }: any) => (
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} placeholder={placeholder} />
+            ))}
+            {/* Cargo do Responsável - selectable chips */}
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Cargo do Responsável</Label>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSIBLE_ROLES.map((role) => (
+                  <SelectableChip
+                    key={role}
+                    label={role}
+                    selected={form.responsible_role === role || (role === "Outro" && form.responsible_role_outro_active)}
+                    onClick={() => {
+                      if (role === "Outro") {
+                        set("responsible_role_outro_active", true);
+                        set("responsible_role", "");
+                      } else {
+                        set("responsible_role_outro_active", false);
+                        set("responsible_role", role);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+              {form.responsible_role_outro_active && (
+                <FormInput
+                  label="Especifique o cargo"
+                  value={form.responsible_role || ""}
+                  onChange={(v) => set("responsible_role", v)}
+                  placeholder="Digite o cargo"
+                />
+              )}
+            </div>
+            {[
               { key: "whatsapp", label: "WhatsApp para Atendimento de Pacientes" },
               { key: "attendant_name", label: "Nome do(a) Atendente no WhatsApp" },
               { key: "instagram", label: "Instagram da Clínica" },
@@ -178,8 +247,8 @@ export default function OnboardingClinica() {
               { key: "state", label: "Estado" },
               { key: "service_area", label: "Região / Bairros de Atendimento" },
               { key: "max_radius_km", label: "Raio máximo de atendimento (km)", type: "number" },
-            ].map(({ key, label, type, placeholder }) => (
-              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} placeholder={placeholder} />
+            ].map(({ key, label, type }) => (
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
             ))}
           </div>
         );
@@ -210,7 +279,6 @@ export default function OnboardingClinica() {
             </div>
           </div>
         );
-      case 2:
         return (
           <div className="space-y-4">
             {[
