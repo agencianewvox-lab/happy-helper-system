@@ -32,19 +32,30 @@ export default function Dashboard() {
   const [gestorFilterOverride, setGestorFilterOverride] = useState<string | null>(null);
   const { predictionsMap, npsGlobal } = useNpsPredictions();
 
+  // Extract unique gestors for admin filter
+  const availableGestors = useMemo(() => {
+    const gestors = new Set<string>();
+    allGrupos.forEach(g => { if (g.gestor_responsavel) gestors.add(g.gestor_responsavel); });
+    return [...gestors].sort();
+  }, [allGrupos]);
+
   const roleGrupos = useMemo(() => {
     if (profileLoading) return [];
-    if (isAdmin) return grupos;
-    if (!gestorFilter) return [];
-    return grupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [grupos, isAdmin, gestorFilter, profileLoading]);
+    let base = isAdmin ? grupos : (!gestorFilter ? [] : grupos.filter(g => g.gestor_responsavel === gestorFilter));
+    if (isAdmin && gestorFilterOverride) {
+      base = base.filter(g => g.gestor_responsavel === gestorFilterOverride);
+    }
+    return base;
+  }, [grupos, isAdmin, gestorFilter, gestorFilterOverride, profileLoading]);
 
   const roleAllGrupos = useMemo(() => {
     if (profileLoading) return [];
-    if (isAdmin) return allGrupos;
-    if (!gestorFilter) return [];
-    return allGrupos.filter(g => g.gestor_responsavel === gestorFilter);
-  }, [allGrupos, isAdmin, gestorFilter, profileLoading]);
+    let base = isAdmin ? allGrupos : (!gestorFilter ? [] : allGrupos.filter(g => g.gestor_responsavel === gestorFilter));
+    if (isAdmin && gestorFilterOverride) {
+      base = base.filter(g => g.gestor_responsavel === gestorFilterOverride);
+    }
+    return base;
+  }, [allGrupos, isAdmin, gestorFilter, gestorFilterOverride, profileLoading]);
 
   // Sound alert for pending demands
   const pendingCount = useMemo(
