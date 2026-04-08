@@ -1001,7 +1001,43 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           });
           matchedGroupId = matchedGroup?.group_id || null;
           matchedGroupName = matchedGroup?.nome || null;
+      }
+
+      if (fnName === "agendar_evento") {
+        let matchedGroupId: string | null = null;
+        if (args.group_name) {
+          const searchTerm = args.group_name.toLowerCase().trim();
+          const mg = grupos.find((g: any) => {
+            const nome = g.nome.toLowerCase();
+            const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+            return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm);
+          });
+          matchedGroupId = mg?.group_id || null;
         }
+        const startTime = args.start_time || new Date().toISOString();
+        const endTime = args.end_time || new Date(new Date(startTime).getTime() + 3600000).toISOString();
+        const participants = Array.isArray(args.participants) ? args.participants : [];
+
+        const { error: insertErr } = await supabase.from("calendar_events").insert({
+          title: args.title,
+          description: args.description || null,
+          start_time: startTime,
+          end_time: endTime,
+          participants: participants,
+          group_id: matchedGroupId,
+          event_type: args.event_type || "reuniao",
+          location: args.location || null,
+          created_by: "Alisson Lima (via WhatsApp)",
+        });
+
+        if (insertErr) {
+          console.error("Error creating calendar event:", insertErr);
+          toolResults.push(`❌ Erro ao agendar evento: ${insertErr.message}`);
+        } else {
+          const dateStr = new Date(startTime).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+          toolResults.push(`✅ Evento agendado: "${args.title}" em ${dateStr}${participants.length ? ` com ${participants.join(", ")}` : ""}`);
+        }
+      }
 
         // Use the matched group name as title if found, otherwise use provided title
         const taskTitle = matchedGroupName || args.title;
