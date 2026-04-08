@@ -538,6 +538,28 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "agendar_evento",
+      description: "Agenda um evento/compromisso/reunião na agenda interna do sistema. Use quando pedirem para agendar, marcar, criar reunião, compromisso, encontro, call, ou qualquer evento na agenda. NÃO use criar_tarefa para compromissos — use ESTA ferramenta.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título do evento (ex: 'Reunião com Dra. Tatiane')" },
+          description: { type: "string", description: "Descrição do evento (detalhes, pauta, etc)", nullable: true },
+          start_time: { type: "string", description: "Data/hora de início no formato ISO 8601 (ex: '2026-04-09T14:00:00'). Se só informarem a data, use 09:00 como hora padrão." },
+          end_time: { type: "string", description: "Data/hora de término no formato ISO 8601. Se não informarem, adicione 1 hora ao início.", nullable: true },
+          participants: { type: "array", items: { type: "string" }, description: "Lista de participantes (nomes da equipe e/ou externos)" },
+          group_name: { type: "string", description: "Nome do cliente/grupo relacionado (opcional)", nullable: true },
+          event_type: { type: "string", enum: ["reuniao", "call", "compromisso", "lembrete", "outro"], description: "Tipo do evento" },
+          location: { type: "string", description: "Local do evento (opcional)", nullable: true },
+        },
+        required: ["title", "start_time", "participants", "event_type"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
@@ -812,7 +834,9 @@ SUAS CAPACIDADES COMO AGENTE:
    d) Buscar na lista de grupos o nome mais próximo do que foi mencionado
    Se NÃO houver cliente, use um título descritivo e a tarefa na descrição.
 
-5. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
+5. AGENDAR EVENTOS/COMPROMISSOS — Quando pedirem para AGENDAR, MARCAR, criar REUNIÃO, COMPROMISSO, CALL, ENCONTRO, ou qualquer evento com data/hora, use "agendar_evento" (NÃO use criar_tarefa). A ferramenta agenda na agenda interna do sistema. Inclua participantes, data/hora e tipo do evento.
+
+6. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
 
 5. ANÁLISE DE EQUIPE — Performance individual dos gestores, volume de respostas, FRT por responsável.
 
@@ -977,7 +1001,43 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
           });
           matchedGroupId = matchedGroup?.group_id || null;
           matchedGroupName = matchedGroup?.nome || null;
+      }
+
+      if (fnName === "agendar_evento") {
+        let matchedGroupId: string | null = null;
+        if (args.group_name) {
+          const searchTerm = args.group_name.toLowerCase().trim();
+          const mg = grupos.find((g: any) => {
+            const nome = g.nome.toLowerCase();
+            const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+            return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm);
+          });
+          matchedGroupId = mg?.group_id || null;
         }
+        const startTime = args.start_time || new Date().toISOString();
+        const endTime = args.end_time || new Date(new Date(startTime).getTime() + 3600000).toISOString();
+        const participants = Array.isArray(args.participants) ? args.participants : [];
+
+        const { error: insertErr } = await supabase.from("calendar_events").insert({
+          title: args.title,
+          description: args.description || null,
+          start_time: startTime,
+          end_time: endTime,
+          participants: participants,
+          group_id: matchedGroupId,
+          event_type: args.event_type || "reuniao",
+          location: args.location || null,
+          created_by: "Alisson Lima (via WhatsApp)",
+        });
+
+        if (insertErr) {
+          console.error("Error creating calendar event:", insertErr);
+          toolResults.push(`❌ Erro ao agendar evento: ${insertErr.message}`);
+        } else {
+          const dateStr = new Date(startTime).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+          toolResults.push(`✅ Evento agendado: "${args.title}" em ${dateStr}${participants.length ? ` com ${participants.join(", ")}` : ""}`);
+        }
+      }
 
         // Use the matched group name as title if found, otherwise use provided title
         const taskTitle = matchedGroupName || args.title;
@@ -1241,7 +1301,7 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
     }
 
     // If there were tool calls and we need a follow-up response with results
-    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "editar_prompt", "editar_config_sistema"].includes(tc.function?.name))) {
+    if (toolCalls.length > 0 && toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "editar_prompt", "editar_config_sistema", "agendar_evento"].includes(tc.function?.name))) {
       // Call OpenAI again with tool results for a natural confirmation message
       const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
         role: "tool",
@@ -1574,6 +1634,7 @@ CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
       toolsPromptSection += `
 - ${firstName} pode RESOLVER pendências dos seus clientes — quando disser que resolveu/fez/completou algo, use "resolver_pendencia"
 - ${firstName} pode CRIAR tarefas para si mesmo ou solicitar tarefas — use "criar_tarefa". SEMPRE identifique o cliente mencionado e use o nome completo do grupo como título, com a ação na descrição.
+- ${firstName} pode AGENDAR eventos/reuniões/compromissos na agenda — use "agendar_evento" (NÃO use criar_tarefa para compromissos com data/hora).
 - Se ${firstName} perguntar sobre algum cliente, grupo, ads, pendência, responda com os dados que você tem
 - IMPORTANTE: Se ${firstName} confirmar que resolveu/fez/tratou uma pendência (mesmo com "joia", "feito", "já resolvi"), SEMPRE use resolver_pendencia para marcar como feito no sistema`;
     }
@@ -1623,7 +1684,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       model: "gpt-4o-mini",
       messages: aiMessages,
       max_tokens: 1500,
-      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!, AGENT_TOOLS.find((t: any) => t.function.name === "resolver_pendencia")!],
+      tools: isOwner ? AGENT_TOOLS : [...FEEDBACK_TOOLS, AGENT_TOOLS.find((t: any) => t.function.name === "criar_tarefa")!, AGENT_TOOLS.find((t: any) => t.function.name === "perguntar_detalhes")!, AGENT_TOOLS.find((t: any) => t.function.name === "resolver_pendencia")!, AGENT_TOOLS.find((t: any) => t.function.name === "agendar_evento")!],
     };
 
     let aiData: any = null;
@@ -1745,6 +1806,39 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           } else {
             const { error: deleteErr } = await supabase.from("tasks").delete().in("id", idsToDelete);
             toolResults.push(deleteErr ? `❌ Erro: ${deleteErr.message}` : `✅ ${idsToDelete.length} tarefa(s) removida(s).`);
+          }
+        }
+
+        if (fnName === "agendar_evento") {
+          let matchedGroupId: string | null = null;
+          if (args.group_name) {
+            const searchTerm = args.group_name.toLowerCase().trim();
+            const mg = allGroups.find((g: any) => {
+              const nome = g.nome.toLowerCase();
+              const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+              return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm);
+            });
+            matchedGroupId = mg?.group_id || null;
+          }
+          const startTime = args.start_time || new Date().toISOString();
+          const endTime = args.end_time || new Date(new Date(startTime).getTime() + 3600000).toISOString();
+          const participants = Array.isArray(args.participants) ? args.participants : [];
+          const { error: insertErr } = await supabase.from("calendar_events").insert({
+            title: args.title,
+            description: args.description || null,
+            start_time: startTime,
+            end_time: endTime,
+            participants: participants,
+            group_id: matchedGroupId,
+            event_type: args.event_type || "reuniao",
+            location: args.location || null,
+            created_by: `${firstName} (via WhatsApp)`,
+          });
+          if (insertErr) {
+            toolResults.push(`❌ Erro ao agendar: ${insertErr.message}`);
+          } else {
+            const dateStr = new Date(startTime).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+            toolResults.push(`✅ Evento agendado: "${args.title}" em ${dateStr}${participants.length ? ` com ${participants.join(", ")}` : ""}`);
           }
         }
 
@@ -1906,7 +2000,7 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
       }
 
       // Follow-up with tool results
-      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "resolver_pendencia"].includes(tc.function?.name))) {
+      if (toolCalls.some((tc: any) => ["criar_pendencia", "remover_pendencias", "criar_tarefa", "remover_tarefas", "enviar_cutucada", "salvar_nota_cliente", "registrar_feedback", "resolver_pendencia", "agendar_evento"].includes(tc.function?.name))) {
         const toolResultMessages = toolCalls.map((tc: any, i: number) => ({
           role: "tool",
           tool_call_id: tc.id,
