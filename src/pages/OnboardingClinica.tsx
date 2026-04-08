@@ -12,6 +12,14 @@ import { CheckCircle2, ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 
+const RESPONSIBLE_ROLES = [
+  "Proprietário(a)",
+  "Cirurgião(ã)-Dentista",
+  "Gestor(a) / Administrador(a)",
+  "Sócio(a)",
+  "Outro",
+];
+
 const SPECIALTIES = [
   "Implantes", "Protocolo", "Prótese", "Ortodontia", "Alinhador",
   "Facetas", "Clareamento", "Canal", "Gengiva", "Odontopediatria",
