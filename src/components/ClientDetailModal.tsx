@@ -775,6 +775,18 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
           <TabsContent value="notas" className="mt-4">
             <ClientNotesTab groupId={grupo.group_id} />
           </TabsContent>
+
+          <TabsContent value="onboarding" className="mt-4 space-y-3">
+            <div className="flex justify-end">
+              <OnboardingSendDialog
+                groupId={grupo.group_id}
+                groupName={grupo.nome}
+                categoria={grupo.categoria}
+                responsavelMaster={(clientInfo as any).responsavel_master}
+              />
+            </div>
+            <OnboardingTab groupId={grupo.group_id} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
