@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CheckCircle2, ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import newvoxLogo from "@/assets/newvox-logo.jpg";
 
 const SPECIALTIES = [
   "Implantes", "Protocolo", "Prótese", "Ortodontia", "Alinhador",
@@ -32,14 +34,68 @@ const DIFFERENTIALS = [
   "Localização", "Ambiente acolhedor", "Preço acessível", "Alta reputação",
 ];
 
+const AGE_RANGES = ["18-25", "26-35", "36-45", "46-55", "56-65", "65+"];
+const GENDERS = ["Feminino", "Masculino", "Ambos igualmente"];
+const SOCIO_CLASSES = ["Classe A", "Classe B", "Classe C", "Classes D/E", "Misto"];
+
 const STEPS = [
-  "Dados da Clínica",
-  "Especialidades & Serviços",
-  "Estrutura & Negócio",
-  "Público-Alvo",
-  "Concorrência & Posicionamento",
-  "Investimento & Expectativas",
+  { label: "Dados da Clínica", icon: "📋" },
+  { label: "Especialidades & Serviços", icon: "⚕️" },
+  { label: "Estrutura & Negócio", icon: "🏥" },
+  { label: "Público-Alvo", icon: "👥" },
+  { label: "Concorrência", icon: "🏆" },
+  { label: "Investimento", icon: "💰" },
 ];
+
+function SelectableChip({ selected, label, onClick }: { selected: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 border",
+        selected
+          ? "bg-cyan-500/20 border-cyan-400/60 text-cyan-300 shadow-[0_0_12px_rgba(0,200,255,0.15)]"
+          : "bg-white/5 border-white/10 text-white/60 hover:border-white/30 hover:text-white/80"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function RadioOption({ value, label, selected }: { value: string; label: string; selected: boolean }) {
+  return (
+    <label
+      className={cn(
+        "flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200",
+        selected
+          ? "bg-cyan-500/15 border-cyan-400/50 shadow-[0_0_12px_rgba(0,200,255,0.1)]"
+          : "bg-white/5 border-white/10 hover:border-white/25"
+      )}
+    >
+      <RadioGroupItem value={value} className="border-white/30 text-cyan-400" />
+      <span className={cn("text-sm", selected ? "text-cyan-300" : "text-white/70")}>{label}</span>
+    </label>
+  );
+}
+
+function FormInput({ label, value, onChange, type = "text", placeholder = "" }: {
+  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-white/70 text-sm font-medium">{label}</Label>
+      <Input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="bg-white/5 border-white/10 text-white placeholder:text-white/25 focus:border-cyan-400/50 focus:ring-cyan-400/20 h-11 rounded-xl"
+      />
+    </div>
+  );
+}
 
 export default function OnboardingClinica() {
   const { groupId } = useParams();
@@ -87,11 +143,16 @@ export default function OnboardingClinica() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center border border-white/20">
-          <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(0,180,220,0.08),transparent_60%)]" />
+        <div className="relative bg-white/[0.04] backdrop-blur-xl rounded-3xl p-10 max-w-md w-full text-center border border-white/[0.06] shadow-2xl">
+          <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-5 ring-2 ring-emerald-400/20">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+          </div>
           <h2 className="text-2xl font-bold text-white mb-2">Onboarding Completo!</h2>
-          <p className="text-white/70">Obrigado por preencher o formulário. Vamos começar a trabalhar para você!</p>
+          <p className="text-white/50 text-sm leading-relaxed">
+            Obrigado por preencher o formulário. Nossa equipe já está trabalhando para criar estratégias personalizadas para você!
+          </p>
         </div>
       </div>
     );
@@ -102,7 +163,6 @@ export default function OnboardingClinica() {
       case 0:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">📋 Dados da Clínica</h3>
             {[
               { key: "clinic_name", label: "Nome da Clínica" },
               { key: "cnpj", label: "CNPJ" },
@@ -118,53 +178,32 @@ export default function OnboardingClinica() {
               { key: "service_area", label: "Região / Bairros de Atendimento" },
               { key: "max_radius_km", label: "Raio máximo de atendimento (km)", type: "number" },
             ].map(({ key, label, type }) => (
-              <div key={key}>
-                <Label className="text-white/80 text-sm">{label}</Label>
-                <Input
-                  type={type || "text"}
-                  value={form[key] || ""}
-                  onChange={(e) => set(key, e.target.value)}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
-                />
-              </div>
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
             ))}
           </div>
         );
       case 1:
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">🦷 Especialidades & Serviços</h3>
-            <div>
-              <Label className="text-white/80 text-sm">Quais especialidades a clínica oferece?</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Quais especialidades a clínica oferece?</Label>
+              <div className="flex flex-wrap gap-2">
                 {SPECIALTIES.map((s) => (
-                  <label key={s} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
-                    <Checkbox checked={(form.specialties || []).includes(s)} onCheckedChange={() => toggleArray("specialties", s)} />
-                    {s}
-                  </label>
+                  <SelectableChip key={s} label={s} selected={(form.specialties || []).includes(s)} onClick={() => toggleArray("specialties", s)} />
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">Qual tratamento você MAIS quer divulgar?</Label>
-              <Input value={form.main_treatment || ""} onChange={(e) => set("main_treatment", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <FormInput label="Qual tratamento você MAIS quer divulgar?" value={form.main_treatment || ""} onChange={(v) => set("main_treatment", v)} />
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">Por que esse tratamento?</Label>
+              <Textarea value={form.treatment_reason || ""} onChange={(e) => set("treatment_reason", e.target.value)} className="bg-white/5 border-white/10 text-white placeholder:text-white/25 rounded-xl focus:border-cyan-400/50" />
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">Por que esse tratamento? O que ele representa para sua clínica?</Label>
-              <Textarea value={form.treatment_reason || ""} onChange={(e) => set("treatment_reason", e.target.value)} className="bg-white/10 border-white/20 text-white" />
-            </div>
-            <div>
-              <Label className="text-white/80 text-sm">Ticket Médio Atual</Label>
-              <Input value={form.avg_ticket || ""} onChange={(e) => set("avg_ticket", e.target.value)} className="bg-white/10 border-white/20 text-white" />
-            </div>
-            <div>
-              <Label className="text-white/80 text-sm">Condições de Pagamento</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+            <FormInput label="Ticket Médio Atual" value={form.avg_ticket || ""} onChange={(v) => set("avg_ticket", v)} />
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Condições de Pagamento</Label>
+              <div className="flex flex-wrap gap-2">
                 {PAYMENT_OPTIONS.map((p) => (
-                  <label key={p} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
-                    <Checkbox checked={(form.payment_options || []).includes(p)} onCheckedChange={() => toggleArray("payment_options", p)} />
-                    {p}
-                  </label>
+                  <SelectableChip key={p} label={p} selected={(form.payment_options || []).includes(p)} onClick={() => toggleArray("payment_options", p)} />
                 ))}
               </div>
             </div>
@@ -173,94 +212,97 @@ export default function OnboardingClinica() {
       case 2:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">🏥 Estrutura & Negócio</h3>
             {[
               { key: "capacity_per_day", label: "Capacidade de Atendimento (pacientes/dia)", type: "number" },
               { key: "monthly_revenue", label: "Faturamento Mensal Médio" },
               { key: "revenue_goal", label: "Meta de Faturamento Mensal (com marketing)" },
               { key: "management_software", label: "Software de gestão / CRM de pacientes?" },
             ].map(({ key, label, type }) => (
-              <div key={key}>
-                <Label className="text-white/80 text-sm">{label}</Label>
-                <Input type={type || "text"} value={form[key] || ""} onChange={(e) => set(key, e.target.value)} className="bg-white/10 border-white/20 text-white" />
-              </div>
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
             ))}
           </div>
         );
       case 3:
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">👥 Público-Alvo</h3>
-            {[
-              { key: "age_range", label: "Faixa etária predominante" },
-              { key: "predominant_gender", label: "Gênero predominante" },
-              { key: "socioeconomic_class", label: "Classe socioeconômica do paciente ideal" },
-            ].map(({ key, label }) => (
-              <div key={key}>
-                <Label className="text-white/80 text-sm">{label}</Label>
-                <Input value={form[key] || ""} onChange={(e) => set(key, e.target.value)} className="bg-white/10 border-white/20 text-white" />
-              </div>
-            ))}
-            <div>
-              <Label className="text-white/80 text-sm">Principais dores do seu paciente que você resolve</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {PATIENT_PAINS.map((p) => (
-                  <label key={p} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
-                    <Checkbox checked={(form.patient_pains || []).includes(p)} onCheckedChange={() => toggleArray("patient_pains", p)} />
-                    {p}
-                  </label>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Faixa etária predominante</Label>
+              <div className="flex flex-wrap gap-2">
+                {AGE_RANGES.map((a) => (
+                  <SelectableChip key={a} label={a} selected={form.age_range === a} onClick={() => set("age_range", a)} />
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">Na sua visão: qual a principal dor do seu paciente?</Label>
-              <Textarea value={form.main_patient_pain || ""} onChange={(e) => set("main_patient_pain", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Gênero predominante</Label>
+              <RadioGroup value={form.predominant_gender || ""} onValueChange={(v) => set("predominant_gender", v)} className="space-y-2">
+                {GENDERS.map((g) => (
+                  <RadioOption key={g} value={g} label={g} selected={form.predominant_gender === g} />
+                ))}
+              </RadioGroup>
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">O que o paciente ganha / sente depois do tratamento?</Label>
-              <Textarea value={form.post_treatment_feeling || ""} onChange={(e) => set("post_treatment_feeling", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Classe socioeconômica do paciente ideal</Label>
+              <div className="flex flex-wrap gap-2">
+                {SOCIO_CLASSES.map((c) => (
+                  <SelectableChip key={c} label={c} selected={form.socioeconomic_class === c} onClick={() => set("socioeconomic_class", c)} />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Principais dores do paciente que você resolve</Label>
+              <div className="flex flex-wrap gap-2">
+                {PATIENT_PAINS.map((p) => (
+                  <SelectableChip key={p} label={p} selected={(form.patient_pains || []).includes(p)} onClick={() => toggleArray("patient_pains", p)} />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">Na sua visão: qual a principal dor do seu paciente?</Label>
+              <Textarea value={form.main_patient_pain || ""} onChange={(e) => set("main_patient_pain", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">O que o paciente ganha / sente depois do tratamento?</Label>
+              <Textarea value={form.post_treatment_feeling || ""} onChange={(e) => set("post_treatment_feeling", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
           </div>
         );
       case 4:
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">🏆 Concorrência & Posicionamento</h3>
-            <div>
-              <Label className="text-white/80 text-sm">Principais concorrentes da clínica</Label>
-              <Textarea value={form.competitors || ""} onChange={(e) => set("competitors", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">Principais concorrentes da clínica</Label>
+              <Textarea value={form.competitors || ""} onChange={(e) => set("competitors", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">3 referências / inspirações no segmento odontológico</Label>
-              <Textarea value={form.references || ""} onChange={(e) => set("references", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">3 referências / inspirações no segmento</Label>
+              <Textarea value={form.references || ""} onChange={(e) => set("references", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">Maiores diferenciais em relação à concorrência</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Maiores diferenciais</Label>
+              <div className="flex flex-wrap gap-2">
                 {DIFFERENTIALS.map((d) => (
-                  <label key={d} className="flex items-center gap-2 text-sm text-white/80 cursor-pointer">
-                    <Checkbox checked={(form.differentials || []).includes(d)} onCheckedChange={() => toggleArray("differentials", d)} />
-                    {d}
-                  </label>
+                  <SelectableChip key={d} label={d} selected={(form.differentials || []).includes(d)} onClick={() => toggleArray("differentials", d)} />
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">Estratégias de marketing já utilizadas</Label>
-              <Textarea value={form.past_marketing || ""} onChange={(e) => set("past_marketing", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">Estratégias de marketing já utilizadas</Label>
+              <Textarea value={form.past_marketing || ""} onChange={(e) => set("past_marketing", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">O que já tentou e NÃO funcionou? Por quê?</Label>
-              <Textarea value={form.failed_strategies || ""} onChange={(e) => set("failed_strategies", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">O que já tentou e NÃO funcionou? Por quê?</Label>
+              <Textarea value={form.failed_strategies || ""} onChange={(e) => set("failed_strategies", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
           </div>
         );
       case 5:
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">💰 Investimento & Expectativas</h3>
-            <div>
-              <Label className="text-white/80 text-sm">Investimento mensal em anúncios: R$ {(form.ad_budget?.[0] || 2000).toLocaleString("pt-BR")}</Label>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">
+                Investimento mensal em anúncios: <span className="text-cyan-400 font-semibold">R$ {(form.ad_budget?.[0] || 2000).toLocaleString("pt-BR")}</span>
+              </Label>
               <Slider
                 value={form.ad_budget || [2000]}
                 onValueChange={(v) => set("ad_budget", v)}
@@ -269,33 +311,30 @@ export default function OnboardingClinica() {
                 step={500}
                 className="mt-2"
               />
-              <div className="flex justify-between text-[10px] text-white/40 mt-1">
+              <div className="flex justify-between text-[10px] text-white/30 mt-1">
                 <span>R$ 500</span>
                 <span>R$ 20.000</span>
               </div>
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">Principal objetivo com tráfego pago</Label>
-              <Textarea value={form.traffic_goal || ""} onChange={(e) => set("traffic_goal", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">Principal objetivo com tráfego pago</Label>
+              <Textarea value={form.traffic_goal || ""} onChange={(e) => set("traffic_goal", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
             {[
               { key: "leads_goal", label: "Meta de leads por mês" },
               { key: "appointments_goal", label: "Meta de consultas / avaliações por mês" },
             ].map(({ key, label }) => (
-              <div key={key}>
-                <Label className="text-white/80 text-sm">{label}</Label>
-                <Input value={form[key] || ""} onChange={(e) => set(key, e.target.value)} className="bg-white/10 border-white/20 text-white" />
-              </div>
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} />
             ))}
-            <div>
-              <Label className="text-white/80 text-sm">O que te deixaria extremamente satisfeito com o nosso trabalho?</Label>
-              <Textarea value={form.satisfaction_criteria || ""} onChange={(e) => set("satisfaction_criteria", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">O que te deixaria extremamente satisfeito com o nosso trabalho?</Label>
+              <Textarea value={form.satisfaction_criteria || ""} onChange={(e) => set("satisfaction_criteria", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
-            <div>
-              <Label className="text-white/80 text-sm">O que você espera nos primeiros 3 meses de parceria?</Label>
-              <Textarea value={form.three_month_expectation || ""} onChange={(e) => set("three_month_expectation", e.target.value)} className="bg-white/10 border-white/20 text-white" />
+            <div className="space-y-1.5">
+              <Label className="text-white/70 text-sm font-medium">O que você espera nos primeiros 3 meses de parceria?</Label>
+              <Textarea value={form.three_month_expectation || ""} onChange={(e) => set("three_month_expectation", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
-            <label className="flex items-center gap-2 text-sm text-white/80 cursor-pointer mt-4 p-3 rounded-lg bg-white/5 border border-white/20">
+            <label className="flex items-center gap-3 text-sm text-white/70 cursor-pointer mt-4 p-4 rounded-xl bg-cyan-500/5 border border-cyan-400/20 hover:border-cyan-400/40 transition-colors">
               <Checkbox checked={form.terms_accepted || false} onCheckedChange={(v) => set("terms_accepted", !!v)} />
               Aceito o termo de autorização para início dos trabalhos de marketing digital.
             </label>
@@ -307,35 +346,73 @@ export default function OnboardingClinica() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 sm:p-8 max-w-xl w-full border border-white/20">
+    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,200,255,0.07),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(0,150,255,0.05),transparent_50%)]" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[1px] bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent" />
+
+      <div className="relative bg-white/[0.03] backdrop-blur-xl rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-white/[0.06] shadow-[0_20px_80px_-20px_rgba(0,200,255,0.08)]">
+        {/* Logo + Header */}
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-white">🦷 Onboarding — Clínica</h1>
-          <p className="text-white/60 text-sm mt-1">Etapa {step + 1} de {STEPS.length} — {STEPS[step]}</p>
-          <div className="flex gap-1 mt-3">
+          <img src={newvoxLogo} alt="New Vox" className="h-14 mx-auto mb-4 rounded-lg" />
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="text-lg">{STEPS[step].icon}</span>
+            <h2 className="text-lg font-semibold text-white">{STEPS[step].label}</h2>
+          </div>
+          <p className="text-white/40 text-xs">Etapa {step + 1} de {STEPS.length}</p>
+
+          {/* Progress */}
+          <div className="flex gap-1.5 mt-4">
             {STEPS.map((_, i) => (
-              <div key={i} className={cn("h-1.5 flex-1 rounded-full transition-colors", i <= step ? "bg-blue-400" : "bg-white/20")} />
+              <div
+                key={i}
+                className={cn(
+                  "h-1 flex-1 rounded-full transition-all duration-500",
+                  i < step ? "bg-cyan-400" : i === step ? "bg-cyan-400/70 animate-pulse" : "bg-white/[0.08]"
+                )}
+              />
             ))}
           </div>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto pr-1">{renderStep()}</div>
+        {/* Content */}
+        <div className="max-h-[58vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+          {renderStep()}
+        </div>
 
-        <div className="flex justify-between mt-6">
-          <Button variant="ghost" disabled={step === 0} onClick={() => setStep(step - 1)} className="text-white/70 hover:text-white">
+        {/* Navigation */}
+        <div className="flex justify-between mt-6 pt-4 border-t border-white/[0.06]">
+          <Button
+            variant="ghost"
+            disabled={step === 0}
+            onClick={() => setStep(step - 1)}
+            className="text-white/50 hover:text-white hover:bg-white/5 rounded-xl"
+          >
             <ChevronLeft className="w-4 h-4 mr-1" /> Voltar
           </Button>
           {step < STEPS.length - 1 ? (
-            <Button onClick={() => setStep(step + 1)} className="bg-blue-500 hover:bg-blue-600 text-white">
+            <Button
+              onClick={() => setStep(step + 1)}
+              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,200,255,0.3)] transition-all"
+            >
               Próximo <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           ) : (
-            <Button onClick={handleSubmit} disabled={submitting || !form.terms_accepted} className="bg-emerald-500 hover:bg-emerald-600 text-white">
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || !form.terms_accepted}
+              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,200,100,0.3)]"
+            >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
               Enviar
             </Button>
           )}
         </div>
+
+        <p className="text-[10px] text-white/20 text-center mt-4">
+          Suas respostas são confidenciais e nos ajudam a criar a melhor estratégia para você.
+        </p>
       </div>
     </div>
   );
