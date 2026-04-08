@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.cnpj-lookup]
 verify_jwt = false
+
+[functions.notify-gestor-onboarding]
+verify_jwt = false

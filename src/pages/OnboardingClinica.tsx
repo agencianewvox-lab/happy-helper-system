@@ -161,6 +161,15 @@ export default function OnboardingClinica() {
         console.error("Auto-fill failed:", cnpjErr);
       }
 
+      // Notify gestor via WhatsApp and create onboarding call task
+      try {
+        await supabase.functions.invoke("notify-gestor-onboarding", {
+          body: { group_id: groupId, client_name: form.clinic_name || null },
+        });
+      } catch (notifyErr) {
+        console.error("Gestor notification failed:", notifyErr);
+      }
+
       setSubmitted(true);
     } catch (err) {
       console.error(err);
