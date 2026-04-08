@@ -526,6 +526,36 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_responses: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          respondent_email: string | null
+          respondent_name: string | null
+          responses: Json
+          survey_type: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
+          responses?: Json
+          survey_type?: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
+          responses?: Json
+          survey_type?: string
+        }
+        Relationships: []
+      }
       pending_demand_resolutions: {
         Row: {
           created_at: string
