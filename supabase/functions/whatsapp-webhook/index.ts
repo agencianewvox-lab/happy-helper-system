@@ -538,6 +538,28 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "agendar_evento",
+      description: "Agenda um evento/compromisso/reunião na agenda interna do sistema. Use quando pedirem para agendar, marcar, criar reunião, compromisso, encontro, call, ou qualquer evento na agenda. NÃO use criar_tarefa para compromissos — use ESTA ferramenta.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título do evento (ex: 'Reunião com Dra. Tatiane')" },
+          description: { type: "string", description: "Descrição do evento (detalhes, pauta, etc)", nullable: true },
+          start_time: { type: "string", description: "Data/hora de início no formato ISO 8601 (ex: '2026-04-09T14:00:00'). Se só informarem a data, use 09:00 como hora padrão." },
+          end_time: { type: "string", description: "Data/hora de término no formato ISO 8601. Se não informarem, adicione 1 hora ao início.", nullable: true },
+          participants: { type: "array", items: { type: "string" }, description: "Lista de participantes (nomes da equipe e/ou externos)" },
+          group_name: { type: "string", description: "Nome do cliente/grupo relacionado (opcional)", nullable: true },
+          event_type: { type: "string", enum: ["reuniao", "call", "compromisso", "lembrete", "outro"], description: "Tipo do evento" },
+          location: { type: "string", description: "Local do evento (opcional)", nullable: true },
+        },
+        required: ["title", "start_time", "participants", "event_type"],
+        additionalProperties: false,
+      },
+    },
+  },
   // Include feedback tools in the agent tools too
   ...FEEDBACK_TOOLS,
 ];
