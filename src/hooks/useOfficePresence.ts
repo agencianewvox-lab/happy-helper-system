@@ -2,125 +2,213 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useProfile } from "./useProfile";
+import { getAvatarColor } from "@/lib/avatarUtils";
 
 export interface OfficeUser {
   id: string;
   user_id: string;
   user_name: string;
-  x: number;
-  y: number;
-  status: string;
+  user_avatar_color: string | null;
   avatar_color: string;
-  current_room: string | null;
+  room_id: string | null;
+  status: string;
+  status_message: string | null;
+  mic_enabled: boolean | null;
   last_seen: string;
+  joined_room_at: string | null;
 }
 
-const AVATAR_COLORS = [
-  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6",
-  "#ec4899", "#06b6d4", "#f97316",
-];
-
-function pickColor(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+export interface OfficeRoom {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  icone: string | null;
+  cor: string | null;
+  capacidade_max: number | null;
+  voz_ativa_padrao: boolean | null;
+  ordem: number | null;
+  ativo: boolean | null;
 }
 
 export function useOfficePresence() {
   const { user } = useAuth();
   const { profile } = useProfile();
   const [users, setUsers] = useState<OfficeUser[]>([]);
-  const [myPosition, setMyPosition] = useState({ x: 5, y: 5 });
+  const [rooms, setRooms] = useState<OfficeRoom[]>([]);
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const presenceId = useRef<string | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval>>();
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const currentStatusRef = useRef("online");
+
+  // Fetch rooms
+  const fetchRooms = useCallback(async () => {
+    const { data } = await supabase
+      .from("office_rooms")
+      .select("*")
+      .eq("ativo", true)
+      .order("ordem");
+    if (data) setRooms(data as OfficeRoom[]);
+    return data;
+  }, []);
+
+  // Fetch all online users
+  const fetchUsers = useCallback(async () => {
+    const { data } = await supabase
+      .from("office_presence")
+      .select("*")
+      .gte("last_seen", new Date(Date.now() - 120000).toISOString());
+    if (data) setUsers(data as OfficeUser[]);
+  }, []);
 
   // Upsert own presence
-  const upsertPresence = useCallback(async (x: number, y: number, status = "online", room: string | null = null) => {
+  const upsertPresence = useCallback(async (updates: Record<string, any> = {}) => {
     if (!user || !profile) return;
-    const { data, error } = await supabase
+    const color = getAvatarColor(profile.full_name);
+    await supabase
       .from("office_presence")
       .upsert({
         user_id: user.id,
         user_name: profile.full_name,
-        x, y, status,
-        avatar_color: pickColor(profile.full_name),
-        current_room: room,
+        avatar_color: color,
+        user_avatar_color: color,
+        x: 0, y: 0,
         last_seen: new Date().toISOString(),
-      }, { onConflict: "user_id" })
-      .select()
-      .single();
-    if (!error && data) presenceId.current = data.id;
+        ...updates,
+      }, { onConflict: "user_id" });
   }, [user, profile]);
 
-  // Join office
+  // Join office (on mount)
   useEffect(() => {
     if (!user || !profile) return;
-    const startX = 3 + Math.floor(Math.random() * 6);
-    const startY = 3 + Math.floor(Math.random() * 4);
-    setMyPosition({ x: startX, y: startY });
-    upsertPresence(startX, startY);
-    setIsConnected(true);
 
-    // Heartbeat every 15s
-    const heartbeat = setInterval(() => {
-      upsertPresence(myPosition.x, myPosition.y);
+    const init = async () => {
+      const roomsData = await fetchRooms();
+      const recepcao = roomsData?.find(r => r.nome === "Recepção");
+      const roomId = recepcao?.id || null;
+
+      await upsertPresence({
+        status: "online",
+        room_id: roomId,
+        joined_room_at: new Date().toISOString(),
+      });
+      setCurrentRoomId(roomId);
+      setIsConnected(true);
+
+      // System message
+      if (roomId) {
+        await supabase.from("office_messages").insert({
+          room_id: roomId,
+          user_id: user.id,
+          user_name: profile.full_name,
+          user_avatar_color: getAvatarColor(profile.full_name),
+          content: `${profile.full_name} entrou na sala`,
+          tipo: "system",
+        });
+      }
+
+      await fetchUsers();
+    };
+
+    init();
+
+    // Heartbeat
+    heartbeatRef.current = setInterval(() => {
+      upsertPresence({ status: currentStatusRef.current });
     }, 15000);
 
     return () => {
-      clearInterval(heartbeat);
-      // Remove on unmount
+      clearInterval(heartbeatRef.current);
+      clearTimeout(idleTimerRef.current);
       if (user) {
         supabase.from("office_presence").delete().eq("user_id", user.id).then(() => {});
       }
     };
   }, [user, profile]);
 
-  // Fetch all users
-  const fetchUsers = useCallback(async () => {
-    const { data } = await supabase
-      .from("office_presence")
-      .select("*")
-      .gte("last_seen", new Date(Date.now() - 60000).toISOString());
-    if (data) setUsers(data as OfficeUser[]);
-  }, []);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
-  // Realtime subscription
+  // Realtime
   useEffect(() => {
     const channel = supabase
-      .channel("office-presence-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "office_presence" }, () => {
-        fetchUsers();
-      })
+      .channel("office-presence-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "office_presence" }, fetchUsers)
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [fetchUsers]);
 
-  // Move avatar
-  const move = useCallback(async (dx: number, dy: number, mapWidth: number, mapHeight: number) => {
+  // Idle detection
+  useEffect(() => {
+    const resetIdle = () => {
+      if (currentStatusRef.current === "away") {
+        currentStatusRef.current = "online";
+        upsertPresence({ status: "online" });
+      }
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        if (currentStatusRef.current === "online") {
+          currentStatusRef.current = "away";
+          upsertPresence({ status: "away" });
+        }
+      }, 300000); // 5 min
+    };
+
+    window.addEventListener("mousemove", resetIdle);
+    window.addEventListener("keydown", resetIdle);
+    resetIdle();
+
+    return () => {
+      window.removeEventListener("mousemove", resetIdle);
+      window.removeEventListener("keydown", resetIdle);
+    };
+  }, [upsertPresence]);
+
+  // Switch room
+  const switchRoom = useCallback(async (roomId: string | null) => {
     if (!user) return;
-    setMyPosition(prev => {
-      const nx = Math.max(0, Math.min(mapWidth - 1, prev.x + dx));
-      const ny = Math.max(0, Math.min(mapHeight - 1, prev.y + dy));
-      upsertPresence(nx, ny);
-      return { x: nx, y: ny };
+    setCurrentRoomId(roomId);
+    await upsertPresence({
+      room_id: roomId,
+      joined_room_at: roomId ? new Date().toISOString() : null,
     });
-  }, [user, upsertPresence]);
 
-  const moveTo = useCallback(async (x: number, y: number) => {
-    if (!user) return;
-    setMyPosition({ x, y });
-    upsertPresence(x, y);
-  }, [user, upsertPresence]);
+    // System message for entering room
+    if (roomId && profile) {
+      await supabase.from("office_messages").insert({
+        room_id: roomId,
+        user_id: user.id,
+        user_name: profile.full_name,
+        user_avatar_color: getAvatarColor(profile.full_name),
+        content: `${profile.full_name} entrou na sala`,
+        tipo: "system",
+      });
+    }
+  }, [user, profile, upsertPresence]);
 
+  // Update status
   const updateStatus = useCallback(async (status: string) => {
-    if (!user) return;
-    upsertPresence(myPosition.x, myPosition.y, status);
-  }, [user, myPosition, upsertPresence]);
+    currentStatusRef.current = status;
+    await upsertPresence({ status });
+  }, [upsertPresence]);
 
-  return { users, myPosition, move, moveTo, updateStatus, isConnected, currentUserId: user?.id };
+  // Update status message
+  const updateStatusMessage = useCallback(async (msg: string) => {
+    await upsertPresence({ status_message: msg || null });
+  }, [upsertPresence]);
+
+  // Toggle mic
+  const toggleMic = useCallback(async (enabled: boolean) => {
+    await upsertPresence({ mic_enabled: enabled });
+  }, [upsertPresence]);
+
+  return {
+    users,
+    rooms,
+    currentRoomId,
+    switchRoom,
+    updateStatus,
+    updateStatusMessage,
+    toggleMic,
+    isConnected,
+    currentUserId: user?.id,
+    fetchRooms,
+  };
 }

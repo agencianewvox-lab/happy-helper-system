@@ -526,14 +526,90 @@ export type Database = {
         }
         Relationships: []
       }
+      office_direct_messages: {
+        Row: {
+          content: string
+          created_at: string
+          from_user_id: string
+          from_user_name: string
+          id: string
+          read: boolean | null
+          to_user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          from_user_id: string
+          from_user_name: string
+          id?: string
+          read?: boolean | null
+          to_user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          from_user_id?: string
+          from_user_name?: string
+          id?: string
+          read?: boolean | null
+          to_user_id?: string
+        }
+        Relationships: []
+      }
+      office_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          room_id: string
+          tipo: string
+          user_avatar_color: string | null
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          room_id: string
+          tipo?: string
+          user_avatar_color?: string | null
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          room_id?: string
+          tipo?: string
+          user_avatar_color?: string | null
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "office_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       office_presence: {
         Row: {
           avatar_color: string
           created_at: string
           current_room: string | null
           id: string
+          joined_room_at: string | null
           last_seen: string
+          mic_enabled: boolean | null
+          room_id: string | null
           status: string
+          status_message: string | null
+          user_avatar_color: string | null
           user_id: string
           user_name: string
           x: number
@@ -544,8 +620,13 @@ export type Database = {
           created_at?: string
           current_room?: string | null
           id?: string
+          joined_room_at?: string | null
           last_seen?: string
+          mic_enabled?: boolean | null
+          room_id?: string | null
           status?: string
+          status_message?: string | null
+          user_avatar_color?: string | null
           user_id: string
           user_name: string
           x?: number
@@ -556,14 +637,98 @@ export type Database = {
           created_at?: string
           current_room?: string | null
           id?: string
+          joined_room_at?: string | null
           last_seen?: string
+          mic_enabled?: boolean | null
+          room_id?: string | null
           status?: string
+          status_message?: string | null
+          user_avatar_color?: string | null
           user_id?: string
           user_name?: string
           x?: number
           y?: number
         }
+        Relationships: [
+          {
+            foreignKeyName: "office_presence_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "office_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      office_rooms: {
+        Row: {
+          ativo: boolean | null
+          capacidade_max: number | null
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          icone: string | null
+          id: string
+          nome: string
+          ordem: number | null
+          voz_ativa_padrao: boolean | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          capacidade_max?: number | null
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          nome: string
+          ordem?: number | null
+          voz_ativa_padrao?: boolean | null
+        }
+        Update: {
+          ativo?: boolean | null
+          capacidade_max?: number | null
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          nome?: string
+          ordem?: number | null
+          voz_ativa_padrao?: boolean | null
+        }
         Relationships: []
+      }
+      office_voice_sessions: {
+        Row: {
+          ended_at: string | null
+          id: string
+          participantes: string[] | null
+          room_id: string | null
+          started_at: string
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          participantes?: string[] | null
+          room_id?: string | null
+          started_at?: string
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          participantes?: string[] | null
+          room_id?: string | null
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_voice_sessions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "office_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       onboarding_responses: {
         Row: {
