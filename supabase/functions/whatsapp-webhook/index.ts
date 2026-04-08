@@ -1808,6 +1808,39 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
           }
         }
 
+        if (fnName === "agendar_evento") {
+          let matchedGroupId: string | null = null;
+          if (args.group_name) {
+            const searchTerm = args.group_name.toLowerCase().trim();
+            const mg = allGroups.find((g: any) => {
+              const nome = g.nome.toLowerCase();
+              const nomeClean = nome.replace(/nv[-\s]*mkt\s*/g, "").replace(/mkt\s*nv[-\s]*/g, "").replace(/nv[-\s]*/g, "").trim();
+              return nome.includes(searchTerm) || searchTerm.includes(nomeClean) || nomeClean.includes(searchTerm);
+            });
+            matchedGroupId = mg?.group_id || null;
+          }
+          const startTime = args.start_time || new Date().toISOString();
+          const endTime = args.end_time || new Date(new Date(startTime).getTime() + 3600000).toISOString();
+          const participants = Array.isArray(args.participants) ? args.participants : [];
+          const { error: insertErr } = await supabase.from("calendar_events").insert({
+            title: args.title,
+            description: args.description || null,
+            start_time: startTime,
+            end_time: endTime,
+            participants: participants,
+            group_id: matchedGroupId,
+            event_type: args.event_type || "reuniao",
+            location: args.location || null,
+            created_by: `${firstName} (via WhatsApp)`,
+          });
+          if (insertErr) {
+            toolResults.push(`❌ Erro ao agendar: ${insertErr.message}`);
+          } else {
+            const dateStr = new Date(startTime).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+            toolResults.push(`✅ Evento agendado: "${args.title}" em ${dateStr}${participants.length ? ` com ${participants.join(", ")}` : ""}`);
+          }
+        }
+
         if (fnName === "perguntar_detalhes") {
           reply = args.question;
         }
