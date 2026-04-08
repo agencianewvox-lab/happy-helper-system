@@ -526,6 +526,45 @@ export type Database = {
         }
         Relationships: []
       }
+      office_presence: {
+        Row: {
+          avatar_color: string
+          created_at: string
+          current_room: string | null
+          id: string
+          last_seen: string
+          status: string
+          user_id: string
+          user_name: string
+          x: number
+          y: number
+        }
+        Insert: {
+          avatar_color?: string
+          created_at?: string
+          current_room?: string | null
+          id?: string
+          last_seen?: string
+          status?: string
+          user_id: string
+          user_name: string
+          x?: number
+          y?: number
+        }
+        Update: {
+          avatar_color?: string
+          created_at?: string
+          current_room?: string | null
+          id?: string
+          last_seen?: string
+          status?: string
+          user_id?: string
+          user_name?: string
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
       onboarding_responses: {
         Row: {
           created_at: string
