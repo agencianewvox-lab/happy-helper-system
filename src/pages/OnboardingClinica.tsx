@@ -176,7 +176,40 @@ export default function OnboardingClinica() {
               { key: "cnpj", label: "CNPJ" },
               { key: "responsible_name", label: "Nome do Responsável / Dentista Principal" },
               { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
-              { key: "responsible_role", label: "Cargo do Responsável" },
+            ].map(({ key, label, type, placeholder }) => (
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} placeholder={placeholder} />
+            ))}
+            {/* Cargo do Responsável - selectable chips */}
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Cargo do Responsável</Label>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSIBLE_ROLES.map((role) => (
+                  <SelectableChip
+                    key={role}
+                    label={role}
+                    selected={form.responsible_role === role || (role === "Outro" && form.responsible_role_outro_active)}
+                    onClick={() => {
+                      if (role === "Outro") {
+                        set("responsible_role_outro_active", true);
+                        set("responsible_role", "");
+                      } else {
+                        set("responsible_role_outro_active", false);
+                        set("responsible_role", role);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+              {form.responsible_role_outro_active && (
+                <FormInput
+                  label="Especifique o cargo"
+                  value={form.responsible_role || ""}
+                  onChange={(v) => set("responsible_role", v)}
+                  placeholder="Digite o cargo"
+                />
+              )}
+            </div>
+            {[
               { key: "whatsapp", label: "WhatsApp para Atendimento de Pacientes" },
               { key: "attendant_name", label: "Nome do(a) Atendente no WhatsApp" },
               { key: "instagram", label: "Instagram da Clínica" },
@@ -186,17 +219,9 @@ export default function OnboardingClinica() {
               { key: "state", label: "Estado" },
               { key: "service_area", label: "Região / Bairros de Atendimento" },
               { key: "max_radius_km", label: "Raio máximo de atendimento (km)", type: "number" },
-            ].map(({ key, label, type, placeholder }) => (
-              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} placeholder={placeholder} />
+            ].map(({ key, label, type }) => (
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
             ))}
-          </div>
-        );
-      case 1:
-        return (
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <Label className="text-white/70 text-sm font-medium">Quais especialidades a clínica oferece?</Label>
-              <div className="flex flex-wrap gap-2">
                 {SPECIALTIES.map((s) => (
                   <SelectableChip key={s} label={s} selected={(form.specialties || []).includes(s)} onClick={() => toggleArray("specialties", s)} />
                 ))}
