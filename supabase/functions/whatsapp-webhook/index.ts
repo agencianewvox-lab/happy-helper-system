@@ -834,7 +834,9 @@ SUAS CAPACIDADES COMO AGENTE:
    d) Buscar na lista de grupos o nome mais próximo do que foi mencionado
    Se NÃO houver cliente, use um título descritivo e a tarefa na descrição.
 
-5. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
+5. AGENDAR EVENTOS/COMPROMISSOS — Quando pedirem para AGENDAR, MARCAR, criar REUNIÃO, COMPROMISSO, CALL, ENCONTRO, ou qualquer evento com data/hora, use "agendar_evento" (NÃO use criar_tarefa). A ferramenta agenda na agenda interna do sistema. Inclua participantes, data/hora e tipo do evento.
+
+6. PEDIR DETALHES — Se faltar informação essencial para executar uma ação (ex: qual cliente, qual prazo, qual responsável), use a ferramenta "perguntar_detalhes" para perguntar ao Alisson antes de agir.
 
 5. ANÁLISE DE EQUIPE — Performance individual dos gestores, volume de respostas, FRT por responsável.
 
