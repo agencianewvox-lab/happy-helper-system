@@ -176,8 +176,8 @@ export default function OnboardingClinica() {
               { key: "cnpj", label: "CNPJ" },
               { key: "responsible_name", label: "Nome do Responsável / Dentista Principal" },
               { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
-            ].map(({ key, label, type, placeholder }) => (
-              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} placeholder={placeholder} />
+            ].map(({ key, label, placeholder }: any) => (
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} placeholder={placeholder} />
             ))}
             {/* Cargo do Responsável - selectable chips */}
             <div className="space-y-2">
