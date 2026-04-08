@@ -202,6 +202,30 @@ export function useOfficePresence() {
     await upsertPresence({ mic_enabled: enabled });
   }, [upsertPresence]);
 
+  // Toggle cam
+  const toggleCam = useCallback(async (enabled: boolean) => {
+    await upsertPresence({ cam_enabled: enabled });
+  }, [upsertPresence]);
+
+  // Lock/unlock room
+  const toggleRoomLock = useCallback(async (roomId: string, lock: boolean) => {
+    if (!user || !profile) return;
+    await supabase.from("office_rooms").update({
+      locked_by: lock ? user.id : null,
+      locked_by_name: lock ? profile.full_name : null,
+    }).eq("id", roomId);
+    await fetchRooms();
+  }, [user, profile, fetchRooms]);
+
+  // Realtime for rooms (lock changes)
+  useEffect(() => {
+    const channel = supabase
+      .channel("office-rooms-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "office_rooms" }, fetchRooms)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchRooms]);
+
   return {
     users,
     rooms,
@@ -210,6 +234,8 @@ export function useOfficePresence() {
     updateStatus,
     updateStatusMessage,
     toggleMic,
+    toggleCam,
+    toggleRoomLock,
     isConnected,
     currentUserId: user?.id,
     fetchRooms,
