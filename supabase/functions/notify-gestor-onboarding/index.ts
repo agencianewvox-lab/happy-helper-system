@@ -91,17 +91,6 @@ O cliente *${clientDisplayName}* acabou de preencher o formulário de onboarding
       }
     }
 
-    // Also send to the group chat
-    try {
-      const groupUrl = new URL(WEBHOOK_URL);
-      groupUrl.searchParams.set("group_id", group_id);
-      groupUrl.searchParams.set("message", message);
-      await fetch(groupUrl.toString(), { method: "GET" });
-      console.log(`Notification sent to group ${group_id}`);
-    } catch (groupErr) {
-      console.error("Failed to send group notification:", groupErr);
-    }
-
     // Auto-create a task for the gestor to schedule the onboarding call
     try {
       await supabase.from("tasks").insert({
