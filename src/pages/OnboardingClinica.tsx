@@ -222,6 +222,14 @@ export default function OnboardingClinica() {
             ].map(({ key, label, type }) => (
               <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
             ))}
+          </div>
+        );
+      case 1:
+        return (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-white/70 text-sm font-medium">Quais especialidades a clínica oferece?</Label>
+              <div className="flex flex-wrap gap-2">
                 {SPECIALTIES.map((s) => (
                   <SelectableChip key={s} label={s} selected={(form.specialties || []).includes(s)} onClick={() => toggleArray("specialties", s)} />
                 ))}
@@ -243,7 +251,6 @@ export default function OnboardingClinica() {
             </div>
           </div>
         );
-      case 2:
         return (
           <div className="space-y-4">
             {[
