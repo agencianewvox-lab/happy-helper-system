@@ -28,6 +28,8 @@ import { MetaAdsTab } from "@/components/MetaAdsTab";
 import { NpsDetailPanel } from "@/components/NpsDetailPanel";
 import { NpsSurveyTab } from "@/components/NpsSurveyTab";
 import { ClientNotesTab } from "@/components/ClientNotesTab";
+import { OnboardingTab } from "@/components/OnboardingTab";
+import { OnboardingSendDialog } from "@/components/OnboardingSendDialog";
 
 interface Conversa {
   id: string;
@@ -269,6 +271,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
             <TabsTrigger value="meta-ads" className="flex-1 gap-1"><Megaphone className="w-3 h-3" /> Ads</TabsTrigger>
             <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
             <TabsTrigger value="notas" className="flex-1 gap-1"><StickyNote className="w-3 h-3" /> Notas</TabsTrigger>
+            <TabsTrigger value="onboarding" className="flex-1 gap-1">📋 Onboarding</TabsTrigger>
           </TabsList>
 
           <TabsContent value="indicadores" className="space-y-4 mt-4">
@@ -771,6 +774,18 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
 
           <TabsContent value="notas" className="mt-4">
             <ClientNotesTab groupId={grupo.group_id} />
+          </TabsContent>
+
+          <TabsContent value="onboarding" className="mt-4 space-y-3">
+            <div className="flex justify-end">
+              <OnboardingSendDialog
+                groupId={grupo.group_id}
+                groupName={grupo.nome}
+                categoria={grupo.categoria}
+                responsavelMaster={(clientInfo as any).responsavel_master}
+              />
+            </div>
+            <OnboardingTab groupId={grupo.group_id} />
           </TabsContent>
         </Tabs>
       </DialogContent>
