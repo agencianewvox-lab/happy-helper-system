@@ -59,7 +59,7 @@ const App = () => (
           <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
           <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
-          <Route path="/onboarding/:groupId/:surveyType?" element={<OnboardingClinica />} />
+          <Route path="/onboardingnv/:groupId/:surveyType?" element={<OnboardingClinica />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
