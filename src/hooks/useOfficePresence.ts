@@ -14,6 +14,7 @@ export interface OfficeUser {
   status: string;
   status_message: string | null;
   mic_enabled: boolean | null;
+  cam_enabled: boolean | null;
   last_seen: string;
   joined_room_at: string | null;
 }
