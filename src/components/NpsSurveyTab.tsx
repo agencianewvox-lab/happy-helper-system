@@ -37,7 +37,7 @@ interface Props {
   categoria?: string | null;
 }
 
-const PUBLISHED_APP_URL = "https://happy-helper-system.lovable.app";
+const PUBLISHED_APP_URL = "https://paineldecontrolenv.lovable.app";
 
 export function NpsSurveyTab({ groupId, categoria }: Props) {
   const isClinica = categoria?.toLowerCase() === "clínicas";
