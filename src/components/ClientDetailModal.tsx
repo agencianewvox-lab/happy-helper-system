@@ -28,6 +28,8 @@ import { MetaAdsTab } from "@/components/MetaAdsTab";
 import { NpsDetailPanel } from "@/components/NpsDetailPanel";
 import { NpsSurveyTab } from "@/components/NpsSurveyTab";
 import { ClientNotesTab } from "@/components/ClientNotesTab";
+import { OnboardingTab } from "@/components/OnboardingTab";
+import { OnboardingSendDialog } from "@/components/OnboardingSendDialog";
 
 interface Conversa {
   id: string;
