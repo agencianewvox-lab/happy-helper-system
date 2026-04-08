@@ -145,28 +145,20 @@ export default function OnboardingClinica() {
       // If role is Proprietário or Sócio, auto-fill client card
       const role = form.responsible_role || "";
       const isOwnerOrPartner = role === "Proprietário(a)" || role === "Sócio(a)";
-      if (isOwnerOrPartner) {
-        const updateData: Record<string, any> = {};
-        if (form.responsible_name) updateData.responsavel_master = form.responsible_name;
-        if (form.responsible_birthday) updateData.aniversario_cliente = form.responsible_birthday;
-
-        if (Object.keys(updateData).length > 0) {
-          await supabase
-            .from("whatsapp_grupos")
-            .update(updateData)
-            .eq("group_id", groupId);
-        }
-
-        // Lookup CNPJ for company birthday
-        if (form.cnpj) {
-          try {
-            await supabase.functions.invoke("cnpj-lookup", {
-              body: { cnpj: form.cnpj, group_id: groupId },
-            });
-          } catch (cnpjErr) {
-            console.error("CNPJ lookup failed:", cnpjErr);
-          }
-        }
+      
+      // Always try to update card data and lookup CNPJ via edge function
+      try {
+        await supabase.functions.invoke("cnpj-lookup", {
+          body: { 
+            cnpj: form.cnpj || null, 
+            group_id: groupId,
+            is_owner_or_partner: isOwnerOrPartner,
+            responsible_name: form.responsible_name || null,
+            responsible_birthday: form.responsible_birthday || null,
+          },
+        });
+      } catch (cnpjErr) {
+        console.error("Auto-fill failed:", cnpjErr);
       }
 
       setSubmitted(true);
