@@ -167,6 +167,7 @@ export default function OnboardingClinica() {
               { key: "clinic_name", label: "Nome da Clínica" },
               { key: "cnpj", label: "CNPJ" },
               { key: "responsible_name", label: "Nome do Responsável / Dentista Principal" },
+              { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
               { key: "responsible_role", label: "Cargo do Responsável" },
               { key: "whatsapp", label: "WhatsApp para Atendimento de Pacientes" },
               { key: "attendant_name", label: "Nome do(a) Atendente no WhatsApp" },
@@ -177,8 +178,8 @@ export default function OnboardingClinica() {
               { key: "state", label: "Estado" },
               { key: "service_area", label: "Região / Bairros de Atendimento" },
               { key: "max_radius_km", label: "Raio máximo de atendimento (km)", type: "number" },
-            ].map(({ key, label, type }) => (
-              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
+            ].map(({ key, label, type, placeholder }) => (
+              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} placeholder={placeholder} />
             ))}
           </div>
         );
