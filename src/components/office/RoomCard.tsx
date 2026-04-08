@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { OfficeRoom, OfficeUser } from "@/hooks/useOfficePresence";
 import OfficeAvatar from "./OfficeAvatar";
+import { Lock } from "lucide-react";
 
 interface Props {
   room: OfficeRoom;
@@ -31,6 +32,7 @@ export default function RoomCard({ room, users, isActive, onClick }: Props) {
   const count = users.length;
   const max = room.capacidade_max || 10;
   const cor = room.cor || "blue";
+  const isLocked = !!room.locked_by;
 
   return (
     <button
@@ -41,15 +43,21 @@ export default function RoomCard({ room, users, isActive, onClick }: Props) {
         corMap[cor] || corMap.blue,
         isActive && "border-primary ring-1 ring-primary/30",
         isActive && (corActiveBg[cor] || corActiveBg.blue),
+        isLocked && !isActive && "opacity-60",
       )}
     >
       <div className="flex items-center gap-2 mb-1.5">
         <span className="text-lg">{room.icone || "🏢"}</span>
         <span className="text-sm font-medium flex-1 truncate">{room.nome}</span>
+        {isLocked && <Lock className="w-3 h-3 text-amber-500" />}
         <span className="text-[10px] text-muted-foreground font-mono">{count}/{max}</span>
       </div>
 
-      {room.descricao && (
+      {isLocked && room.locked_by_name && (
+        <p className="text-[9px] text-amber-500 mb-1">🔒 Trancada por {room.locked_by_name}</p>
+      )}
+
+      {room.descricao && !isLocked && (
         <p className="text-[10px] text-muted-foreground mb-2 line-clamp-1">{room.descricao}</p>
       )}
 
