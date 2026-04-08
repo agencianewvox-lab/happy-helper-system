@@ -600,6 +600,7 @@ export type Database = {
       office_presence: {
         Row: {
           avatar_color: string
+          cam_enabled: boolean | null
           created_at: string
           current_room: string | null
           id: string
@@ -617,6 +618,7 @@ export type Database = {
         }
         Insert: {
           avatar_color?: string
+          cam_enabled?: boolean | null
           created_at?: string
           current_room?: string | null
           id?: string
@@ -634,6 +636,7 @@ export type Database = {
         }
         Update: {
           avatar_color?: string
+          cam_enabled?: boolean | null
           created_at?: string
           current_room?: string | null
           id?: string
@@ -668,6 +671,8 @@ export type Database = {
           descricao: string | null
           icone: string | null
           id: string
+          locked_by: string | null
+          locked_by_name: string | null
           nome: string
           ordem: number | null
           voz_ativa_padrao: boolean | null
@@ -680,6 +685,8 @@ export type Database = {
           descricao?: string | null
           icone?: string | null
           id?: string
+          locked_by?: string | null
+          locked_by_name?: string | null
           nome: string
           ordem?: number | null
           voz_ativa_padrao?: boolean | null
@@ -692,6 +699,8 @@ export type Database = {
           descricao?: string | null
           icone?: string | null
           id?: string
+          locked_by?: string | null
+          locked_by_name?: string | null
           nome?: string
           ordem?: number | null
           voz_ativa_padrao?: boolean | null

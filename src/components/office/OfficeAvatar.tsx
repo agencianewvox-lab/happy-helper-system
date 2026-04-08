@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { getInitials, getAvatarColor } from "@/lib/avatarUtils";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
   size?: "sm" | "md" | "lg" | "xl";
   status?: string;
   micEnabled?: boolean;
+  camEnabled?: boolean;
   showStatus?: boolean;
   statusMessage?: string | null;
   onClick?: () => void;
@@ -35,7 +36,7 @@ const statusRings: Record<string, string> = {
   offline: "",
 };
 
-export default function OfficeAvatar({ name, size = "md", status = "online", micEnabled, showStatus = true, statusMessage, onClick, className }: Props) {
+export default function OfficeAvatar({ name, size = "md", status = "online", micEnabled, camEnabled, showStatus = true, statusMessage, onClick, className }: Props) {
   const color = getAvatarColor(name);
   const initials = getInitials(name);
   const isLarge = size === "lg" || size === "xl";
@@ -74,6 +75,17 @@ export default function OfficeAvatar({ name, size = "md", status = "online", mic
           size === "lg" ? "w-5 h-5 bottom-0 left-0" : "w-6 h-6 bottom-1 left-1",
         )}>
           {micEnabled ? <Mic className="w-3 h-3 text-white" /> : <MicOff className="w-3 h-3 text-muted-foreground" />}
+        </div>
+      )}
+
+      {/* Cam indicator */}
+      {camEnabled !== undefined && isLarge && (
+        <div className={cn(
+          "absolute rounded-full flex items-center justify-center border-2 border-card",
+          camEnabled ? "bg-blue-500" : "bg-muted",
+          size === "lg" ? "w-5 h-5 top-0 left-0" : "w-6 h-6 top-1 left-1",
+        )}>
+          {camEnabled ? <Video className="w-3 h-3 text-white" /> : <VideoOff className="w-3 h-3 text-muted-foreground" />}
         </div>
       )}
     </div>

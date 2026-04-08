@@ -15,13 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Building2, Settings } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "@/hooks/use-toast";
 
 export default function Escritorio() {
   const { signOut, user } = useAuth();
   const { profile, isAdmin, isMaster } = useProfile();
   const {
     users, rooms, currentRoomId, switchRoom,
-    updateStatus, updateStatusMessage, toggleMic,
+    updateStatus, updateStatusMessage, toggleMic, toggleCam, toggleRoomLock,
     isConnected, currentUserId, fetchRooms,
   } = useOfficePresence();
 
@@ -32,9 +33,27 @@ export default function Escritorio() {
   const [myStatus, setMyStatus] = useState("online");
   const [myStatusMsg, setMyStatusMsg] = useState("");
   const [micEnabled, setMicEnabled] = useState(false);
+  const [camEnabled, setCamEnabled] = useState(false);
 
   const currentRoom = rooms.find(r => r.id === currentRoomId);
   const usersInCurrentRoom = users.filter(u => u.room_id === currentRoomId);
+
+  const handleSwitchRoom = useCallback((roomId: string) => {
+    const targetRoom = rooms.find(r => r.id === roomId);
+    if (targetRoom?.locked_by && targetRoom.locked_by !== currentUserId) {
+      // Check if user is already in the room
+      const isInRoom = users.some(u => u.user_id === currentUserId && u.room_id === roomId);
+      if (!isInRoom) {
+        toast({
+          title: "Sala trancada",
+          description: `Esta sala foi trancada por ${targetRoom.locked_by_name}. Aguarde ser destrancada.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    switchRoom(roomId);
+  }, [rooms, currentUserId, users, switchRoom]);
 
   const handleSendMessage = useCallback((content: string) => {
     if (!user || !profile) return;
@@ -61,13 +80,37 @@ export default function Escritorio() {
     toggleMic(enabled);
   }, [toggleMic]);
 
+  const handleToggleCam = useCallback((enabled: boolean) => {
+    setCamEnabled(enabled);
+    toggleCam(enabled);
+  }, [toggleCam]);
+
+  const handleToggleLock = useCallback((lock: boolean) => {
+    if (currentRoomId) {
+      toggleRoomLock(currentRoomId, lock);
+    }
+  }, [currentRoomId, toggleRoomLock]);
+
   const handleClickUser = useCallback((u: OfficeUser) => {
     setDmTarget(u);
   }, []);
 
   const handleLeaveRoom = useCallback(() => {
+    // Stop camera when leaving
+    if (camEnabled) {
+      setCamEnabled(false);
+      toggleCam(false);
+    }
+    if (micEnabled) {
+      setMicEnabled(false);
+      toggleMic(false);
+    }
+    // If I locked the room, unlock it when leaving
+    if (currentRoom?.locked_by === currentUserId && currentRoomId) {
+      toggleRoomLock(currentRoomId, false);
+    }
     switchRoom(null);
-  }, [switchRoom]);
+  }, [switchRoom, camEnabled, micEnabled, toggleCam, toggleMic, currentRoom, currentUserId, currentRoomId, toggleRoomLock]);
 
   return (
     <SidebarProvider>
@@ -107,7 +150,7 @@ export default function Escritorio() {
                       room={room}
                       users={users.filter(u => u.room_id === room.id)}
                       isActive={currentRoomId === room.id}
-                      onClick={() => switchRoom(room.id)}
+                      onClick={() => handleSwitchRoom(room.id)}
                     />
                   ))}
                 </div>
@@ -125,11 +168,14 @@ export default function Escritorio() {
                   currentUserName={profile?.full_name}
                   currentAvatarColor={profile ? getAvatarColor(profile.full_name) : undefined}
                   micEnabled={micEnabled}
+                  camEnabled={camEnabled}
                   status={myStatus}
                   statusMessage={myStatusMsg}
                   onLeaveRoom={handleLeaveRoom}
                   onSendMessage={handleSendMessage}
                   onToggleMic={handleToggleMic}
+                  onToggleCam={handleToggleCam}
+                  onToggleLock={handleToggleLock}
                   onStatusChange={handleStatusChange}
                   onStatusMessageChange={handleStatusMsgChange}
                   onClickUser={handleClickUser}
