@@ -27,7 +27,8 @@ export function useWebRTC(
   currentUserName: string | undefined,
   micEnabled: boolean,
   camEnabled: boolean,
-  usersInRoom: Array<{ user_id: string; user_name: string }>
+  usersInRoom: Array<{ user_id: string; user_name: string }>,
+  localCameraStream: MediaStream | null = null,
 ) {
   const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([]);
   const [screenSharing, setScreenSharing] = useState(false);
@@ -79,19 +80,42 @@ export function useWebRTC(
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: false, // Video handled separately via presence cam
+        video: false,
       });
-      // Mute audio by default, controlled by micEnabled
       stream.getAudioTracks().forEach(t => { t.enabled = micEnabled; });
       localStreamRef.current = stream;
       return stream;
     } catch {
-      // Return empty stream if mic not available
       const stream = new MediaStream();
       localStreamRef.current = stream;
       return stream;
     }
   }, [micEnabled]);
+
+  // Sync camera stream into all peer connections
+  useEffect(() => {
+    peersRef.current.forEach((peer) => {
+      const senders = peer.pc.getSenders();
+      const videoSender = senders.find(s => s.track?.kind === "video" || (s.track === null && !senders.some(ss => ss.track?.kind === "video")));
+      
+      if (localCameraStream) {
+        const videoTrack = localCameraStream.getVideoTracks()[0];
+        if (videoTrack) {
+          const existingVideoSender = senders.find(s => s.track?.kind === "video");
+          if (existingVideoSender) {
+            existingVideoSender.replaceTrack(videoTrack);
+          } else {
+            peer.pc.addTrack(videoTrack, localCameraStream);
+          }
+        }
+      } else {
+        const existingVideoSender = senders.find(s => s.track?.kind === "video");
+        if (existingVideoSender) {
+          existingVideoSender.replaceTrack(null);
+        }
+      }
+    });
+  }, [localCameraStream]);
 
   // Send signal via Supabase
   const sendSignal = useCallback(async (
@@ -124,11 +148,19 @@ export function useWebRTC(
     const pc = new RTCPeerConnection(ICE_SERVERS);
     peersRef.current.set(remoteUserId, { pc, userId: remoteUserId, userName: remoteUserName });
 
-    // Add local stream tracks
+    // Add local audio stream tracks
     const localStream = await getLocalStream();
     localStream.getTracks().forEach(track => {
       pc.addTrack(track, localStream);
     });
+
+    // Add local camera video track if available
+    if (localCameraStream) {
+      const videoTrack = localCameraStream.getVideoTracks()[0];
+      if (videoTrack) {
+        pc.addTrack(videoTrack, localCameraStream);
+      }
+    }
 
     // Handle remote stream
     pc.ontrack = (event) => {
