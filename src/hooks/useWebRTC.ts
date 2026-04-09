@@ -5,6 +5,22 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:openrelay.metered.ca:80" },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
 };
 
@@ -145,7 +161,11 @@ export function useWebRTC(
       const stream = remoteCameraStreamsRef.current.get(remoteUserId) ?? new MediaStream();
       remoteCameraStreamsRef.current.set(remoteUserId, stream);
 
-      event.streams[0]?.getTracks().forEach((track) => {
+      const incomingTracks = event.streams[0]?.getTracks().length
+        ? event.streams[0].getTracks()
+        : [event.track];
+
+      incomingTracks.forEach((track) => {
         const exists = stream.getTracks().some((existingTrack) => existingTrack.id === track.id);
         if (!exists) {
           stream.addTrack(track);
