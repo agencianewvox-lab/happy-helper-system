@@ -149,18 +149,22 @@ export function OnboardingTab({ groupId }: Props) {
       </div>
 
       <Dialog open={fullOpen} onOpenChange={setFullOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-base">Respostas do Onboarding</DialogTitle>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <span>Preenchido em {createdAt}</span>
-              <Badge variant="secondary" className="text-[10px]">{data.survey_type === "clinica" ? "Clínica" : "Genérico"}</Badge>
+        <DialogContent className="w-[96vw] max-w-4xl h-[92vh] p-0 flex flex-col overflow-hidden">
+          <div className="flex flex-col h-full min-h-0">
+            <DialogHeader className="px-6 pt-6 pb-3 border-b border-border/50 shrink-0">
+              <DialogTitle className="text-base">Respostas do Onboarding</DialogTitle>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <span>Preenchido em {createdAt}</span>
+                <Badge variant="secondary" className="text-[10px]">{data.survey_type === "clinica" ? "Clínica" : "Genérico"}</Badge>
+              </div>
+            </DialogHeader>
+            <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6 pt-3">
+              <ScrollArea className="h-full w-full">
+                <ResponseGrid responses={responses} />
+              </ScrollArea>
             </div>
-          </DialogHeader>
-          <ScrollArea className="flex-1 min-h-0 pr-2">
-            <ResponseGrid responses={responses} />
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </>
