@@ -72,6 +72,7 @@ export default function RoomView({
     micEnabled,
     camEnabled,
     usersInRoom,
+    streamRef.current,
   );
 
   // Handle camera stream (local preview)
@@ -121,12 +122,12 @@ export default function RoomView({
   };
 
   const screenStreams = remoteStreams.filter(s => s.type === "screen");
-  const audioStreams = remoteStreams.filter(s => s.type === "camera");
+  const cameraStreams = remoteStreams.filter(s => s.type === "camera");
 
   return (
     <div className="flex flex-col h-full rounded-xl border border-border/30 bg-card/60 overflow-hidden">
-      {/* Hidden audio elements for remote audio */}
-      {audioStreams.map(rs => (
+      {/* Hidden audio elements for remote audio (from camera streams) */}
+      {cameraStreams.map(rs => (
         <HiddenAudio key={`audio-${rs.peerId}`} stream={rs.stream} />
       ))}
 
@@ -204,13 +205,21 @@ export default function RoomView({
             </div>
           )}
 
-          {/* Local camera preview */}
-          {camEnabled && (
-            <div className="mb-4 flex justify-center">
-              <div className="relative rounded-xl overflow-hidden border border-border/30 shadow-lg" style={{ width: 240, height: 180 }}>
-                <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                <div className="absolute bottom-1 left-1 bg-card/80 px-1.5 py-0.5 rounded text-[9px] font-medium">Sua câmera</div>
-              </div>
+          {/* Camera video tiles (local + remote) */}
+          {(camEnabled || cameraStreams.some(s => s.stream.getVideoTracks().length > 0)) && (
+            <div className="mb-4 flex flex-wrap gap-3 justify-center">
+              {/* Local camera */}
+              {camEnabled && (
+                <div className="relative rounded-xl overflow-hidden border border-border/30 shadow-lg" style={{ width: 240, height: 180 }}>
+                  <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                  <div className="absolute bottom-1 left-1 bg-card/80 px-1.5 py-0.5 rounded text-[9px] font-medium">Você</div>
+                </div>
+              )}
+              {/* Remote cameras */}
+              {cameraStreams.map(rs => {
+                if (rs.stream.getVideoTracks().length === 0) return null;
+                return <RemoteVideoTile key={`cam-${rs.peerId}`} rs={rs} />;
+              })}
             </div>
           )}
 
