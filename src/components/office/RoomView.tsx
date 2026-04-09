@@ -299,11 +299,45 @@ export default function RoomView({
 // Hidden audio element to play remote peer audio
 function HiddenAudio({ stream }: { stream: MediaStream }) {
   const ref = useRef<HTMLAudioElement>(null);
+
   useEffect(() => {
-    if (ref.current) {
-      ref.current.srcObject = stream;
-      ref.current.play().catch(() => {});
-    }
+    const audioEl = ref.current;
+    if (!audioEl) return;
+
+    const tryPlay = () => {
+      audioEl.play().catch(() => {});
+    };
+
+    audioEl.srcObject = stream;
+    tryPlay();
+
+    const handleAddTrack = (event: MediaStreamTrackEvent) => {
+      if (event.track.kind === "audio") {
+        event.track.onunmute = () => {
+          tryPlay();
+        };
+        tryPlay();
+      }
+    };
+
+    stream.getAudioTracks().forEach((track) => {
+      track.onunmute = () => {
+        tryPlay();
+      };
+    });
+
+    stream.addEventListener("addtrack", handleAddTrack);
+
+    return () => {
+      stream.removeEventListener("addtrack", handleAddTrack);
+      stream.getAudioTracks().forEach((track) => {
+        track.onunmute = null;
+      });
+      if (audioEl.srcObject === stream) {
+        audioEl.srcObject = null;
+      }
+    };
   }, [stream]);
+
   return <audio ref={ref} autoPlay playsInline style={{ display: "none" }} />;
 }
