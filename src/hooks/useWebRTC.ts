@@ -19,6 +19,8 @@ interface PeerConnection {
   pc: RTCPeerConnection;
   userId: string;
   userName: string;
+  audioSender: RTCRtpSender;
+  videoSender: RTCRtpSender;
 }
 
 export function useWebRTC(
@@ -28,12 +30,12 @@ export function useWebRTC(
   micEnabled: boolean,
   camEnabled: boolean,
   usersInRoom: Array<{ user_id: string; user_name: string }>,
+  localAudioStream: MediaStream | null = null,
   localCameraStream: MediaStream | null = null,
 ) {
   const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([]);
   const [screenSharing, setScreenSharing] = useState(false);
   const peersRef = useRef<Map<string, PeerConnection>>(new Map());
-  const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const screenPeersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const roomIdRef = useRef(roomId);
@@ -63,10 +65,6 @@ export function useWebRTC(
     screenPeersRef.current.forEach(pc => pc.close());
     screenPeersRef.current.clear();
     setRemoteStreams([]);
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(t => t.stop());
-      localStreamRef.current = null;
-    }
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
@@ -74,46 +72,18 @@ export function useWebRTC(
     }
   }, []);
 
-  // Get or create local media stream
-  const getLocalStream = useCallback(async (): Promise<MediaStream> => {
-    if (localStreamRef.current) return localStreamRef.current;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-      });
-      stream.getAudioTracks().forEach(t => { t.enabled = micEnabled; });
-      localStreamRef.current = stream;
-      return stream;
-    } catch {
-      const stream = new MediaStream();
-      localStreamRef.current = stream;
-      return stream;
-    }
-  }, [micEnabled]);
+  useEffect(() => {
+    peersRef.current.forEach((peer) => {
+      const audioTrack = localAudioStream?.getAudioTracks()[0] ?? null;
+      peer.audioSender.replaceTrack(audioTrack).catch(() => {});
+    });
+  }, [localAudioStream]);
 
   // Sync camera stream into all peer connections
   useEffect(() => {
     peersRef.current.forEach((peer) => {
-      const senders = peer.pc.getSenders();
-      const videoSender = senders.find(s => s.track?.kind === "video" || (s.track === null && !senders.some(ss => ss.track?.kind === "video")));
-      
-      if (localCameraStream) {
-        const videoTrack = localCameraStream.getVideoTracks()[0];
-        if (videoTrack) {
-          const existingVideoSender = senders.find(s => s.track?.kind === "video");
-          if (existingVideoSender) {
-            existingVideoSender.replaceTrack(videoTrack);
-          } else {
-            peer.pc.addTrack(videoTrack, localCameraStream);
-          }
-        }
-      } else {
-        const existingVideoSender = senders.find(s => s.track?.kind === "video");
-        if (existingVideoSender) {
-          existingVideoSender.replaceTrack(null);
-        }
-      }
+      const videoTrack = localCameraStream?.getVideoTracks()[0] ?? null;
+      peer.videoSender.replaceTrack(videoTrack).catch(() => {});
     });
   }, [localCameraStream]);
 
@@ -146,20 +116,25 @@ export function useWebRTC(
     }
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
-    peersRef.current.set(remoteUserId, { pc, userId: remoteUserId, userName: remoteUserName });
+    const audioSender = pc.addTransceiver("audio", { direction: "sendrecv" }).sender;
+    const videoSender = pc.addTransceiver("video", { direction: "sendrecv" }).sender;
 
-    // Add local audio stream tracks
-    const localStream = await getLocalStream();
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
+    peersRef.current.set(remoteUserId, {
+      pc,
+      userId: remoteUserId,
+      userName: remoteUserName,
+      audioSender,
+      videoSender,
     });
 
-    // Add local camera video track if available
-    if (localCameraStream) {
-      const videoTrack = localCameraStream.getVideoTracks()[0];
-      if (videoTrack) {
-        pc.addTrack(videoTrack, localCameraStream);
-      }
+    const audioTrack = localAudioStream?.getAudioTracks()[0];
+    if (audioTrack) {
+      await audioSender.replaceTrack(audioTrack);
+    }
+
+    const videoTrack = localCameraStream?.getVideoTracks()[0];
+    if (videoTrack) {
+      await videoSender.replaceTrack(videoTrack);
     }
 
     // Handle remote stream
@@ -199,7 +174,7 @@ export function useWebRTC(
     }
 
     return pc;
-  }, [getLocalStream, sendSignal, currentUserName]);
+  }, [localAudioStream, localCameraStream, sendSignal, currentUserName]);
 
   // Handle incoming signals
   const handleSignal = useCallback(async (signal: any) => {
@@ -322,15 +297,6 @@ export function useWebRTC(
     });
   }, [roomId, currentUserId, usersInRoom, createPeerConnection, cleanupPeer]);
 
-  // Sync mic enabled state to local stream
-  useEffect(() => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach(t => {
-        t.enabled = micEnabled;
-      });
-    }
-  }, [micEnabled]);
-
   // Clean up when leaving room
   useEffect(() => {
     if (!roomId) {
@@ -403,6 +369,6 @@ export function useWebRTC(
     screenSharing,
     startScreenShare,
     stopScreenShare,
-    localStream: localStreamRef.current,
+    localStream: localAudioStream,
   };
 }
