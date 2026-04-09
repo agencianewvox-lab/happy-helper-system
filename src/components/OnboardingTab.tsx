@@ -72,7 +72,7 @@ const renderValue = (key: string, value: any): string => {
 
 function ResponseGrid({ responses }: { responses: Record<string, any> }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-2 pb-4">
       {Object.entries(responses)
         .filter(([key]) => !SKIP_KEYS.includes(key))
         .map(([key, value]) => (
@@ -80,7 +80,7 @@ function ResponseGrid({ responses }: { responses: Record<string, any> }) {
             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
               {FIELD_LABELS[key] || key.replace(/_/g, " ")}
             </span>
-            <span className="text-xs text-foreground break-words whitespace-pre-wrap">
+            <span className="text-xs leading-relaxed text-foreground break-words whitespace-pre-wrap">
               {renderValue(key, value)}
             </span>
           </div>
