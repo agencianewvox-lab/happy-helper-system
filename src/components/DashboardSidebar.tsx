@@ -1,4 +1,4 @@
-import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Building2 } from "lucide-react";
+import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Building2, Home } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -21,6 +21,7 @@ interface DashboardSidebarProps {
 }
 
 const navItems = [
+  { title: "Início", url: "/dashboard", icon: Home, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Performance", url: "/performance", icon: BarChart3, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Chat IA", url: "/chat", icon: Brain, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
