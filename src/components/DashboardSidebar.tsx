@@ -21,6 +21,7 @@ interface DashboardSidebarProps {
 }
 
 const navItems = [
+  { title: "Início", url: "/dashboard", icon: Home, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Performance", url: "/performance", icon: BarChart3, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Chat IA", url: "/chat", icon: Brain, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
