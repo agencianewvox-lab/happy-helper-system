@@ -111,11 +111,11 @@ export function OnboardingTab({ groupId }: Props) {
 
         <div className="grid gap-2">
           {Object.entries(responses)
-            .filter(([key]) => !SKIP_KEYS.includes(key) && FIELD_LABELS[key])
+            .filter(([key]) => !SKIP_KEYS.includes(key))
             .map(([key, value]) => (
               <div key={key} className="flex flex-col gap-0.5 p-2 rounded bg-muted/30 border border-border/30">
                 <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                  {FIELD_LABELS[key] || key}
+                  {FIELD_LABELS[key] || key.replace(/_/g, " ")}
                 </span>
                 <span className="text-xs text-foreground">
                   {renderValue(key, value)}
