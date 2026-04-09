@@ -36,6 +36,7 @@ export function useWebRTC(
   const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([]);
   const [screenSharing, setScreenSharing] = useState(false);
   const peersRef = useRef<Map<string, PeerConnection>>(new Map());
+  const remoteCameraStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   const screenStreamRef = useRef<MediaStream | null>(null);
   const screenPeersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const roomIdRef = useRef(roomId);
@@ -50,6 +51,7 @@ export function useWebRTC(
       peer.pc.close();
       peersRef.current.delete(userId);
     }
+    remoteCameraStreamsRef.current.delete(userId);
     const screenPeer = screenPeersRef.current.get(userId);
     if (screenPeer) {
       screenPeer.close();
@@ -62,6 +64,7 @@ export function useWebRTC(
   const cleanupAll = useCallback(() => {
     peersRef.current.forEach((peer) => peer.pc.close());
     peersRef.current.clear();
+    remoteCameraStreamsRef.current.clear();
     screenPeersRef.current.forEach(pc => pc.close());
     screenPeersRef.current.clear();
     setRemoteStreams([]);
@@ -139,13 +142,28 @@ export function useWebRTC(
 
     // Handle remote stream
     pc.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      if (remoteStream) {
-        setRemoteStreams(prev => {
-          const filtered = prev.filter(s => !(s.peerId === remoteUserId && s.type === "camera"));
-          return [...filtered, { peerId: remoteUserId, peerName: remoteUserName, stream: remoteStream, type: "camera" }];
-        });
-      }
+      const stream = remoteCameraStreamsRef.current.get(remoteUserId) ?? new MediaStream();
+      remoteCameraStreamsRef.current.set(remoteUserId, stream);
+
+      event.streams[0]?.getTracks().forEach((track) => {
+        const exists = stream.getTracks().some((existingTrack) => existingTrack.id === track.id);
+        if (!exists) {
+          stream.addTrack(track);
+        }
+      });
+
+      event.track.onended = () => {
+        stream.removeTrack(event.track);
+        setRemoteStreams(prev => prev.filter(s => !(s.peerId === remoteUserId && s.type === "camera")));
+        if (stream.getTracks().length > 0) {
+          setRemoteStreams(prev => [...prev, { peerId: remoteUserId, peerName: remoteUserName, stream, type: "camera" }]);
+        }
+      };
+
+      setRemoteStreams(prev => {
+        const filtered = prev.filter(s => !(s.peerId === remoteUserId && s.type === "camera"));
+        return [...filtered, { peerId: remoteUserId, peerName: remoteUserName, stream, type: "camera" }];
+      });
     };
 
     // Send ICE candidates
@@ -256,6 +274,23 @@ export function useWebRTC(
   // Subscribe to signals via Realtime
   useEffect(() => {
     if (!roomId || !currentUserId) return;
+
+    const processPendingSignals = async () => {
+      const { data } = await supabase
+        .from("webrtc_signals")
+        .select("*")
+        .eq("to_user_id", currentUserId)
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: true });
+
+      if (data?.length) {
+        for (const signal of data) {
+          await handleSignal(signal);
+        }
+      }
+    };
+
+    processPendingSignals();
 
     const channel = supabase
       .channel(`webrtc-signals-${roomId}`)
