@@ -955,6 +955,36 @@ export type Database = {
         }
         Relationships: []
       }
+      webrtc_signals: {
+        Row: {
+          created_at: string
+          from_user_id: string
+          id: string
+          room_id: string
+          signal_data: Json
+          signal_type: string
+          to_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_user_id: string
+          id?: string
+          room_id: string
+          signal_data?: Json
+          signal_type: string
+          to_user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          room_id?: string
+          signal_data?: Json
+          signal_type?: string
+          to_user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_conversas: {
         Row: {
           created_at: string
