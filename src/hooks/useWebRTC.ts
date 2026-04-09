@@ -145,7 +145,11 @@ export function useWebRTC(
       const stream = remoteCameraStreamsRef.current.get(remoteUserId) ?? new MediaStream();
       remoteCameraStreamsRef.current.set(remoteUserId, stream);
 
-      event.streams[0]?.getTracks().forEach((track) => {
+      const incomingTracks = event.streams[0]?.getTracks().length
+        ? event.streams[0].getTracks()
+        : [event.track];
+
+      incomingTracks.forEach((track) => {
         const exists = stream.getTracks().some((existingTrack) => existingTrack.id === track.id);
         if (!exists) {
           stream.addTrack(track);
