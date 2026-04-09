@@ -57,6 +57,10 @@ export function useWebRTC(
   const screenPeersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const roomIdRef = useRef(roomId);
   const channelRef = useRef<any>(null);
+  const lastLocalTrackIdsRef = useRef<{ audio: string | null; video: string | null }>({
+    audio: null,
+    video: null,
+  });
 
   roomIdRef.current = roomId;
 
@@ -90,21 +94,6 @@ export function useWebRTC(
       setScreenSharing(false);
     }
   }, []);
-
-  useEffect(() => {
-    peersRef.current.forEach((peer) => {
-      const audioTrack = localAudioStream?.getAudioTracks()[0] ?? null;
-      peer.audioSender.replaceTrack(audioTrack).catch(() => {});
-    });
-  }, [localAudioStream]);
-
-  // Sync camera stream into all peer connections
-  useEffect(() => {
-    peersRef.current.forEach((peer) => {
-      const videoTrack = localCameraStream?.getVideoTracks()[0] ?? null;
-      peer.videoSender.replaceTrack(videoTrack).catch(() => {});
-    });
-  }, [localCameraStream]);
 
   // Send signal via Supabase
   const sendSignal = useCallback(async (
@@ -213,6 +202,33 @@ export function useWebRTC(
 
     return pc;
   }, [localAudioStream, localCameraStream, sendSignal, currentUserName]);
+
+  useEffect(() => {
+    const audioTrack = localAudioStream?.getAudioTracks()[0] ?? null;
+    const videoTrack = localCameraStream?.getVideoTracks()[0] ?? null;
+
+    peersRef.current.forEach((peer) => {
+      peer.audioSender.replaceTrack(audioTrack).catch(() => {});
+      peer.videoSender.replaceTrack(videoTrack).catch(() => {});
+    });
+
+    const nextTrackIds = {
+      audio: audioTrack?.id ?? null,
+      video: videoTrack?.id ?? null,
+    };
+
+    const trackChanged =
+      lastLocalTrackIdsRef.current.audio !== nextTrackIds.audio ||
+      lastLocalTrackIdsRef.current.video !== nextTrackIds.video;
+
+    lastLocalTrackIdsRef.current = nextTrackIds;
+
+    if (!trackChanged || peersRef.current.size === 0) return;
+
+    peersRef.current.forEach(({ userId, userName }) => {
+      createPeerConnection(userId, userName, true).catch(() => {});
+    });
+  }, [localAudioStream, localCameraStream, createPeerConnection]);
 
   // Handle incoming signals
   const handleSignal = useCallback(async (signal: any) => {
