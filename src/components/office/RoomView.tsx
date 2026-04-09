@@ -63,7 +63,9 @@ export default function RoomView({
 }: Props) {
   const [showChat, setShowChat] = useState(true);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const [localAudioStream, setLocalAudioStream] = useState<MediaStream | null>(null);
+  const [localCameraStream, setLocalCameraStream] = useState<MediaStream | null>(null);
 
   const { remoteStreams, screenSharing, startScreenShare, stopScreenShare } = useWebRTC(
     room.id,
@@ -72,34 +74,68 @@ export default function RoomView({
     micEnabled,
     camEnabled,
     usersInRoom,
-    streamRef.current,
+    localAudioStream,
+    localCameraStream,
   );
 
-  // Handle camera stream (local preview)
   useEffect(() => {
-    if (camEnabled) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          streamRef.current = stream;
-          if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        })
-        .catch(() => {
-          toast({ title: "Erro de câmera", description: "Não foi possível acessar a câmera.", variant: "destructive" });
-          onToggleCam(false);
-        });
-    } else {
-      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localCameraStream;
     }
+  }, [localCameraStream]);
+
+  useEffect(() => {
     return () => {
-      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+      audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+      localCameraStream?.getTracks().forEach((track) => track.stop());
     };
-  }, [camEnabled]);
+  }, [localCameraStream]);
 
   const handleSend = useCallback((content: string) => { onSendMessage(content); }, [onSendMessage]);
 
   const isLocked = !!room.locked_by;
   const isLockedByMe = room.locked_by === currentUserId;
+
+  const handleToggleMicClick = useCallback(async () => {
+    if (micEnabled) {
+      audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+      audioStreamRef.current = null;
+      setLocalAudioStream(null);
+      onToggleMic(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+      });
+      audioStreamRef.current = stream;
+      setLocalAudioStream(stream);
+      onToggleMic(true);
+    } catch {
+      toast({ title: "Erro de microfone", description: "Permita o acesso ao microfone para ouvir e ser ouvido.", variant: "destructive" });
+      onToggleMic(false);
+    }
+  }, [micEnabled, onToggleMic]);
+
+  const handleToggleCamClick = useCallback(async () => {
+    if (camEnabled) {
+      localCameraStream?.getTracks().forEach((track) => track.stop());
+      setLocalCameraStream(null);
+      onToggleCam(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      setLocalCameraStream(stream);
+      onToggleCam(true);
+    } catch {
+      toast({ title: "Erro de câmera", description: "Não foi possível acessar a câmera.", variant: "destructive" });
+      onToggleCam(false);
+    }
+  }, [camEnabled, localCameraStream, onToggleCam]);
 
   const handleToggleLock = () => {
     if (isLocked && !isLockedByMe) {
@@ -162,12 +198,12 @@ export default function RoomView({
             className="h-7 w-32 text-[10px] bg-background/50 border-border/30" />
 
           <Button size="sm" variant={micEnabled ? "default" : "ghost"} className="h-7 w-7 p-0"
-            onClick={() => onToggleMic(!micEnabled)} title={micEnabled ? "Desligar microfone" : "Ligar microfone"}>
+            onClick={handleToggleMicClick} title={micEnabled ? "Desligar microfone" : "Ligar microfone"}>
             {micEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
           </Button>
 
           <Button size="sm" variant={camEnabled ? "default" : "ghost"} className="h-7 w-7 p-0"
-            onClick={() => onToggleCam(!camEnabled)} title={camEnabled ? "Desligar câmera" : "Ligar câmera"}>
+            onClick={handleToggleCamClick} title={camEnabled ? "Desligar câmera" : "Ligar câmera"}>
             {camEnabled ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
           </Button>
 
