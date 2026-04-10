@@ -2141,8 +2141,8 @@ function extractPhoneFromJid(jid: string): string | null {
   return match ? match[1] : null;
 }
 
-// Grupos permitidos
-const ALLOWED_GROUPS: Record<string, string> = {
+// Grupos permitidos — loaded from DB at request time, with hardcoded fallback
+const HARDCODED_GROUPS: Record<string, string> = {
   "120363406574401569@g.us": "NV-MKT IMPLANTAR JATAÍ",
   "120363427941134678@g.us": "NV - MICROLINS",
   "120363406346934597@g.us": "NV MKT - EXCLUSIVE",
@@ -2175,6 +2175,28 @@ const ALLOWED_GROUPS: Record<string, string> = {
   "120363420585618479@g.us": "NV - Cabana do lago",
   "120363424696043704@g.us": "NV-MKT Belo Odonto🦷",
 };
+
+// Dynamic whitelist: combines hardcoded + DB-registered groups
+let ALLOWED_GROUPS: Record<string, string> = { ...HARDCODED_GROUPS };
+
+async function loadAllowedGroupsFromDB(supabase: any): Promise<void> {
+  try {
+    const { data: dbGroups } = await supabase
+      .from("whatsapp_grupos")
+      .select("group_id, nome");
+    if (dbGroups && dbGroups.length > 0) {
+      // Merge DB groups into allowed list (DB takes precedence)
+      for (const g of dbGroups) {
+        if (g.group_id && !ALLOWED_GROUPS[g.group_id]) {
+          ALLOWED_GROUPS[g.group_id] = g.nome;
+        }
+      }
+    }
+    console.log(`Allowed groups loaded: ${Object.keys(ALLOWED_GROUPS).length} total`);
+  } catch (err) {
+    console.error("Error loading groups from DB:", err);
+  }
+}
 
 function isGroupJid(jid: string): boolean {
   return jid?.endsWith("@g.us") || false;
