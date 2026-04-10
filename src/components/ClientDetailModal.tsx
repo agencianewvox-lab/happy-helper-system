@@ -86,6 +86,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const { user } = useAuth();
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [loadingConversas, setLoadingConversas] = useState(false);
   const [clientInfo, setClientInfo] = useState({
@@ -223,6 +224,21 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   }, [groupId, makeKey]);
 
   if (!grupo) return null;
+
+  const handleDelete = async () => {
+    if (!grupo?.id) return;
+    const confirmed = window.confirm(`Tem certeza que deseja excluir "${grupo.nome}"? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    const { error } = await supabase.from("whatsapp_grupos").delete().eq("id", grupo.id);
+    setDeleting(false);
+    if (error) {
+      toast.error("Erro ao excluir: " + error.message);
+    } else {
+      toast.success("Cliente excluído com sucesso!");
+      onClose();
+    }
+  };
 
   const sent = a ? sentimentConfig[a.sentiment] : null;
   const eng = a ? engagementConfig[a.engagement_type] : null;
