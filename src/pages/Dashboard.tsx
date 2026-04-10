@@ -201,6 +201,7 @@ export default function Dashboard() {
                     AO VIVO
                   </div>
                   <TVModeButton onClick={() => setTvMode(true)} />
+                  <AddClientDialog />
                   <CoachPanel />
                 </div>
               </div>
