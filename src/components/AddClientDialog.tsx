@@ -11,6 +11,7 @@ import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const CATEGORIAS = ["Clínica", "E-commerce", "Restaurante", "Imobiliária", "Educação", "Saúde", "Outro"];
+const GESTORES = ["Murilo Araújo", "Netto Monge", "Jader Costa"];
 
 export function AddClientDialog() {
   const [open, setOpen] = useState(false);
