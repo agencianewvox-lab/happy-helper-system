@@ -40,6 +40,7 @@ interface PeerConnection {
   makingOffer: boolean;
   ignoreOffer: boolean;
   isSettingRemoteAnswerPending: boolean;
+  needsNegotiation: boolean;
   pendingIceCandidates: RTCIceCandidateInit[];
 }
 
@@ -195,6 +196,7 @@ export function useWebRTC(
         makingOffer: false,
         ignoreOffer: false,
         isSettingRemoteAnswerPending: false,
+        needsNegotiation: false,
         pendingIceCandidates: [],
       };
 
@@ -250,9 +252,15 @@ export function useWebRTC(
   const negotiatePeer = useCallback(
     async (remoteUserId: string) => {
       const peer = peersRef.current.get(remoteUserId);
-      if (!peer || peer.makingOffer || peer.pc.signalingState !== "stable") return;
+      if (!peer) return;
+
+      if (peer.makingOffer || peer.pc.signalingState !== "stable") {
+        peer.needsNegotiation = true;
+        return;
+      }
 
       try {
+        peer.needsNegotiation = false;
         peer.makingOffer = true;
         await applyLocalTracksToPeer(peer);
 
@@ -269,6 +277,16 @@ export function useWebRTC(
       } catch {
       } finally {
         peer.makingOffer = false;
+
+        if (peer.needsNegotiation && peer.pc.signalingState === "stable") {
+          queueMicrotask(() => {
+            const latestPeer = peersRef.current.get(remoteUserId);
+            if (!latestPeer?.needsNegotiation || latestPeer.makingOffer || latestPeer.pc.signalingState !== "stable") return;
+
+            latestPeer.needsNegotiation = false;
+            negotiatePeer(remoteUserId).catch(() => {});
+          });
+        }
       }
     },
     [applyLocalTracksToPeer, currentUserName, sendSignal],
@@ -277,6 +295,11 @@ export function useWebRTC(
   const handleSignal = useCallback(
     async (signal: any) => {
       if (!currentUserId || signal.to_user_id !== currentUserId) return;
+
+      if (signal.room_id !== roomIdRef.current) {
+        await supabase.from("webrtc_signals").delete().eq("id", signal.id);
+        return;
+      }
 
       const fromUserId = signal.from_user_id as string;
       const signalType = signal.signal_type as string;
@@ -294,9 +317,24 @@ export function useWebRTC(
           peer.ignoreOffer = !isPolitePeer(fromUserId) && offerCollision;
           if (peer.ignoreOffer) return;
 
-          peer.isSettingRemoteAnswerPending = description.type === "answer";
-          await peer.pc.setRemoteDescription(description);
-          peer.isSettingRemoteAnswerPending = false;
+          if (description.type === "answer" && peer.pc.signalingState !== "have-local-offer") {
+            return;
+          }
+
+          if (description.type === "offer" && offerCollision && peer.pc.signalingState !== "stable") {
+            await Promise.all([
+              peer.pc.setLocalDescription({ type: "rollback" }),
+              peer.pc.setRemoteDescription(description),
+            ]);
+          } else {
+            peer.isSettingRemoteAnswerPending = description.type === "answer";
+
+            try {
+              await peer.pc.setRemoteDescription(description);
+            } finally {
+              peer.isSettingRemoteAnswerPending = false;
+            }
+          }
 
           await flushPendingIceCandidates(peer);
 
@@ -310,6 +348,16 @@ export function useWebRTC(
               sdp: answer.sdp,
               type: answer.type,
               userName: currentUserName,
+            });
+          }
+
+          if (peer.needsNegotiation && peer.pc.signalingState === "stable") {
+            queueMicrotask(() => {
+              const latestPeer = peersRef.current.get(fromUserId);
+              if (!latestPeer?.needsNegotiation || latestPeer.makingOffer || latestPeer.pc.signalingState !== "stable") return;
+
+              latestPeer.needsNegotiation = false;
+              negotiatePeer(fromUserId).catch(() => {});
             });
           }
         } else if (signalType === "ice-candidate") {

@@ -37,7 +37,23 @@ interface Props {
 function RemoteVideoTile({ rs }: { rs: RemoteStream }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
-    if (ref.current) ref.current.srcObject = rs.stream;
+    const videoEl = ref.current;
+    if (!videoEl) return;
+
+    const tryPlay = () => {
+      videoEl.play().catch(() => {});
+    };
+
+    videoEl.srcObject = rs.stream;
+    videoEl.onloadedmetadata = tryPlay;
+    tryPlay();
+
+    return () => {
+      videoEl.onloadedmetadata = null;
+      if (videoEl.srcObject === rs.stream) {
+        videoEl.srcObject = null;
+      }
+    };
   }, [rs.stream]);
 
   const isScreen = rs.type === "screen";
@@ -46,7 +62,7 @@ function RemoteVideoTile({ rs }: { rs: RemoteStream }) {
       "relative rounded-xl overflow-hidden border border-border/30 shadow-lg bg-black",
       isScreen ? "col-span-full" : ""
     )} style={isScreen ? { width: "100%", maxHeight: 400 } : { width: 240, height: 180 }}>
-      <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
+      <video ref={ref} autoPlay playsInline muted data-remote-media="true" className="w-full h-full object-cover" />
       <div className="absolute bottom-1 left-1 bg-card/80 px-1.5 py-0.5 rounded text-[9px] font-medium">
         {isScreen ? `🖥️ Tela de ${rs.peerName}` : rs.peerName}
       </div>
@@ -90,6 +106,22 @@ export default function RoomView({
       localCameraStream?.getTracks().forEach((track) => track.stop());
     };
   }, [localCameraStream]);
+
+  useEffect(() => {
+    const resumeRemoteMedia = () => {
+      document.querySelectorAll<HTMLMediaElement>("[data-remote-media='true']").forEach((mediaEl) => {
+        mediaEl.play().catch(() => {});
+      });
+    };
+
+    window.addEventListener("pointerdown", resumeRemoteMedia);
+    window.addEventListener("keydown", resumeRemoteMedia);
+
+    return () => {
+      window.removeEventListener("pointerdown", resumeRemoteMedia);
+      window.removeEventListener("keydown", resumeRemoteMedia);
+    };
+  }, []);
 
   const handleSend = useCallback((content: string) => { onSendMessage(content); }, [onSendMessage]);
 
@@ -162,8 +194,8 @@ export default function RoomView({
 
   return (
     <div className="flex flex-col h-full rounded-xl border border-border/30 bg-card/60 overflow-hidden">
-      {/* Hidden audio elements for remote audio (from camera streams) */}
-      {cameraStreams.map(rs => (
+      {/* Hidden audio elements for remote audio */}
+      {remoteStreams.map(rs => (
         <HiddenAudio key={`audio-${rs.peerId}`} stream={rs.stream} />
       ))}
 
@@ -339,5 +371,5 @@ function HiddenAudio({ stream }: { stream: MediaStream }) {
     };
   }, [stream]);
 
-  return <audio ref={ref} autoPlay playsInline style={{ display: "none" }} />;
+  return <audio ref={ref} autoPlay playsInline data-remote-media="true" style={{ display: "none" }} />;
 }
