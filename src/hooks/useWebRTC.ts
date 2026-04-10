@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
@@ -77,7 +78,7 @@ export function useWebRTC(
   );
 
   const sendSignal = useCallback(
-    async (toUserId: string, signalType: string, signalData: unknown) => {
+    async (toUserId: string, signalType: string, signalData: Json) => {
       if (!currentUserId || !roomIdRef.current) return;
 
       await supabase.from("webrtc_signals").insert({
