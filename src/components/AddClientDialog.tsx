@@ -89,11 +89,16 @@ export function AddClientDialog() {
           </div>
           <div>
             <Label>Gestor Responsável</Label>
-            <Input
-              placeholder="Nome do gestor"
-              value={form.gestor_responsavel}
-              onChange={(e) => setForm({ ...form, gestor_responsavel: e.target.value })}
-            />
+            <Select value={form.gestor_responsavel} onValueChange={(v) => setForm({ ...form, gestor_responsavel: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar gestor" />
+              </SelectTrigger>
+              <SelectContent>
+                {GESTORES.map((g) => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
