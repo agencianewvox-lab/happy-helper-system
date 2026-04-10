@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { Grupo, NpsPrediction } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,7 +20,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp, ArrowUpRight, ArrowDownRight,
-  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone, UserCheck, AlertCircle, Siren, StickyNote,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone, UserCheck, AlertCircle, Siren, StickyNote, Trash2,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -85,6 +86,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const { user } = useAuth();
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [loadingConversas, setLoadingConversas] = useState(false);
   const [clientInfo, setClientInfo] = useState({
@@ -223,6 +225,21 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
 
   if (!grupo) return null;
 
+  const handleDelete = async () => {
+    if (!grupo?.id) return;
+    const confirmed = window.confirm(`Tem certeza que deseja excluir "${grupo.nome}"? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+    setDeleting(true);
+    const { error } = await supabase.from("whatsapp_grupos").delete().eq("id", grupo.id);
+    setDeleting(false);
+    if (error) {
+      toast.error("Erro ao excluir: " + error.message);
+    } else {
+      toast.success("Cliente excluído com sucesso!");
+      onClose();
+    }
+  };
+
   const sent = a ? sentimentConfig[a.sentiment] : null;
   const eng = a ? engagementConfig[a.engagement_type] : null;
   const SentIcon = sent?.icon || Minus;
@@ -242,19 +259,24 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl bg-card border-border/50 max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            {isPriorityMax && <Siren className="w-5 h-5 text-red-500 animate-bounce" />}
-            <DialogTitle className="text-xl">{grupo.nome}</DialogTitle>
-            {isPriorityMax && (
-              <Badge className="text-xs bg-red-600 text-white border-red-600 animate-pulse">
-                PRIORIDADE MÁXIMA
-              </Badge>
-            )}
-            {a && a.churn_risk >= 60 && !isPriorityMax && (
-              <Badge variant="destructive" className="text-xs flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> Risco
-              </Badge>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {isPriorityMax && <Siren className="w-5 h-5 text-red-500 animate-bounce" />}
+              <DialogTitle className="text-xl">{grupo.nome}</DialogTitle>
+              {isPriorityMax && (
+                <Badge className="text-xs bg-red-600 text-white border-red-600 animate-pulse">
+                  PRIORIDADE MÁXIMA
+                </Badge>
+              )}
+              {a && a.churn_risk >= 60 && !isPriorityMax && (
+                <Badge variant="destructive" className="text-xs flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Risco
+                </Badge>
+              )}
+            </div>
+            <Button variant="ghost" size="icon" onClick={handleDelete} disabled={deleting} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Excluir cliente">
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </Button>
           </div>
           {isPriorityMax && a?.priority_reason && (
             <p className="text-xs text-red-500 font-semibold mt-1">🚨 {a.priority_reason}</p>
