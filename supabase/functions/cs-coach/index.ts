@@ -25,7 +25,8 @@ function findWebhook(nome: string): string | null {
 const COACH_TYPES = [
   "grupo_parado", "sentimento_caindo", "pendencia_esquecida", "frt_alto",
   "cliente_elogiou", "aniversario", "ads_decolou", "ads_caiu",
-  "onboarding_travou", "parabens_performance", "cliente_novo", "padrao_detectado"
+  "onboarding_travou", "parabens_performance", "cliente_novo", "padrao_detectado",
+  "cliente_sem_resposta", "cobranca_cliente"
 ];
 
 const TYPE_LABELS: Record<string, string> = {
@@ -41,7 +42,55 @@ const TYPE_LABELS: Record<string, string> = {
   parabens_performance: "Parabéns pela performance",
   cliente_novo: "Cliente novo precisa de atenção",
   padrao_detectado: "Sugestão baseada em padrão",
+  cliente_sem_resposta: "⚠️ Cliente esperando resposta",
+  cobranca_cliente: "🚨 Cliente cobrando resposta — URGENTE",
 };
+
+// Patterns for follow-up/cobrança messages
+const COBRANCA_PATTERNS = [
+  /^\?{1,}$/,              // "?", "??", "???"
+  /^e\s*a[ií]\s*\??$/i,    // "e aí?", "e ai?"
+  /^cadê\??$/i,            // "cadê?"
+  /^cade\??$/i,
+  /^oi\?+$/i,              // "oi??"
+  /^gente\??$/i,           // "gente?"
+  /^alguém\??$/i,          // "alguém?"
+  /^alguem\??$/i,
+  /^pessoal\??$/i,         // "pessoal?"
+  /^bom dia\?+$/i,         // "bom dia??"
+  /^boa tarde\?+$/i,
+];
+
+const COBRANCA_KEYWORDS = [
+  "ninguém responde", "ninguem responde",
+  "sem resposta", "esperando resposta",
+  "não respondem", "nao respondem",
+  "vocês sumiram", "voces sumiram",
+  "cadê a resposta", "cade a resposta",
+  "alguém me responde", "alguem me responde",
+  "faz tempo que espero", "to esperando",
+  "tô esperando", "estou esperando",
+  "preciso de uma resposta", "preciso de retorno",
+  "sem retorno",
+];
+
+const TEAM_MEMBERS_NAMES = [
+  "jader", "murillo", "murilo", "priscilla", "priscila", "alisson",
+  "joel", "thais", "daniella", "victor botto", "netto", "netto monge", "jiza",
+];
+
+function isTeamMember(contactName: string): boolean {
+  if (!contactName) return false;
+  const lower = contactName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return TEAM_MEMBERS_NAMES.some(name => lower.includes(name));
+}
+
+function isCobrancaMessage(text: string): boolean {
+  const trimmed = (text || "").trim();
+  if (COBRANCA_PATTERNS.some(p => p.test(trimmed))) return true;
+  const lower = trimmed.toLowerCase();
+  return COBRANCA_KEYWORDS.some(kw => lower.includes(kw));
+}
 
 interface CoachOpportunity {
   tipo: string;
@@ -49,6 +98,7 @@ interface CoachOpportunity {
   group_id?: string;
   group_name?: string;
   context: string;
+  bypass_interval?: boolean; // skip min interval filter for urgent alerts
 }
 
 Deno.serve(async (req) => {
@@ -111,7 +161,7 @@ Deno.serve(async (req) => {
       supabase.from("whatsapp_conversas")
         .select("group_id, mensagem, nome_contato, direcao, recebido_em")
         .gte("recebido_em", new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString())
-        .order("recebido_em", { ascending: false })
+        .order("recebido_em", { ascending: true })
         .limit(1000),
       supabase.from("pending_demand_resolutions")
         .select("*")
@@ -179,7 +229,7 @@ Deno.serve(async (req) => {
 
       const analytics = analyticsMap[grupo.group_id];
       const groupConvs = convByGroup[grupo.group_id] || [];
-      const lastMsg = groupConvs[0];
+      const lastMsg = groupConvs[groupConvs.length - 1];
       const lastMsgTimestamp = lastMsg?.recebido_em ? new Date(lastMsg.recebido_em).getTime() : null;
       const hoursSinceLastMsg = lastMsgTimestamp ? (now.getTime() - lastMsgTimestamp) / (1000 * 60 * 60) : 999;
 
@@ -267,6 +317,116 @@ Deno.serve(async (req) => {
                 group_name: grupo.nome,
                 context: `Cliente "${grupo.nome}" completa ${months} meses como cliente! Ótimo momento para celebrar a parceria.`,
               });
+            }
+          }
+        }
+      }
+
+      // ========================================
+      // TYPE: Cliente sem resposta (>30min em horário comercial)
+      // ========================================
+      if (tiposAtivos.includes("cliente_sem_resposta") || tiposAtivos.includes("cobranca_cliente")) {
+        // Find the LAST client message and check if team responded after it
+        let lastClientMsgIdx = -1;
+        for (let i = groupConvs.length - 1; i >= 0; i--) {
+          const conv = groupConvs[i];
+          if (conv.direcao === "entrada" && !isTeamMember(conv.nome_contato)) {
+            lastClientMsgIdx = i;
+            break;
+          }
+        }
+
+        if (lastClientMsgIdx >= 0) {
+          const lastClientMsg = groupConvs[lastClientMsgIdx];
+          const clientMsgText = lastClientMsg.mensagem || "";
+          const clientMsgTime = new Date(lastClientMsg.recebido_em).getTime();
+          const minutesWaiting = (now.getTime() - clientMsgTime) / (1000 * 60);
+
+          // Check if team responded AFTER this client message
+          let teamRespondedAfter = false;
+          for (let j = lastClientMsgIdx + 1; j < groupConvs.length; j++) {
+            if (groupConvs[j].direcao === "saida" || isTeamMember(groupConvs[j].nome_contato)) {
+              teamRespondedAfter = true;
+              break;
+            }
+          }
+
+          // Find the FIRST unanswered client message to calculate real wait time
+          let firstUnansweredIdx = lastClientMsgIdx;
+          for (let i = lastClientMsgIdx - 1; i >= 0; i--) {
+            const conv = groupConvs[i];
+            if (conv.direcao === "saida" || isTeamMember(conv.nome_contato)) break;
+            if (conv.direcao === "entrada" && !isTeamMember(conv.nome_contato)) {
+              firstUnansweredIdx = i;
+            }
+          }
+          const firstUnansweredMsg = groupConvs[firstUnansweredIdx];
+          const realWaitMinutes = (now.getTime() - new Date(firstUnansweredMsg.recebido_em).getTime()) / (1000 * 60);
+
+          // Cobrança: no minimum wait. Normal: 30min minimum.
+          const isCobranca = isCobrancaMessage(clientMsgText);
+          const minWait = isCobranca ? 5 : 30;
+
+          if (!teamRespondedAfter && minutesWaiting >= minWait) {
+            const hoursWaiting = Math.round(realWaitMinutes / 60 * 10) / 10;
+
+            if (isCobranca && tiposAtivos.includes("cobranca_cliente")) {
+              // 🚨 COBRANÇA — MÁXIMA URGÊNCIA
+              opportunities.push({
+                tipo: "cobranca_cliente",
+                destinatario: responsavel,
+                group_id: grupo.group_id,
+                group_name: grupo.nome,
+                context: `🚨 URGENTE! Cliente "${grupo.nome}" COBROU RESPOSTA com "${clientMsgText.slice(0, 80)}". Esperando resposta há ${hoursWaiting}h (desde "${(firstUnansweredMsg.mensagem || "").slice(0, 60)}"). Isso é gravíssimo — responda IMEDIATAMENTE.`,
+                bypass_interval: true,
+              });
+
+              // Also auto-insert as pending demand
+              const { data: existing } = await supabase
+                .from("pending_demand_resolutions")
+                .select("id")
+                .eq("group_id", grupo.group_id)
+                .eq("resolved", false)
+                .limit(1);
+              if (!existing || existing.length === 0) {
+                await supabase.from("pending_demand_resolutions").insert({
+                  group_id: grupo.group_id,
+                  term: "cobrança de resposta",
+                  requested_at: lastClientMsg.recebido_em,
+                  status: "pendente",
+                  resolved: false,
+                });
+              }
+            } else if (minutesWaiting >= 30 && tiposAtivos.includes("cliente_sem_resposta")) {
+              // ⚠️ Cliente esperando resposta
+              const urgencyLevel = minutesWaiting >= 120 ? "URGENTE" : "ATENÇÃO";
+              opportunities.push({
+                tipo: "cliente_sem_resposta",
+                destinatario: responsavel,
+                group_id: grupo.group_id,
+                group_name: grupo.nome,
+                context: `${urgencyLevel}: Cliente "${grupo.nome}" enviou "${clientMsgText.slice(0, 100)}" e está esperando resposta há ${hoursWaiting}h. Não deixe o cliente no vácuo!`,
+                bypass_interval: minutesWaiting >= 120,
+              });
+
+              // Auto-insert pending demand if waiting > 1h and none exists
+              if (minutesWaiting >= 60) {
+                const { data: existing } = await supabase
+                  .from("pending_demand_resolutions")
+                  .select("id")
+                  .eq("group_id", grupo.group_id)
+                  .eq("resolved", false)
+                  .limit(1);
+                if (!existing || existing.length === 0) {
+                  await supabase.from("pending_demand_resolutions").insert({
+                    group_id: grupo.group_id,
+                    term: "demanda",
+                    requested_at: lastClientMsg.recebido_em,
+                    status: "pendente",
+                    resolved: false,
+                  });
+                }
+              }
             }
           }
         }
@@ -525,11 +685,13 @@ Deno.serve(async (req) => {
       // Filter: max per person
       if ((msgCountToday[opp.destinatario] || 0) >= maxPerPerson) continue;
 
-      // Filter: min interval
-      const lastTime = lastMsgTime[opp.destinatario];
-      if (lastTime) {
-        const elapsed = (now.getTime() - new Date(lastTime).getTime()) / (1000 * 60);
-        if (elapsed < minInterval) continue;
+      // Filter: min interval (bypass for urgent alerts)
+      if (!opp.bypass_interval) {
+        const lastTime = lastMsgTime[opp.destinatario];
+        if (lastTime) {
+          const elapsed = (now.getTime() - new Date(lastTime).getTime()) / (1000 * 60);
+          if (elapsed < minInterval) continue;
+        }
       }
 
       // Filter: same type+group in last 24h
