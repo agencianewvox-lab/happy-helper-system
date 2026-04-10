@@ -6,9 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ReactMarkdown from "react-markdown";
 import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays, Siren, ArrowUpRight, ArrowDownRight, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 import { NpsScoreBadge } from "@/components/NpsScoreBadge";
 
 interface ClientCardProps {
@@ -73,8 +76,10 @@ function TrendArrow({ trend }: { trend?: string }) {
 }
 
 const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
+const CARD_CATEGORIAS = ["Clientes / Operação", "Clínicas", "Internos / Gestão"];
 
 export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCardProps) {
+  const { isMaster } = useProfile();
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
@@ -186,10 +191,39 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
             </div>
           )}
 
-          {grupo.categoria && (
+          {grupo.categoria && !isMaster && (
             <Badge variant="secondary" className="text-[10px]">
               {grupo.categoria}
             </Badge>
+          )}
+          {isMaster && (
+            <Select
+              value={grupo.categoria || ""}
+              onValueChange={async (newCat) => {
+                const { error } = await supabase
+                  .from("whatsapp_grupos")
+                  .update({ categoria: newCat } as any)
+                  .eq("group_id", grupo.group_id);
+                if (error) {
+                  toast.error("Erro ao alterar categoria");
+                } else {
+                  toast.success(`Categoria alterada para ${newCat}`);
+                  window.location.reload();
+                }
+              }}
+            >
+              <SelectTrigger
+                className="h-6 w-auto text-[10px] px-2 py-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {CARD_CATEGORIAS.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           <div className="grid grid-cols-2 gap-2 text-xs">

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const CATEGORIAS = ["Clínica", "E-commerce", "Restaurante", "Imobiliária", "Educação", "Saúde", "Outro"];
+const CATEGORIAS = ["Clientes / Operação", "Clínicas", "Internos / Gestão"];
 const GESTORES = ["Murilo Araújo", "Netto Monge", "Jader Costa"];
 
 export function AddClientDialog() {
