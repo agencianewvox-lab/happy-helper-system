@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
@@ -40,6 +41,7 @@ interface PeerConnection {
   makingOffer: boolean;
   ignoreOffer: boolean;
   isSettingRemoteAnswerPending: boolean;
+  needsNegotiation: boolean;
   pendingIceCandidates: RTCIceCandidateInit[];
 }
 
@@ -76,7 +78,7 @@ export function useWebRTC(
   );
 
   const sendSignal = useCallback(
-    async (toUserId: string, signalType: string, signalData: unknown) => {
+    async (toUserId: string, signalType: string, signalData: Json) => {
       if (!currentUserId || !roomIdRef.current) return;
 
       await supabase.from("webrtc_signals").insert({
@@ -195,6 +197,7 @@ export function useWebRTC(
         makingOffer: false,
         ignoreOffer: false,
         isSettingRemoteAnswerPending: false,
+        needsNegotiation: false,
         pendingIceCandidates: [],
       };
 
@@ -232,7 +235,10 @@ export function useWebRTC(
         if (!event.candidate) return;
 
         sendSignal(remoteUserId, "ice-candidate", {
-          candidate: event.candidate.toJSON(),
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex,
+          usernameFragment: event.candidate.usernameFragment,
         }).catch(() => {});
       };
 
@@ -250,9 +256,15 @@ export function useWebRTC(
   const negotiatePeer = useCallback(
     async (remoteUserId: string) => {
       const peer = peersRef.current.get(remoteUserId);
-      if (!peer || peer.makingOffer || peer.pc.signalingState !== "stable") return;
+      if (!peer) return;
+
+      if (peer.makingOffer || peer.pc.signalingState !== "stable") {
+        peer.needsNegotiation = true;
+        return;
+      }
 
       try {
+        peer.needsNegotiation = false;
         peer.makingOffer = true;
         await applyLocalTracksToPeer(peer);
 
@@ -269,6 +281,16 @@ export function useWebRTC(
       } catch {
       } finally {
         peer.makingOffer = false;
+
+        if (peer.needsNegotiation && peer.pc.signalingState === "stable") {
+          queueMicrotask(() => {
+            const latestPeer = peersRef.current.get(remoteUserId);
+            if (!latestPeer?.needsNegotiation || latestPeer.makingOffer || latestPeer.pc.signalingState !== "stable") return;
+
+            latestPeer.needsNegotiation = false;
+            negotiatePeer(remoteUserId).catch(() => {});
+          });
+        }
       }
     },
     [applyLocalTracksToPeer, currentUserName, sendSignal],
@@ -277,6 +299,11 @@ export function useWebRTC(
   const handleSignal = useCallback(
     async (signal: any) => {
       if (!currentUserId || signal.to_user_id !== currentUserId) return;
+
+      if (signal.room_id !== roomIdRef.current) {
+        await supabase.from("webrtc_signals").delete().eq("id", signal.id);
+        return;
+      }
 
       const fromUserId = signal.from_user_id as string;
       const signalType = signal.signal_type as string;
@@ -294,9 +321,24 @@ export function useWebRTC(
           peer.ignoreOffer = !isPolitePeer(fromUserId) && offerCollision;
           if (peer.ignoreOffer) return;
 
-          peer.isSettingRemoteAnswerPending = description.type === "answer";
-          await peer.pc.setRemoteDescription(description);
-          peer.isSettingRemoteAnswerPending = false;
+          if (description.type === "answer" && peer.pc.signalingState !== "have-local-offer") {
+            return;
+          }
+
+          if (description.type === "offer" && offerCollision && peer.pc.signalingState !== "stable") {
+            await Promise.all([
+              peer.pc.setLocalDescription({ type: "rollback" }),
+              peer.pc.setRemoteDescription(description),
+            ]);
+          } else {
+            peer.isSettingRemoteAnswerPending = description.type === "answer";
+
+            try {
+              await peer.pc.setRemoteDescription(description);
+            } finally {
+              peer.isSettingRemoteAnswerPending = false;
+            }
+          }
 
           await flushPendingIceCandidates(peer);
 
@@ -312,17 +354,27 @@ export function useWebRTC(
               userName: currentUserName,
             });
           }
+
+          if (peer.needsNegotiation && peer.pc.signalingState === "stable") {
+            queueMicrotask(() => {
+              const latestPeer = peersRef.current.get(fromUserId);
+              if (!latestPeer?.needsNegotiation || latestPeer.makingOffer || latestPeer.pc.signalingState !== "stable") return;
+
+              latestPeer.needsNegotiation = false;
+              negotiatePeer(fromUserId).catch(() => {});
+            });
+          }
         } else if (signalType === "ice-candidate") {
           const peer = peersRef.current.get(fromUserId) ?? await ensurePeerConnection(fromUserId, data.userName || "Colega");
-          if (!data.candidate || peer.ignoreOffer) return;
+          if (!data || peer.ignoreOffer) return;
 
           if (peer.pc.remoteDescription) {
             try {
-              await peer.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+              await peer.pc.addIceCandidate(new RTCIceCandidate(data));
             } catch {
             }
           } else {
-            peer.pendingIceCandidates.push(data.candidate);
+            peer.pendingIceCandidates.push(data);
           }
         } else if (signalType === "screen-offer") {
           const existingScreenPeer = screenPeersRef.current.get(fromUserId);
@@ -345,7 +397,12 @@ export function useWebRTC(
 
           pc.onicecandidate = (event) => {
             if (!event.candidate) return;
-            sendSignal(fromUserId, "screen-ice-candidate", { candidate: event.candidate.toJSON() }).catch(() => {});
+            sendSignal(fromUserId, "screen-ice-candidate", {
+              candidate: event.candidate.candidate,
+              sdpMid: event.candidate.sdpMid,
+              sdpMLineIndex: event.candidate.sdpMLineIndex,
+              usernameFragment: event.candidate.usernameFragment,
+            }).catch(() => {});
           };
 
           pc.onconnectionstatechange = () => {
@@ -366,9 +423,9 @@ export function useWebRTC(
           }
         } else if (signalType === "screen-ice-candidate") {
           const pc = screenPeersRef.current.get(fromUserId);
-          if (pc && data.candidate) {
+          if (pc && data) {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+              await pc.addIceCandidate(new RTCIceCandidate(data));
             } catch {
             }
           }
@@ -519,7 +576,12 @@ export function useWebRTC(
 
         pc.onicecandidate = (event) => {
           if (!event.candidate) return;
-          sendSignal(user.user_id, "screen-ice-candidate", { candidate: event.candidate.toJSON() }).catch(() => {});
+          sendSignal(user.user_id, "screen-ice-candidate", {
+            candidate: event.candidate.candidate,
+            sdpMid: event.candidate.sdpMid,
+            sdpMLineIndex: event.candidate.sdpMLineIndex,
+            usernameFragment: event.candidate.usernameFragment,
+          }).catch(() => {});
         };
 
         const offer = await pc.createOffer();
