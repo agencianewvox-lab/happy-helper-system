@@ -235,7 +235,10 @@ export function useWebRTC(
         if (!event.candidate) return;
 
         sendSignal(remoteUserId, "ice-candidate", {
-          candidate: event.candidate.toJSON(),
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex,
+          usernameFragment: event.candidate.usernameFragment,
         }).catch(() => {});
       };
 
@@ -363,15 +366,15 @@ export function useWebRTC(
           }
         } else if (signalType === "ice-candidate") {
           const peer = peersRef.current.get(fromUserId) ?? await ensurePeerConnection(fromUserId, data.userName || "Colega");
-          if (!data.candidate || peer.ignoreOffer) return;
+          if (!data || peer.ignoreOffer) return;
 
           if (peer.pc.remoteDescription) {
             try {
-              await peer.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+              await peer.pc.addIceCandidate(new RTCIceCandidate(data));
             } catch {
             }
           } else {
-            peer.pendingIceCandidates.push(data.candidate);
+            peer.pendingIceCandidates.push(data);
           }
         } else if (signalType === "screen-offer") {
           const existingScreenPeer = screenPeersRef.current.get(fromUserId);
@@ -394,7 +397,12 @@ export function useWebRTC(
 
           pc.onicecandidate = (event) => {
             if (!event.candidate) return;
-            sendSignal(fromUserId, "screen-ice-candidate", { candidate: event.candidate.toJSON() }).catch(() => {});
+            sendSignal(fromUserId, "screen-ice-candidate", {
+              candidate: event.candidate.candidate,
+              sdpMid: event.candidate.sdpMid,
+              sdpMLineIndex: event.candidate.sdpMLineIndex,
+              usernameFragment: event.candidate.usernameFragment,
+            }).catch(() => {});
           };
 
           pc.onconnectionstatechange = () => {
@@ -415,9 +423,9 @@ export function useWebRTC(
           }
         } else if (signalType === "screen-ice-candidate") {
           const pc = screenPeersRef.current.get(fromUserId);
-          if (pc && data.candidate) {
+          if (pc && data) {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+              await pc.addIceCandidate(new RTCIceCandidate(data));
             } catch {
             }
           }
@@ -568,7 +576,12 @@ export function useWebRTC(
 
         pc.onicecandidate = (event) => {
           if (!event.candidate) return;
-          sendSignal(user.user_id, "screen-ice-candidate", { candidate: event.candidate.toJSON() }).catch(() => {});
+          sendSignal(user.user_id, "screen-ice-candidate", {
+            candidate: event.candidate.candidate,
+            sdpMid: event.candidate.sdpMid,
+            sdpMLineIndex: event.candidate.sdpMLineIndex,
+            usernameFragment: event.candidate.usernameFragment,
+          }).catch(() => {});
         };
 
         const offer = await pc.createOffer();
