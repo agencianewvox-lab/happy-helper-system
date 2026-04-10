@@ -259,19 +259,24 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl bg-card border-border/50 max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            {isPriorityMax && <Siren className="w-5 h-5 text-red-500 animate-bounce" />}
-            <DialogTitle className="text-xl">{grupo.nome}</DialogTitle>
-            {isPriorityMax && (
-              <Badge className="text-xs bg-red-600 text-white border-red-600 animate-pulse">
-                PRIORIDADE MÁXIMA
-              </Badge>
-            )}
-            {a && a.churn_risk >= 60 && !isPriorityMax && (
-              <Badge variant="destructive" className="text-xs flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> Risco
-              </Badge>
-            )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {isPriorityMax && <Siren className="w-5 h-5 text-red-500 animate-bounce" />}
+              <DialogTitle className="text-xl">{grupo.nome}</DialogTitle>
+              {isPriorityMax && (
+                <Badge className="text-xs bg-red-600 text-white border-red-600 animate-pulse">
+                  PRIORIDADE MÁXIMA
+                </Badge>
+              )}
+              {a && a.churn_risk >= 60 && !isPriorityMax && (
+                <Badge variant="destructive" className="text-xs flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Risco
+                </Badge>
+              )}
+            </div>
+            <Button variant="ghost" size="icon" onClick={handleDelete} disabled={deleting} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Excluir cliente">
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </Button>
           </div>
           {isPriorityMax && a?.priority_reason && (
             <p className="text-xs text-red-500 font-semibold mt-1">🚨 {a.priority_reason}</p>
