@@ -2275,6 +2275,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Load dynamic whitelist from DB (merges with hardcoded)
+    await loadAllowedGroupsFromDB(supabase);
+
     const body = await req.json();
     console.log("Webhook received, event:", body.event, "| has data:", !!body.data);
 
