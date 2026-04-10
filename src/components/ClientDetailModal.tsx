@@ -226,17 +226,38 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   if (!grupo) return null;
 
   const handleDelete = async () => {
-    if (!grupo?.id) return;
-    const confirmed = window.confirm(`Tem certeza que deseja excluir "${grupo.nome}"? Esta ação não pode ser desfeita.`);
+    if (!grupo?.id || !grupo?.group_id) return;
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir "${grupo.nome}"?\n\nTodas as conversas, notas, pendências, pesquisas NPS, previsões, onboarding e dados relacionados serão apagados permanentemente.`
+    );
     if (!confirmed) return;
     setDeleting(true);
-    const { error } = await supabase.from("whatsapp_grupos").delete().eq("id", grupo.id);
-    setDeleting(false);
-    if (error) {
-      toast.error("Erro ao excluir: " + error.message);
-    } else {
-      toast.success("Cliente excluído com sucesso!");
+    try {
+      const gid = grupo.group_id;
+      // Delete all related data in parallel
+      await Promise.all([
+        supabase.from("whatsapp_conversas").delete().eq("group_id", gid),
+        supabase.from("client_notes").delete().eq("group_id", gid),
+        supabase.from("pending_demand_resolutions").delete().eq("group_id", gid),
+        supabase.from("nps_surveys").delete().eq("group_id", gid),
+        supabase.from("nps_predictions").delete().eq("group_id", gid),
+        supabase.from("nps_prediction_history").delete().eq("group_id", gid),
+        supabase.from("onboarding_responses").delete().eq("group_id", gid),
+        supabase.from("coach_messages").delete().eq("group_id", gid),
+        supabase.from("calendar_events").delete().eq("group_id", gid),
+        supabase.from("master_notifications").delete().eq("group_id", gid),
+        supabase.from("team_feedback_log").delete().eq("group_id", gid),
+        supabase.from("tasks").delete().eq("group_id", gid),
+      ]);
+      // Finally delete the group itself
+      const { error } = await supabase.from("whatsapp_grupos").delete().eq("id", grupo.id);
+      if (error) throw error;
+      toast.success("Cliente e todos os dados relacionados foram excluídos!");
       onClose();
+    } catch (err: any) {
+      toast.error("Erro ao excluir: " + err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
