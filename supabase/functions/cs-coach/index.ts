@@ -351,9 +351,24 @@ Deno.serve(async (req) => {
             }
           }
 
-          if (!teamRespondedAfter && minutesWaiting >= 30) {
-            const isCobranca = isCobrancaMessage(clientMsgText);
-            const hoursWaiting = Math.round(minutesWaiting / 60 * 10) / 10;
+          // Find the FIRST unanswered client message to calculate real wait time
+          let firstUnansweredIdx = lastClientMsgIdx;
+          for (let i = lastClientMsgIdx - 1; i >= 0; i--) {
+            const conv = groupConvs[i];
+            if (conv.direcao === "saida" || isTeamMember(conv.nome_contato)) break;
+            if (conv.direcao === "entrada" && !isTeamMember(conv.nome_contato)) {
+              firstUnansweredIdx = i;
+            }
+          }
+          const firstUnansweredMsg = groupConvs[firstUnansweredIdx];
+          const realWaitMinutes = (now.getTime() - new Date(firstUnansweredMsg.recebido_em).getTime()) / (1000 * 60);
+
+          // Cobrança: no minimum wait. Normal: 30min minimum.
+          const isCobranca = isCobrancaMessage(clientMsgText);
+          const minWait = isCobranca ? 5 : 30;
+
+          if (!teamRespondedAfter && minutesWaiting >= minWait) {
+            const hoursWaiting = Math.round(realWaitMinutes / 60 * 10) / 10;
 
             if (isCobranca && tiposAtivos.includes("cobranca_cliente")) {
               // 🚨 COBRANÇA — MÁXIMA URGÊNCIA
@@ -362,7 +377,7 @@ Deno.serve(async (req) => {
                 destinatario: responsavel,
                 group_id: grupo.group_id,
                 group_name: grupo.nome,
-                context: `🚨 URGENTE! Cliente "${grupo.nome}" COBROU RESPOSTA com "${clientMsgText.slice(0, 80)}". Esperando há ${hoursWaiting}h. Isso é gravíssimo — responda IMEDIATAMENTE.`,
+                context: `🚨 URGENTE! Cliente "${grupo.nome}" COBROU RESPOSTA com "${clientMsgText.slice(0, 80)}". Esperando resposta há ${hoursWaiting}h (desde "${(firstUnansweredMsg.mensagem || "").slice(0, 60)}"). Isso é gravíssimo — responda IMEDIATAMENTE.`,
                 bypass_interval: true,
               });
 
