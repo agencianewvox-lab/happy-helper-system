@@ -76,8 +76,10 @@ function TrendArrow({ trend }: { trend?: string }) {
 }
 
 const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
+const CARD_CATEGORIAS = ["Clientes / Operação", "Clínicas", "Internos / Gestão"];
 
 export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCardProps) {
+  const { isMaster } = useProfile();
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
