@@ -191,10 +191,39 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
             </div>
           )}
 
-          {grupo.categoria && (
+          {grupo.categoria && !isMaster && (
             <Badge variant="secondary" className="text-[10px]">
               {grupo.categoria}
             </Badge>
+          )}
+          {isMaster && (
+            <Select
+              value={grupo.categoria || ""}
+              onValueChange={async (newCat) => {
+                const { error } = await supabase
+                  .from("whatsapp_grupos")
+                  .update({ categoria: newCat } as any)
+                  .eq("group_id", grupo.group_id);
+                if (error) {
+                  toast.error("Erro ao alterar categoria");
+                } else {
+                  toast.success(`Categoria alterada para ${newCat}`);
+                  window.location.reload();
+                }
+              }}
+            >
+              <SelectTrigger
+                className="h-6 w-auto text-[10px] px-2 py-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {CARD_CATEGORIAS.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           <div className="grid grid-cols-2 gap-2 text-xs">
