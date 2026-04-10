@@ -18,6 +18,7 @@ import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { CoachPanel } from "@/components/CoachPanel";
+import { AddClientDialog } from "@/components/AddClientDialog";
 import { useNpsPredictions } from "@/hooks/useNpsPredictions";
 import { BirthdayAlerts } from "@/components/BirthdayAlerts";
 
