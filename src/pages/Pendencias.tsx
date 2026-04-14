@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 
+let draggedDemandId: string | null = null;
+
 type DemandStatus = "pendente" | "fazendo" | "feito";
 
 interface DemandItem {
@@ -34,6 +36,9 @@ interface DemandItem {
   grupo_nome?: string;
   gestor_responsavel?: string | null;
   due_date?: string | null;
+  demand_text?: string;
+  solution_text?: string;
+  priority?: "urgente" | "normal" | "baixa";
 }
 
 interface GrupoOption {
@@ -80,6 +85,9 @@ export default function Pendencias() {
         .select("group_id, nome, gestor_responsavel");
       if (grpError) throw grpError;
 
+      const { data: analyticsData } = await supabase.functions.invoke("group-analytics");
+      const analyticsMap = analyticsData?.analytics || {};
+
       setGrupos(grps || []);
 
       const grupoMap = new Map<string, { nome: string; gestor: string | null }>();
@@ -89,6 +97,8 @@ export default function Pendencias() {
 
       const items: DemandItem[] = (resolutions || []).map((r: any) => {
         const grp = grupoMap.get(r.group_id);
+        const detail = (analyticsMap[r.group_id]?.pending_demand_details || []).find((d: any) => d.term === r.term && d.requested_at === r.requested_at)
+          || (analyticsMap[r.group_id]?.pending_demand_details || []).find((d: any) => d.term === r.term);
         return {
           id: r.id,
           group_id: r.group_id,
@@ -99,6 +109,9 @@ export default function Pendencias() {
           grupo_nome: grp?.nome || r.group_id,
           gestor_responsavel: grp?.gestor || null,
           due_date: r.due_date || null,
+          demand_text: detail?.message_excerpt || r.term,
+          solution_text: detail?.suggested_solution || null,
+          priority: detail?.priority || "normal",
         };
       });
 
@@ -382,7 +395,25 @@ export default function Pendencias() {
             const items = columnDemands[status];
             const Icon = config.icon;
             return (
-              <div key={status} className={cn("rounded-xl border p-4 flex flex-col", config.bg)}>
+              <div
+                key={status}
+                className={cn("rounded-xl border p-4 flex flex-col transition-all", config.bg)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.add("ring-2", "ring-primary/40");
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.classList.remove("ring-2", "ring-primary/40");
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove("ring-2", "ring-primary/40");
+                  if (draggedDemandId) {
+                    updateStatus(draggedDemandId, status);
+                    draggedDemandId = null;
+                  }
+                }}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Icon className={cn("w-5 h-5", config.color)} />
@@ -408,7 +439,13 @@ export default function Pendencias() {
                       return (
                         <div
                           key={item.id}
-                          className="bg-card border border-border/40 rounded-lg p-3 space-y-2 shadow-sm hover:shadow-md transition-shadow"
+                          draggable
+                          onDragStart={() => { draggedDemandId = item.id; }}
+                          onDragEnd={() => { draggedDemandId = null; }}
+                          className={cn(
+                            "bg-card border border-border/40 rounded-lg p-3 space-y-2 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing active:opacity-70",
+                            item.priority === "urgente" && "border-red-500/50 bg-red-500/5"
+                          )}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
@@ -423,10 +460,17 @@ export default function Pendencias() {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            <AlertTriangle className="w-3 h-3 inline mr-1 text-orange-400" />
-                            {item.term}
-                          </p>
+                          <div className="space-y-1.5 text-xs">
+                            <p className="text-foreground font-medium leading-relaxed">
+                              <AlertTriangle className="w-3 h-3 inline mr-1 text-orange-400" />
+                              <span className="text-muted-foreground">Demanda:</span> {item.demand_text || item.term}
+                            </p>
+                            {item.solution_text && (
+                              <p className="text-emerald-400 leading-relaxed">
+                                <span className="font-medium">Solução:</span> {item.solution_text}
+                              </p>
+                            )}
+                          </div>
                           {item.due_date && (
                             <p className={cn("text-[10px] flex items-center gap-1", isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground")}>
                               <CalendarIcon className="w-3 h-3" />
