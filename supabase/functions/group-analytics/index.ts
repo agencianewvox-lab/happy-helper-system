@@ -86,6 +86,38 @@ const GREETING_PATTERNS = ["bom dia", "boa tarde", "boa noite", "oi", "olá", "o
 const CONFIRMATION_PATTERNS = ["ok", "certo", "beleza", "combinado", "pode ser", "tá bom", "ta bom", "tá", "ta", "sim", "não", "nao", "blz", "vlw", "valeu", "top", "show", "perfeito"];
 const THANKS_PATTERNS = ["obrigado", "obrigada", "brigadão", "brigadao", "brigada", "valeu", "thanks"];
 const APPROVAL_PATTERNS = ["aprovado", "aprovada", "pode postar", "manda", "solta", "gostei", "amei", "lindo", "linda"];
+const REPORT_PATTERNS = [
+  "relatorio diario", "relatório diário", "relatorio semanal", "relatório semanal",
+  "segue o nosso relatório", "segue o relatorio", "captação", "captacao",
+  "leads novos", "sem retorno", "sem interesse", "agendamentos do dia",
+  "conversas iniciadas", "custo por conversa", "valor investido", "investimento:",
+  "impressoes:", "impressões:", "alcance:", "periodo:", "período:"
+];
+const TERMINAL_ACK_PATTERNS = [
+  /^(?:ok(?:ay)?|certo|fechado|combinado|perfeito|show|top|valeu|obrigad[oa]|blz|beleza|resolvido|joia|joia|👍+|👍🏻+|👍🏽+|👍🏿+|🙏+|❤️+)[!.\s]*$/i,
+  /^(?:👍|👍🏻|👍🏽|👍🏿|👏|🙏|❤️|✅|ok){1,4}$/i,
+];
+const SCHEDULE_PROMISE_PATTERNS = [
+  /agend(ar|o|amos|ei)/i,
+  /reuni[aã]o/i,
+  /\bcall\b/i,
+  /logo aciono/i,
+  /te aciono/i,
+  /te chamo/i,
+  /vamos nos falar/i,
+  /podemos nos falar/i,
+  /vamos marcar/i,
+  /marcamos/i,
+];
+const SCHEDULE_FOLLOW_THROUGH_PATTERNS = [
+  /agendad[oa]/i,
+  /segue.*link/i,
+  /hor[aá]rio confirmado/i,
+  /marquei/i,
+  /chamei/i,
+  /liguei/i,
+  /falei com voc[eê]/i,
+];
 
 interface PendingDemandDetail {
   term: string;
@@ -430,6 +462,66 @@ function isNoiseMessage(text: string): boolean {
   return false;
 }
 
+function normalizeText(text: string): string {
+  return (text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function getEffectiveTime(msg: any): string {
+  return msg.recebido_em && msg.recebido_em > msg.created_at ? msg.recebido_em : msg.created_at;
+}
+
+function isInformationalReport(text: string): boolean {
+  const normalized = normalizeText(text);
+  const matches = REPORT_PATTERNS.filter((pattern) => normalized.includes(pattern)).length;
+  return matches >= 2 || (normalized.includes("relatorio") && normalized.includes("lead"));
+}
+
+function isTerminalAcknowledgement(text: string): boolean {
+  const normalized = normalizeText(text);
+  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function businessMinutesBetween(startIso: string, endIso: string, businessStart = 8, businessEnd = 18.5): number {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (end <= start) return 0;
+  const toBrt = (date: Date) => new Date(date.getTime() - 3 * 60 * 60 * 1000);
+  const startBrt = toBrt(start);
+  const endBrt = toBrt(end);
+  const setBusinessStart = (date: Date) => date.setHours(Math.floor(businessStart), businessStart % 1 ? 30 : 0, 0, 0);
+  const setBusinessEnd = (date: Date) => date.setHours(Math.floor(businessEnd), businessEnd % 1 ? 30 : 0, 0, 0);
+  const clamp = (date: Date) => {
+    const clone = new Date(date);
+    while (clone.getDay() === 0 || clone.getDay() === 6) {
+      clone.setDate(clone.getDate() + 1);
+      setBusinessStart(clone);
+    }
+    const hour = clone.getHours() + clone.getMinutes() / 60;
+    if (hour < businessStart) setBusinessStart(clone);
+    else if (hour >= businessEnd) {
+      clone.setDate(clone.getDate() + 1);
+      setBusinessStart(clone);
+      while (clone.getDay() === 0 || clone.getDay() === 6) clone.setDate(clone.getDate() + 1);
+    }
+    return clone;
+  };
+  const cursor = clamp(startBrt);
+  if (cursor >= endBrt) return 0;
+  let total = 0;
+  while (cursor < endBrt) {
+    if (cursor.getDay() !== 0 && cursor.getDay() !== 6) {
+      const dayEnd = new Date(cursor);
+      setBusinessEnd(dayEnd);
+      const sliceEnd = endBrt < dayEnd ? endBrt : dayEnd;
+      if (sliceEnd > cursor) total += (sliceEnd.getTime() - cursor.getTime()) / 60000;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+    setBusinessStart(cursor);
+    while (cursor.getDay() === 0 || cursor.getDay() === 6) cursor.setDate(cursor.getDate() + 1);
+  }
+  return Math.max(0, Math.round(total));
+}
+
 function hasUrgency(text: string): boolean {
   const lower = text.toLowerCase();
   return URGENCY_KEYWORDS.some(kw => lower.includes(kw));
@@ -456,18 +548,18 @@ function preFilterMessages(groupId: string, msgs: any[]): CandidateMessage[] {
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
   const THIRTY_MIN = 30 * 60 * 1000;
   const TEN_MIN = 10 * 60 * 1000;
-  const recentMsgs = msgs.filter(m => (now - new Date(m.created_at).getTime()) <= SEVEN_DAYS);
+  const recentMsgs = msgs.filter(m => (now - new Date(getEffectiveTime(m)).getTime()) <= SEVEN_DAYS);
   if (recentMsgs.length === 0) return [];
   const candidates: CandidateMessage[] = [];
   for (let i = 0; i < recentMsgs.length; i++) {
     const m = recentMsgs[i];
     if (m.direcao !== "entrada") continue;
     const text = m.mensagem || "";
-    if (isNoiseMessage(text)) continue;
-    const msgTime = new Date(m.created_at).getTime();
+    if (isNoiseMessage(text) || isInformationalReport(text) || isTerminalAcknowledgement(text)) continue;
+    const msgTime = new Date(getEffectiveTime(m)).getTime();
     let teamResponded = false;
     for (let j = i + 1; j < recentMsgs.length; j++) {
-      if (recentMsgs[j].direcao === "saida") { teamResponded = true; break; }
+        if (recentMsgs[j].direcao === "saida") { teamResponded = true; break; }
     }
     if (teamResponded) continue;
     const elapsedMs = now - msgTime;
@@ -482,7 +574,7 @@ function preFilterMessages(groupId: string, msgs: any[]): CandidateMessage[] {
     candidates.push({
       mensagem: text,
       nome_contato: m.nome_contato || "Desconhecido",
-      created_at: m.created_at,
+      created_at: getEffectiveTime(m),
       group_id: groupId,
       context,
       hours_waiting: Math.round(elapsedMs / (60 * 60 * 1000) * 10) / 10,
@@ -490,6 +582,43 @@ function preFilterMessages(groupId: string, msgs: any[]): CandidateMessage[] {
     });
   }
   return candidates;
+}
+
+function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingItem[] {
+  const ordered = [...msgs].sort((a, b) => getEffectiveTime(a).localeCompare(getEffectiveTime(b)));
+  const items: AIPendingItem[] = [];
+  for (let i = 0; i < ordered.length; i++) {
+    const msg = ordered[i];
+    const text = msg.mensagem || "";
+    if (msg.direcao !== "saida" || isInformationalReport(text)) continue;
+    if (!SCHEDULE_PROMISE_PATTERNS.some((pattern) => pattern.test(text))) continue;
+
+    const subsequent = ordered.slice(i + 1);
+    const fulfilled = subsequent.some((next) => next.direcao === "saida" && SCHEDULE_FOLLOW_THROUGH_PATTERNS.some((pattern) => pattern.test(next.mensagem || "")));
+    if (fulfilled) continue;
+
+    const relevantClientReply = [...subsequent]
+      .filter((next) => next.direcao === "entrada" && !isInformationalReport(next.mensagem || "") && !isTerminalAcknowledgement(next.mensagem || ""))
+      .pop();
+
+    const waitingMinutes = businessMinutesBetween(getEffectiveTime(msg), new Date().toISOString());
+    if (waitingMinutes < 30) continue;
+
+    const clientName = relevantClientReply?.nome_contato || "cliente";
+    items.push({
+      group_id: groupId,
+      client_name: clientName,
+      message: relevantClientReply?.mensagem || text,
+      type: "Demanda",
+      priority: relevantClientReply || waitingMinutes >= 120 ? "urgente" : "normal",
+      timestamp: relevantClientReply ? getEffectiveTime(relevantClientReply) : getEffectiveTime(msg),
+      suggested_action: `Agendar a call combinada e confirmar horário com ${clientName}`,
+      hours_waiting: Math.round((waitingMinutes / 60) * 10) / 10,
+      confidence: "alta",
+    });
+    break;
+  }
+  return items;
 }
 
 // ─── LAYER 2: AI Analysis ───
@@ -520,6 +649,8 @@ CATEGORIAS DE CLASSIFICAÇÃO:
 3. "NÃO É PENDÊNCIA" — SOMENTE quando: equipe respondeu claramente, assunto já tratado, ou cliente apenas compartilhando informação sem esperar retorno.
 
 4. "RESOLVIDA" — Havia solicitação mas mensagens posteriores mostram que equipe já tratou.
+
+NÃO marque como pendência quando a última mensagem for apenas encerramento/ack do cliente (ex: "ok", "perfeito", "👍") ou quando for relatório diário/semanal meramente informativo.
 
 PRIORIDADE:
 - "urgente": afeta campanha ativa, cliente irritado, esperando há +4h em horário comercial, ou qualquer reenvio/solicitação sem resposta há +2h
@@ -559,6 +690,7 @@ function detectPendingLocally(allCandidates: CandidateMessage[]): AIPendingItem[
   const items: AIPendingItem[] = [];
   for (const c of allCandidates) {
     const text = c.mensagem.toLowerCase();
+    if (isInformationalReport(text) || isTerminalAcknowledgement(text)) continue;
     const hasQuestion = text.includes("?");
     const hasRequest = REQUEST_KEYWORDS.some(kw => text.includes(kw));
     const hasDemand = DEMAND_KEYWORDS.some(kw => text.includes(kw));
@@ -670,7 +802,11 @@ async function detectPendingWithAI(allCandidates: CandidateMessage[], apiKey: st
 function postValidate(items: AIPendingItem[], resolvedSet: Set<string>): PendingDemandDetail[] {
   const seen = new Map<string, PendingDemandDetail>();
   for (const item of items) {
-    const term = item.type === "Demanda" ? "demanda" : "pergunta sem resposta";
+        const term = item.suggested_action?.toLowerCase().includes("agendar a call")
+          ? "agendar call"
+          : item.type === "Demanda"
+            ? "demanda"
+            : "pergunta sem resposta";
     const excerpt = (item.message || "").slice(0, 150);
     const dedupKey = `${item.group_id}|${term}`;
     if (seen.has(dedupKey)) continue;
@@ -801,8 +937,8 @@ Deno.serve(async (req) => {
     while (true) {
       const { data, error } = await supabase
         .from("whatsapp_conversas")
-        .select("group_id, nome_contato, mensagem, created_at, direcao")
-        .order("created_at", { ascending: true })
+        .select("group_id, nome_contato, mensagem, created_at, recebido_em, direcao")
+        .order("recebido_em", { ascending: true })
         .range(offset, offset + pageSize - 1);
       if (error) throw error;
       if (!data || data.length === 0) break;
@@ -904,9 +1040,10 @@ Deno.serve(async (req) => {
       for (const msg of msgs) {
         if (msg.direcao === "entrada" && !waitingForResponse) {
           waitingForResponse = true;
-          clientMsgTime = new Date(msg.created_at);
+          if (isInformationalReport(msg.mensagem || "") || isTerminalAcknowledgement(msg.mensagem || "")) continue;
+          clientMsgTime = new Date(getEffectiveTime(msg));
         } else if (msg.direcao === "saida" && waitingForResponse && clientMsgTime) {
-          const bizMinutes = businessMinutesBetween(clientMsgTime, new Date(msg.created_at));
+          const bizMinutes = businessMinutesBetween(clientMsgTime.toISOString(), getEffectiveTime(msg));
           if (bizMinutes > 0 && bizMinutes < 30 * BIZ_MINUTES_PER_DAY) { totalFrt += bizMinutes; frtCount++; }
           waitingForResponse = false;
           clientMsgTime = null;
@@ -923,7 +1060,7 @@ Deno.serve(async (req) => {
       else engagementType = "misto";
 
       const lastMsg = msgs[msgs.length - 1];
-      const lastMsgTime = lastMsg ? new Date(lastMsg.created_at).getTime() : null;
+      const lastMsgTime = lastMsg ? new Date(getEffectiveTime(lastMsg)).getTime() : null;
 
       partialData.set(groupId, {
         avgFrt,
@@ -939,6 +1076,15 @@ Deno.serve(async (req) => {
     const allCandidates: CandidateMessage[] = [];
     for (const [groupId, msgs] of groupedConvs) {
       allCandidates.push(...preFilterMessages(groupId, msgs));
+      allCandidates.push(...detectUnfulfilledTeamPromises(groupId, msgs).map((item) => ({
+        mensagem: item.message,
+        nome_contato: item.client_name,
+        created_at: item.timestamp,
+        group_id: item.group_id,
+        context: msgs,
+        hours_waiting: item.hours_waiting,
+        is_urgent: item.priority === "urgente",
+      })));
     }
     console.log(`Pre-filter: ${allCandidates.length} candidates from ${groupedConvs.size} groups`);
 
@@ -951,6 +1097,9 @@ Deno.serve(async (req) => {
     ]);
     if (pendingResult.status === "fulfilled") aiPendingItems = pendingResult.value;
     else console.error("AI pending failed:", pendingResult.reason);
+    for (const [groupId, msgs] of groupedConvs) {
+      aiPendingItems.push(...detectUnfulfilledTeamPromises(groupId, msgs));
+    }
     if (intentResult.status === "fulfilled") intentMap = intentResult.value;
     else console.error("AI intent failed:", intentResult.reason);
 

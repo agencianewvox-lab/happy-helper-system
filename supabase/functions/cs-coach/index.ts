@@ -78,6 +78,16 @@ const TEAM_MEMBERS_NAMES = [
   "jader", "murillo", "murilo", "priscilla", "priscila", "alisson",
   "joel", "thais", "daniella", "victor botto", "netto", "netto monge", "jiza",
 ];
+const REPORT_PATTERNS = [
+  "relatorio diario", "relatório diário", "relatorio semanal", "relatório semanal",
+  "segue o nosso relatório", "segue o relatorio", "leads novos", "sem retorno",
+  "sem interesse", "agendamentos do dia", "conversas iniciadas", "custo por conversa",
+  "valor investido", "investimento:", "impressoes:", "impressões:", "alcance:"
+];
+const TERMINAL_ACK_PATTERNS = [
+  /^(?:ok(?:ay)?|certo|fechado|combinado|perfeito|show|top|valeu|obrigad[oa]|blz|beleza|resolvido|joia|jóia|👍+|👍🏻+|👍🏽+|👍🏿+|🙏+|❤️+)[!.\s]*$/i,
+  /^(?:👍|👍🏻|👍🏽|👍🏿|👏|🙏|❤️|✅|ok){1,4}$/i,
+];
 
 function isTeamMember(contactName: string): boolean {
   if (!contactName) return false;
@@ -90,6 +100,62 @@ function isCobrancaMessage(text: string): boolean {
   if (COBRANCA_PATTERNS.some(p => p.test(trimmed))) return true;
   const lower = trimmed.toLowerCase();
   return COBRANCA_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function normalizeText(text: string): string {
+  return (text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function isInformationalReport(text: string): boolean {
+  const normalized = normalizeText(text);
+  const matches = REPORT_PATTERNS.filter((pattern) => normalized.includes(pattern)).length;
+  return matches >= 2 || (normalized.includes("relatorio") && normalized.includes("lead"));
+}
+
+function isTerminalAcknowledgement(text: string): boolean {
+  const normalized = normalizeText(text);
+  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function businessMinutesBetween(startIso: string, endIso: string, businessStart = 8, businessEnd = 18.5): number {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (end <= start) return 0;
+  const toBrt = (date: Date) => new Date(date.getTime() - 3 * 60 * 60 * 1000);
+  const startBrt = toBrt(start);
+  const endBrt = toBrt(end);
+  const setBusinessStart = (date: Date) => date.setHours(Math.floor(businessStart), businessStart % 1 ? 30 : 0, 0, 0);
+  const setBusinessEnd = (date: Date) => date.setHours(Math.floor(businessEnd), businessEnd % 1 ? 30 : 0, 0, 0);
+  const clamp = (date: Date) => {
+    const clone = new Date(date);
+    while (clone.getDay() === 0 || clone.getDay() === 6) {
+      clone.setDate(clone.getDate() + 1);
+      setBusinessStart(clone);
+    }
+    const hour = clone.getHours() + clone.getMinutes() / 60;
+    if (hour < businessStart) setBusinessStart(clone);
+    else if (hour >= businessEnd) {
+      clone.setDate(clone.getDate() + 1);
+      setBusinessStart(clone);
+      while (clone.getDay() === 0 || clone.getDay() === 6) clone.setDate(clone.getDate() + 1);
+    }
+    return clone;
+  };
+  const cursor = clamp(startBrt);
+  if (cursor >= endBrt) return 0;
+  let total = 0;
+  while (cursor < endBrt) {
+    if (cursor.getDay() !== 0 && cursor.getDay() !== 6) {
+      const dayEnd = new Date(cursor);
+      setBusinessEnd(dayEnd);
+      const sliceEnd = endBrt < dayEnd ? endBrt : dayEnd;
+      if (sliceEnd > cursor) total += (sliceEnd.getTime() - cursor.getTime()) / 60000;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+    setBusinessStart(cursor);
+    while (cursor.getDay() === 0 || cursor.getDay() === 6) cursor.setDate(cursor.getDate() + 1);
+  }
+  return Math.max(0, Math.round(total));
 }
 
 interface CoachOpportunity {
@@ -235,6 +301,22 @@ Deno.serve(async (req) => {
 
       // TYPE 1: Grupo parado (48h+)
       if (tiposAtivos.includes("grupo_parado") && hoursSinceLastMsg > 48) {
+        const { data: existingGroupPending } = await supabase
+          .from("pending_demand_resolutions")
+          .select("id")
+          .eq("group_id", grupo.group_id)
+          .eq("term", "movimentar grupo")
+          .eq("resolved", false)
+          .limit(1);
+        if (!existingGroupPending || existingGroupPending.length === 0) {
+          await supabase.from("pending_demand_resolutions").insert({
+            group_id: grupo.group_id,
+            term: "movimentar grupo",
+            requested_at: new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(),
+            status: "pendente",
+            resolved: false,
+          });
+        }
         opportunities.push({
           tipo: "grupo_parado",
           destinatario: responsavel,
@@ -339,8 +421,9 @@ Deno.serve(async (req) => {
         if (lastClientMsgIdx >= 0) {
           const lastClientMsg = groupConvs[lastClientMsgIdx];
           const clientMsgText = lastClientMsg.mensagem || "";
-          const clientMsgTime = new Date(lastClientMsg.recebido_em).getTime();
-          const minutesWaiting = (now.getTime() - clientMsgTime) / (1000 * 60);
+          if (isInformationalReport(clientMsgText) || isTerminalAcknowledgement(clientMsgText)) continue;
+          const clientMsgTimeIso = lastClientMsg.recebido_em;
+          const minutesWaiting = businessMinutesBetween(clientMsgTimeIso, now.toISOString());
 
           // Check if team responded AFTER this client message
           let teamRespondedAfter = false;
@@ -361,7 +444,7 @@ Deno.serve(async (req) => {
             }
           }
           const firstUnansweredMsg = groupConvs[firstUnansweredIdx];
-          const realWaitMinutes = (now.getTime() - new Date(firstUnansweredMsg.recebido_em).getTime()) / (1000 * 60);
+           const realWaitMinutes = businessMinutesBetween(firstUnansweredMsg.recebido_em, now.toISOString());
 
           // Cobrança: no minimum wait. Normal: 30min minimum.
           const isCobranca = isCobrancaMessage(clientMsgText);
@@ -410,7 +493,7 @@ Deno.serve(async (req) => {
               });
 
               // Auto-insert pending demand if waiting > 1h and none exists
-              if (minutesWaiting >= 60) {
+               if (minutesWaiting >= 60) {
                 const { data: existing } = await supabase
                   .from("pending_demand_resolutions")
                   .select("id")
@@ -630,8 +713,11 @@ Deno.serve(async (req) => {
     // TYPE 3: Pendências esquecidas (1h+)
     if (tiposAtivos.includes("pendencia_esquecida")) {
       for (const pend of (pendencias || [])) {
-        const hoursOpen = (now.getTime() - new Date(pend.created_at).getTime()) / (1000 * 60 * 60);
-        if (hoursOpen >= 1) {
+        const businessMinutesOpen = businessMinutesBetween(pend.requested_at || pend.created_at, now.toISOString());
+        const hoursOpen = businessMinutesOpen / 60;
+        const urgentPending = /agendar|call|reuni[aã]o|cobran[cç]a/.test(pend.term || "");
+        const minHours = urgentPending ? 0.25 : /movimentar grupo/.test(pend.term || "") ? 8 : 1;
+        if (hoursOpen >= minHours) {
           const grupo = grupos.find((g: any) => g.group_id === pend.group_id);
           if (grupo?.gestor_responsavel) {
             opportunities.push({
@@ -639,7 +725,8 @@ Deno.serve(async (req) => {
               destinatario: grupo.gestor_responsavel,
               group_id: pend.group_id,
               group_name: grupo?.nome || pend.group_id,
-              context: `Pendência "${pend.term}" no grupo "${grupo?.nome}" está aberta há ${Math.round(hoursOpen)} horas. Status: ${pend.status}.`,
+              context: `Pendência "${pend.term}" no grupo "${grupo?.nome}" está aberta há ${Math.round(hoursOpen * 10) / 10} horas úteis. Status: ${pend.status}.`,
+              bypass_interval: urgentPending,
             });
           }
         }
