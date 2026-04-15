@@ -28,6 +28,7 @@ export function useClientData() {
       if (error) throw error;
       if (data?.analytics) {
         setAnalyticsMap(data.analytics);
+        if (globalCache) globalCache.analyticsMap = data.analytics;
       }
     } catch (err: any) {
       console.error("Analytics fetch error:", err);
