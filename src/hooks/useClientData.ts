@@ -1,15 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Grupo, GroupAnalytics } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
 import { businessMinutesSince, getEffectiveMessageTime, requiresResponse } from "@/lib/clientMonitoring";
 
+// Global cache to persist data across component remounts (tab switches)
+let globalCache: {
+  grupos: Grupo[];
+  analyticsMap: Record<string, GroupAnalytics>;
+  lastFetch: number;
+} | null = null;
+
+const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
 export function useClientData() {
-  const [grupos, setGrupos] = useState<Grupo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [grupos, setGrupos] = useState<Grupo[]>(globalCache?.grupos || []);
+  const [loading, setLoading] = useState(!globalCache);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [categoriaFilter, setCategoriaFilter] = useState<string | null>(null);
-  const [analyticsMap, setAnalyticsMap] = useState<Record<string, GroupAnalytics>>({});
+  const [analyticsMap, setAnalyticsMap] = useState<Record<string, GroupAnalytics>>(globalCache?.analyticsMap || {});
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   const fetchAnalytics = useCallback(async () => {
@@ -19,6 +28,7 @@ export function useClientData() {
       if (error) throw error;
       if (data?.analytics) {
         setAnalyticsMap(data.analytics);
+        if (globalCache) globalCache.analyticsMap = data.analytics;
       }
     } catch (err: any) {
       console.error("Analytics fetch error:", err);
@@ -138,6 +148,7 @@ export function useClientData() {
       });
 
       setGrupos(enriched);
+      globalCache = { ...(globalCache || { analyticsMap: {} }), grupos: enriched, lastFetch: Date.now() };
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -148,8 +159,12 @@ export function useClientData() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchAnalytics();
+    // Skip initial fetch if cache is fresh
+    const isCacheFresh = globalCache && (Date.now() - globalCache.lastFetch) < CACHE_TTL;
+    if (!isCacheFresh) {
+      fetchData();
+      fetchAnalytics();
+    }
 
     const channel = supabase
       .channel("conversas-realtime")

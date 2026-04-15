@@ -61,7 +61,7 @@ function getDateRange(period: string): { start: Date; end: Date } {
   return { start, end };
 }
 
-export function usePerformanceData(period: string) {
+export function usePerformanceData(period: string, customRange?: { start: Date; end: Date } | null) {
   const [grupos, setGrupos] = useState<GrupoInfo[]>([]);
   const [npsHistory, setNpsHistory] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -72,7 +72,7 @@ export function usePerformanceData(period: string) {
   const [profiles, setProfiles] = useState<{ user_id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { start, end } = useMemo(() => getDateRange(period), [period]);
+  const { start, end } = useMemo(() => customRange ? customRange : getDateRange(period), [period, customRange]);
   const startISO = start.toISOString();
 
   const fetchAll = useCallback(async () => {

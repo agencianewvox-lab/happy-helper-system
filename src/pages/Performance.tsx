@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,19 +7,26 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Area, AreaChart, Cell, PieChart, Pie,
 } from "recharts";
 import {
   MessageSquare, Timer, CheckCircle, TrendingUp, Users, ArrowUpDown,
   Trophy, Medal, Award, Heart, ListChecks, AlertTriangle, Activity, Star, DollarSign,
+  CalendarIcon,
 } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { usePerformanceData, type GestorMetrics } from "@/hooks/usePerformanceData";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 
-type Period = "today" | "week" | "month" | "quarter";
+type Period = "today" | "week" | "month" | "quarter" | "custom";
 
 interface TeamPerfData {
   period: string;
@@ -98,9 +105,11 @@ const tooltipStyle = {
 
 export default function Performance() {
   const [period, setPeriod] = useState<Period>("week");
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [selectedGestor, setSelectedGestor] = useState<string>("all");
   const [teamData, setTeamData] = useState<TeamPerfData | null>(null);
   const [teamLoading, setTeamLoading] = useState(true);
+  const teamDataCache = useRef<Record<string, { data: TeamPerfData; ts: number }>>({});
   const { isAdmin, gestorFilter } = useProfile();
 
   // For non-admin users, force their own gestor view
@@ -109,6 +118,13 @@ export default function Performance() {
       setSelectedGestor(gestorFilter);
     }
   }, [isAdmin, gestorFilter]);
+
+  const customRange = useMemo(() => {
+    if (period === "custom" && customDateRange.from && customDateRange.to) {
+      return { start: customDateRange.from, end: customDateRange.to };
+    }
+    return null;
+  }, [period, customDateRange]);
 
   const {
     loading: dataLoading,
@@ -122,10 +138,17 @@ export default function Performance() {
     getLtvEvolution,
     getLtvStats,
     gestorRanking,
-  } = usePerformanceData(period);
+  } = usePerformanceData(period, customRange);
 
-  // Fetch team-performance edge function data
+  // Fetch team-performance edge function data with caching
   useEffect(() => {
+    const cacheKey = period === "custom" ? `custom-${customDateRange.from?.toISOString()}-${customDateRange.to?.toISOString()}` : period;
+    const cached = teamDataCache.current[cacheKey];
+    if (cached && Date.now() - cached.ts < 5 * 60 * 1000) {
+      setTeamData(cached.data);
+      setTeamLoading(false);
+      return;
+    }
     async function fetchTeamData() {
       setTeamLoading(true);
       try {
@@ -137,7 +160,9 @@ export default function Performance() {
           },
         });
         if (!resp.ok) throw new Error("Erro ao buscar dados");
-        setTeamData(await resp.json());
+        const data = await resp.json();
+        teamDataCache.current[cacheKey] = { data, ts: Date.now() };
+        setTeamData(data);
       } catch (err) {
         console.error("Team performance fetch error:", err);
       } finally {
@@ -145,7 +170,7 @@ export default function Performance() {
       }
     }
     fetchTeamData();
-  }, [period]);
+  }, [period, customDateRange]);
 
   const gestorName = selectedGestor === "all" ? null : selectedGestor;
   const metrics = useMemo(() => computeGestorMetrics(gestorName), [computeGestorMetrics, gestorName]);
@@ -194,19 +219,13 @@ export default function Performance() {
     }));
   }, [teamData]);
 
-  const chartData = useMemo(() => {
-    if (!teamData) return [];
-    return teamData.daily_volumes.map((d) => ({
-      ...d,
-      date: formatDate(d.date),
-    }));
-  }, [teamData]);
 
   const periodLabels: Record<Period, string> = {
     today: "Hoje",
     week: "7 dias",
     month: "Mês",
     quarter: "Trimestre",
+    custom: "Personalizado",
   };
 
   const loading = dataLoading || teamLoading;
@@ -264,6 +283,37 @@ export default function Performance() {
                     {periodLabels[p]}
                   </Button>
                 ))}
+                {isAdmin && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={period === "custom" ? "default" : "outline"}
+                        size="sm"
+                        className="text-xs gap-1"
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        {period === "custom" && customDateRange.from && customDateRange.to
+                          ? `${format(customDateRange.from, "dd/MM")} - ${format(customDateRange.to, "dd/MM")}`
+                          : "Período"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="range"
+                        selected={customDateRange}
+                        onSelect={(range: any) => {
+                          setCustomDateRange({ from: range?.from, to: range?.to });
+                          if (range?.from && range?.to) {
+                            setPeriod("custom");
+                          }
+                        }}
+                        numberOfMonths={2}
+                        locale={ptBR}
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
           </div>
@@ -374,8 +424,8 @@ export default function Performance() {
           </Card>
         </div>
 
-        {/* ═══════════ EVOLUÇÃO SENTIMENTO + VOLUME ═══════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ═══════════ EVOLUÇÃO SENTIMENTO ═══════════ */}
+        <div>
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -395,29 +445,6 @@ export default function Performance() {
                 </ResponsiveContainer>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-12">Sem dados de sentimento.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/60 border-border/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Volume Diário de Mensagens</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[280px]">
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: "11px" }} />
-                    <Area type="monotone" dataKey="entrada" name="Entrada" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
-                    <Area type="monotone" dataKey="saida" name="Saída" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de volume.</p>
               )}
             </CardContent>
           </Card>
@@ -604,8 +631,10 @@ export default function Performance() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {gestores.map((g, idx) => {
-                      const stats = getLtvStats(g);
+                    {gestores
+                      .map(g => ({ name: g, stats: getLtvStats(g) }))
+                      .sort((a, b) => b.stats.totalMonths - a.stats.totalMonths)
+                      .map(({ name: g, stats }, idx) => {
                       const RankIcon = rankIcons[idx] || null;
                       const rankColor = rankColors[idx] || "text-muted-foreground";
                       return (
@@ -625,8 +654,7 @@ export default function Performance() {
                           </div>
                         </div>
                       );
-                    })
-                    .sort(() => 0)}
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -676,29 +704,6 @@ export default function Performance() {
             </CardContent>
           </Card>
 
-          {/* Volume Ranking */}
-          <Card className="bg-card/60 border-border/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Users className="w-4 h-4" /> Ranking de Volume
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {filteredCollaborators.length > 0 ? (
-                <ResponsiveContainer width="100%" height={Math.max(200, filteredCollaborators.length * 45)}>
-                  <BarChart data={filteredCollaborators.filter(c => c.total_responses > 0)} layout="vertical" margin={{ left: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={75} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="total_responses" name="Respostas" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-6">Sem dados de volume.</p>
-              )}
-            </CardContent>
-          </Card>
         </div>
         )}
 
