@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 import { NpsScoreBadge } from "@/components/NpsScoreBadge";
+import { calculateSlaStatus } from "@/lib/clientMonitoring";
 
 interface ClientCardProps {
   grupo: Grupo;
@@ -90,14 +91,16 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
   const [showSummary, setShowSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const liveSla = calculateSlaStatus(grupo.actionable_waiting_since);
+  const isSlaViolated = liveSla.violated;
 
   // Live tick for SLA timer
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (!grupo.sla_violated && !isPriorityMax) return;
+    if (!grupo.actionable_waiting_since && !isPriorityMax) return;
     const interval = setInterval(() => setTick((t) => t + 1), 60000);
     return () => clearInterval(interval);
-  }, [grupo.sla_violated, isPriorityMax]);
+  }, [grupo.actionable_waiting_since, isPriorityMax]);
 
   const handleGenerateSummary = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -140,7 +143,7 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
           "bg-card/80 backdrop-blur-sm",
           isPriorityMax
             ? "border-red-500 ring-2 ring-red-500/30 shadow-red-500/20 shadow-xl animate-pulse"
-            : grupo.sla_violated
+            : isSlaViolated
               ? "border-red-500/60 ring-1 ring-red-500/20 shadow-red-500/10 shadow-lg"
               : temMensagens
                 ? "border-border/50 hover:border-primary/30"
@@ -184,10 +187,10 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
         </CardHeader>
         <CardContent className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}>
           {/* SLA Violation Banner */}
-          {grupo.sla_violated && (
+          {isSlaViolated && (
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-500 bg-red-500/10 rounded px-2 py-1 border border-red-500/20 animate-pulse">
               <PhoneOff className="w-3.5 h-3.5 shrink-0" />
-              <span>Silêncio da Equipe — {formatDelay(grupo.sla_delay_minutes + 30)} sem resposta</span>
+              <span>Silêncio da Equipe — {formatDelay(liveSla.elapsedMinutes)} sem resposta</span>
             </div>
           )}
 

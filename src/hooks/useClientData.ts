@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Grupo, GroupAnalytics } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
-import { businessMinutesSince, getEffectiveMessageTime, requiresResponse } from "@/lib/clientMonitoring";
+import { calculateSlaStatus, getEffectiveMessageTime, requiresResponse } from "@/lib/clientMonitoring";
 
 // Global cache to persist data across component remounts (tab switches)
 let globalCache: {
@@ -115,15 +115,7 @@ export function useClientData() {
       const enriched: Grupo[] = (gruposData || []).map((g: any) => {
         const stats = msgMap.get(g.group_id);
         // SLA: last msg is from client and 30+ biz minutes without team response
-        let sla_violated = false;
-        let sla_delay_minutes = 0;
-        if (stats?.actionable_waiting_since) {
-          const elapsed = businessMinutesSince(stats.actionable_waiting_since);
-          if (elapsed >= 30) {
-            sla_violated = true;
-            sla_delay_minutes = elapsed - 30;
-          }
-        }
+        const slaStatus = calculateSlaStatus(stats?.actionable_waiting_since);
         return {
           id: g.id,
           group_id: g.group_id,
@@ -134,8 +126,9 @@ export function useClientData() {
           mensagens_hoje: stats?.todayCount || 0,
           ultima_mensagem: stats?.last_msg || null,
           ultimo_horario: stats?.last_time || null,
-          sla_violated,
-          sla_delay_minutes,
+          actionable_waiting_since: stats?.actionable_waiting_since || null,
+          sla_violated: slaStatus.violated,
+          sla_delay_minutes: slaStatus.delayMinutes,
           investimento_ads: g.investimento_ads ?? null,
           investimento_google_ads: g.investimento_google_ads ?? null,
           plataforma_ads: g.plataforma_ads ?? null,

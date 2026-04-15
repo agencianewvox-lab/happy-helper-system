@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePendingAlert, useHighRiskAlert } from "@/hooks/usePendingAlert";
 import { cn } from "@/lib/utils";
 import { useClientData } from "@/hooks/useClientData";
@@ -21,6 +21,7 @@ import { CoachPanel } from "@/components/CoachPanel";
 import { AddClientDialog } from "@/components/AddClientDialog";
 import { useNpsPredictions } from "@/hooks/useNpsPredictions";
 import { BirthdayAlerts } from "@/components/BirthdayAlerts";
+import { calculateSlaStatus } from "@/lib/clientMonitoring";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -31,7 +32,15 @@ export default function Dashboard() {
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
   const [gestorFilterOverride, setGestorFilterOverride] = useState<string | null>(null);
+  const [slaTick, setSlaTick] = useState(0);
   const { predictionsMap, npsGlobal } = useNpsPredictions();
+
+  useEffect(() => {
+    const interval = setInterval(() => setSlaTick((value) => value + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getGroupSlaStatus = (grupo: Grupo) => calculateSlaStatus(grupo.actionable_waiting_since);
 
   // Extract unique gestors for admin filter
   const availableGestors = useMemo(() => {
@@ -81,7 +90,7 @@ export default function Dashboard() {
       ? Math.round(avgFrtAll.reduce((s, g) => s + (g.analytics!.avg_frt_minutes || 0), 0) / avgFrtAll.length)
       : null;
     const positiveSent = roleAllGrupos.filter((g) => g.analytics?.sentiment === "positivo").length;
-    const slaViolations = roleAllGrupos.filter((g) => g.sla_violated).length;
+    const slaViolations = roleAllGrupos.filter((g) => getGroupSlaStatus(g).violated).length;
     const priorityCount = roleAllGrupos.filter((g) => g.analytics?.priority_level === "maxima").length;
     const now = Date.now();
     const h24 = 24 * 60 * 60 * 1000;
@@ -114,7 +123,7 @@ export default function Dashboard() {
     const pendencias = roleAllGrupos.filter((g) => g.analytics?.has_pending_demands).length;
 
     return { total, totalMsgsHoje, comMsgs, highRisk, avgFrt, positiveSent, pendencias, pendUrgentes, pendNormais, pendPossiveis, inativos, dengue, slaViolations, priorityCount };
-  }, [roleAllGrupos]);
+  }, [roleAllGrupos, slaTick]);
 
   // Filter groups by clicked metric
   const metricFilteredGrupos = useMemo(() => {
@@ -137,22 +146,24 @@ export default function Dashboard() {
           if (!g.ultimo_horario) return true;
           return Date.now() - new Date(g.ultimo_horario).getTime() > 48 * 60 * 60 * 1000;
         }); break;
-        case "sla": result = roleGrupos.filter(g => g.sla_violated); break;
+        case "sla": result = roleGrupos.filter(g => getGroupSlaStatus(g).violated); break;
         case "priority": result = roleGrupos.filter(g => g.analytics?.priority_level === "maxima"); break;
         default: break;
       }
     }
     // Sort: Priority máxima first, then SLA violated, then rest
     return [...result].sort((a, b) => {
+      const aSla = getGroupSlaStatus(a);
+      const bSla = getGroupSlaStatus(b);
       const aPM = a.analytics?.priority_level === "maxima" ? 1 : 0;
       const bPM = b.analytics?.priority_level === "maxima" ? 1 : 0;
       if (aPM !== bPM) return bPM - aPM;
-      if (a.sla_violated && !b.sla_violated) return -1;
-      if (!a.sla_violated && b.sla_violated) return 1;
-      if (a.sla_violated && b.sla_violated) return b.sla_delay_minutes - a.sla_delay_minutes;
+      if (aSla.violated && !bSla.violated) return -1;
+      if (!aSla.violated && bSla.violated) return 1;
+      if (aSla.violated && bSla.violated) return bSla.delayMinutes - aSla.delayMinutes;
       return 0;
     });
-  }, [roleGrupos, metricFilter]);
+  }, [roleGrupos, metricFilter, slaTick]);
 
   const metricLabels: Record<string, string> = {
     total: "Total Grupos",

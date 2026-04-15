@@ -94,6 +94,7 @@ export interface Grupo {
   mensagens_hoje: number;
   ultima_mensagem: string | null;
   ultimo_horario: string | null;
+  actionable_waiting_since?: string | null;
   analytics?: GroupAnalytics;
   /** True when last message is from client and team hasn't responded in 30+ biz minutes */
   sla_violated: boolean;

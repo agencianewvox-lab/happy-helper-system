@@ -86,6 +86,33 @@ export function businessMinutesSince(isoTime: string, businessStartHour = 8, bus
   return businessMinutesBetween(isoTime, now.toISOString(), businessStartHour, businessEndHour);
 }
 
+export function calculateSlaStatus(
+  actionableWaitingSince: string | null | undefined,
+  thresholdMinutes = 30,
+  businessStartHour = 8,
+  businessEndHour = 18.5,
+) {
+  if (!actionableWaitingSince) {
+    return {
+      violated: false,
+      delayMinutes: 0,
+      elapsedMinutes: 0,
+    };
+  }
+
+  const elapsedMinutes = businessMinutesSince(
+    actionableWaitingSince,
+    businessStartHour,
+    businessEndHour,
+  );
+
+  return {
+    violated: elapsedMinutes >= thresholdMinutes,
+    delayMinutes: Math.max(0, elapsedMinutes - thresholdMinutes),
+    elapsedMinutes,
+  };
+}
+
 export function businessMinutesBetween(
   startIso: string,
   endIso: string,
