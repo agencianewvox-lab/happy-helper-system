@@ -638,8 +638,10 @@ export default function Performance() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {gestores.map((g, idx) => {
-                      const stats = getLtvStats(g);
+                    {gestores
+                      .map(g => ({ name: g, stats: getLtvStats(g) }))
+                      .sort((a, b) => b.stats.totalMonths - a.stats.totalMonths)
+                      .map(({ name: g, stats }, idx) => {
                       const RankIcon = rankIcons[idx] || null;
                       const rankColor = rankColors[idx] || "text-muted-foreground";
                       return (
@@ -659,8 +661,7 @@ export default function Performance() {
                           </div>
                         </div>
                       );
-                    })
-                    .sort(() => 0)}
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -710,29 +711,6 @@ export default function Performance() {
             </CardContent>
           </Card>
 
-          {/* Volume Ranking */}
-          <Card className="bg-card/60 border-border/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Users className="w-4 h-4" /> Ranking de Volume
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {filteredCollaborators.length > 0 ? (
-                <ResponsiveContainer width="100%" height={Math.max(200, filteredCollaborators.length * 45)}>
-                  <BarChart data={filteredCollaborators.filter(c => c.total_responses > 0)} layout="vertical" margin={{ left: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={75} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="total_responses" name="Respostas" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-6">Sem dados de volume.</p>
-              )}
-            </CardContent>
-          </Card>
         </div>
         )}
 
