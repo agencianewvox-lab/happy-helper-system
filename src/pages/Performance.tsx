@@ -431,8 +431,8 @@ export default function Performance() {
           </Card>
         </div>
 
-        {/* ═══════════ EVOLUÇÃO SENTIMENTO + VOLUME ═══════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ═══════════ EVOLUÇÃO SENTIMENTO ═══════════ */}
+        <div>
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -452,29 +452,6 @@ export default function Performance() {
                 </ResponsiveContainer>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-12">Sem dados de sentimento.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/60 border-border/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Volume Diário de Mensagens</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[280px]">
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: "11px" }} />
-                    <Area type="monotone" dataKey="entrada" name="Entrada" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
-                    <Area type="monotone" dataKey="saida" name="Saída" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de volume.</p>
               )}
             </CardContent>
           </Card>
