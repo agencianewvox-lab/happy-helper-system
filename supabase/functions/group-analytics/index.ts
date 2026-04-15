@@ -97,6 +97,12 @@ const TERMINAL_ACK_PATTERNS = [
   /^(?:ok(?:ay)?|certo|fechado|combinado|perfeito|show|top|valeu|obrigad[oa]|blz|beleza|resolvido|joia|joia|👍+|👍🏻+|👍🏽+|👍🏿+|🙏+|❤️+)[!.\s]*$/i,
   /^(?:👍|👍🏻|👍🏽|👍🏿|👏|🙏|❤️|✅|ok){1,4}$/i,
 ];
+const SELF_RESOLVED_PATTERNS = [
+  /^(?:ok[,.!\s]+)?vou\s+(?:fazer|pagar|realizar|resolver)\s+(?:isso\s+)?aqui[!.\s]*$/i,
+  /^(?:ok[,.!\s]+)?vou\s+ver(?:ificar)?\s+aqui[!.\s]*$/i,
+  /^(?:ja|já)\s+estou\s+aqui[!.\s]*$/i,
+  /^(?:deixa|deixa que eu)\s+(?:comigo|eu\s+(?:vejo|verifico|resolvo)\s+aqui)[!.\s]*$/i,
+];
 const SCHEDULE_PROMISE_PATTERNS = [
   /agend(ar|o|amos|ei)/i,
   /reuni[aã]o/i,
@@ -112,6 +118,9 @@ const SCHEDULE_PROMISE_PATTERNS = [
 const SCHEDULE_FOLLOW_THROUGH_PATTERNS = [
   /agendad[oa]/i,
   /segue.*link/i,
+  /enviando.*link/i,
+  /link da reuni[aã]o/i,
+  /meet\.google\.com/i,
   /hor[aá]rio confirmado/i,
   /marquei/i,
   /chamei/i,
@@ -466,6 +475,10 @@ function normalizeText(text: string): string {
   return (text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
+function stripTrailingSignature(text: string): string {
+  return text.replace(/[!.\s]+[a-z]{1,2}$/i, "").trim();
+}
+
 function getEffectiveTime(msg: any): string {
   return msg.recebido_em && msg.recebido_em > msg.created_at ? msg.recebido_em : msg.created_at;
 }
@@ -478,7 +491,9 @@ function isInformationalReport(text: string): boolean {
 
 function isTerminalAcknowledgement(text: string): boolean {
   const normalized = normalizeText(text);
-  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized));
+  const sanitized = stripTrailingSignature(normalized);
+  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized))
+    || SELF_RESOLVED_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized));
 }
 
 function businessMinutesBetween(startIso: string, endIso: string, businessStart = 8, businessEnd = 18.5): number {
@@ -594,7 +609,12 @@ function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingI
     if (!SCHEDULE_PROMISE_PATTERNS.some((pattern) => pattern.test(text))) continue;
 
     const subsequent = ordered.slice(i + 1);
-    const fulfilled = subsequent.some((next) => next.direcao === "saida" && SCHEDULE_FOLLOW_THROUGH_PATTERNS.some((pattern) => pattern.test(next.mensagem || "")));
+    const fulfilled = subsequent.some((next) => {
+      const nextText = next.mensagem || "";
+      if (next.direcao === "saida" && SCHEDULE_FOLLOW_THROUGH_PATTERNS.some((pattern) => pattern.test(nextText))) return true;
+      if (next.direcao === "entrada" && /entrando|estou aqui|ja estou aqui|já estou aqui|entrei|no meet/i.test(normalizeText(nextText))) return true;
+      return false;
+    });
     if (fulfilled) continue;
 
     const relevantClientReply = [...subsequent]
@@ -1039,8 +1059,8 @@ Deno.serve(async (req) => {
       let clientMsgTime: Date | null = null;
       for (const msg of msgs) {
         if (msg.direcao === "entrada" && !waitingForResponse) {
-          waitingForResponse = true;
           if (isInformationalReport(msg.mensagem || "") || isTerminalAcknowledgement(msg.mensagem || "")) continue;
+          waitingForResponse = true;
           clientMsgTime = new Date(getEffectiveTime(msg));
         } else if (msg.direcao === "saida" && waitingForResponse && clientMsgTime) {
           const bizMinutes = businessMinutesBetween(clientMsgTime, new Date(getEffectiveTime(msg)));
@@ -1115,11 +1135,15 @@ Deno.serve(async (req) => {
       if (validated.length > 0) validatedByGroup.set(groupId, validated.slice(0, 5));
     }
 
-    // Step 4b: Auto-insert new pending demands into the database
+    // Step 4b: Sync auto-generated pending demands with the database
+    const AUTO_TERMS = new Set(["demanda", "pergunta sem resposta", "agendar call"]);
     const newDemandsToInsert: { group_id: string; term: string; requested_at: string; status: string; resolved: boolean }[] = [];
+    const activeAutoKeys = new Set<string>();
     for (const [groupId, details] of validatedByGroup) {
       for (const d of details) {
-        // Check it's not already in the resolved set (by group_id + term)
+        if (AUTO_TERMS.has(d.term)) {
+          activeAutoKeys.add(`${groupId}|${d.term}`);
+        }
         let alreadyExists = false;
         for (const rk of resolvedSet) {
           const parts = rk.split("|");
@@ -1139,12 +1163,28 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    const { data: existingUnresolved } = await supabase
+      .from("pending_demand_resolutions")
+      .select("id, group_id, term")
+      .eq("resolved", false);
+
+    if (existingUnresolved && existingUnresolved.length > 0) {
+      const staleIds = existingUnresolved
+        .filter((item: any) => AUTO_TERMS.has(item.term) && !activeAutoKeys.has(`${item.group_id}|${item.term}`))
+        .map((item: any) => item.id);
+
+      if (staleIds.length > 0) {
+        const { error: staleResolveError } = await supabase
+          .from("pending_demand_resolutions")
+          .update({ resolved: true, status: "feito", resolved_at: new Date().toISOString() })
+          .in("id", staleIds);
+        if (staleResolveError) console.error("Error auto-resolving stale demands:", staleResolveError);
+        else console.log(`Auto-resolved ${staleIds.length} stale pending demands`);
+      }
+    }
+
     if (newDemandsToInsert.length > 0) {
-      // Check existing unresolved demands to avoid duplicates
-      const { data: existingUnresolved } = await supabase
-        .from("pending_demand_resolutions")
-        .select("group_id, term")
-        .eq("resolved", false);
       const existingKeys = new Set((existingUnresolved || []).map((e: any) => `${e.group_id}|${e.term}`));
       const truly_new = newDemandsToInsert.filter(d => !existingKeys.has(`${d.group_id}|${d.term}`));
       if (truly_new.length > 0) {

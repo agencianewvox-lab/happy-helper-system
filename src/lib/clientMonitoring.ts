@@ -32,12 +32,23 @@ const TERMINAL_ACK_PATTERNS = [
   /^(?:👍|👍🏻|👍🏽|👍🏿|👏|🙏|❤️|✅|ok){1,4}$/i,
 ];
 
+const SELF_RESOLVED_PATTERNS = [
+  /^(?:ok[,.!\s]+)?vou\s+(?:fazer|pagar|realizar|resolver)\s+(?:isso\s+)?aqui[!.\s]*$/i,
+  /^(?:ok[,.!\s]+)?vou\s+ver(?:ificar)?\s+aqui[!.\s]*$/i,
+  /^(?:ja|já)\s+estou\s+aqui[!.\s]*$/i,
+  /^(?:deixa|deixa que eu)\s+(?:comigo|eu\s+(?:vejo|verifico|resolvo)\s+aqui)[!.\s]*$/i,
+];
+
 function normalizeText(text: string | null | undefined) {
   return (text || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
+}
+
+function stripTrailingSignature(text: string) {
+  return text.replace(/[!.\s]+[a-z]{1,2}$/i, "").trim();
 }
 
 export function getEffectiveMessageTime(createdAt: string, receivedAt?: string | null) {
@@ -54,7 +65,9 @@ export function isInformationalReport(text: string | null | undefined) {
 export function isTerminalAcknowledgement(text: string | null | undefined) {
   const normalized = normalizeText(text);
   if (!normalized) return false;
-  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized));
+  const sanitized = stripTrailingSignature(normalized);
+  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized))
+    || SELF_RESOLVED_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized));
 }
 
 export function requiresResponse(text: string | null | undefined) {
