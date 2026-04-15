@@ -1043,7 +1043,7 @@ Deno.serve(async (req) => {
           if (isInformationalReport(msg.mensagem || "") || isTerminalAcknowledgement(msg.mensagem || "")) continue;
           clientMsgTime = new Date(getEffectiveTime(msg));
         } else if (msg.direcao === "saida" && waitingForResponse && clientMsgTime) {
-          const bizMinutes = businessMinutesBetween(clientMsgTime.toISOString(), getEffectiveTime(msg));
+          const bizMinutes = businessMinutesBetween(clientMsgTime, new Date(getEffectiveTime(msg)));
           if (bizMinutes > 0 && bizMinutes < 30 * BIZ_MINUTES_PER_DAY) { totalFrt += bizMinutes; frtCount++; }
           waitingForResponse = false;
           clientMsgTime = null;
