@@ -232,6 +232,7 @@ export default function Performance() {
     week: "7 dias",
     month: "Mês",
     quarter: "Trimestre",
+    custom: "Personalizado",
   };
 
   const loading = dataLoading || teamLoading;
@@ -289,6 +290,37 @@ export default function Performance() {
                     {periodLabels[p]}
                   </Button>
                 ))}
+                {isAdmin && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={period === "custom" ? "default" : "outline"}
+                        size="sm"
+                        className="text-xs gap-1"
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        {period === "custom" && customDateRange.from && customDateRange.to
+                          ? `${format(customDateRange.from, "dd/MM")} - ${format(customDateRange.to, "dd/MM")}`
+                          : "Período"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="range"
+                        selected={customDateRange}
+                        onSelect={(range: any) => {
+                          setCustomDateRange({ from: range?.from, to: range?.to });
+                          if (range?.from && range?.to) {
+                            setPeriod("custom");
+                          }
+                        }}
+                        numberOfMonths={2}
+                        locale={ptBR}
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
           </div>
