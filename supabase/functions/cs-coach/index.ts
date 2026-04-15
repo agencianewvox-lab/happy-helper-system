@@ -87,8 +87,8 @@ const REPORT_PATTERNS = [
 const TERMINAL_ACK_PATTERNS = [
   /^(?:ok(?:ay)?|certo|fechado|combinado|perfeito|show|top|valeu|obrigad[oa]|blz|beleza|resolvido|joia|jóia|massa|dahora|demais|sensacional|maravilh[oa]|excelente|incrivel|arrasou|mandou bem|muito bom|bom demais|👍+|👍🏻+|👍🏽+|👍🏿+|🙏+|❤️+|ok obrigado|ok obrigada|show obrigado|show obrigada)[!.\s]*$/i,
   /^(?:👍|👍🏻|👍🏽|👍🏿|👏|🙏|❤️|✅|🔥|ok){1,4}$/i,
-  /^(?:top|show|perfeito|massa|sensacional|excelente|maravilh[oa]|incrivel|arrasou|muito bom|bom)\s+(?:demais|bom demais|de\s*bola|de\s*mais|hein|viu|d\+)[!.\s]*$/i,
-  /^top\s+bom\s+demais[!.\s]*$/i,
+  /^(?:top|show|perfeito|massa|sensacional|excelente|maravilh[oa]|incrivel|arrasou|muito bom|bom)\s+(?:demais|dms|bom demais|bom dms|de\s*bola|de\s*mais|hein|viu|d\+)[!.\s]*$/i,
+  /^top\s+bom\s+(?:demais|dms|d\+)[!.\s]*$/i,
   /^(?:ficou|ta|tá|está)\s+(?:top|show|perfeito|lindo|massa|demais|sensacional|excelente|maravilhos[oa]|incrivel|otimo|ótimo|bom demais)[!.\s]*$/i,
   /^(?:amei|adorei|curti|gostei|aprovado|aprovei|manda ver|pode ser|isso ai|isso aí|boa|boaa+|ótimo|otimo|muito bom|bom demais|top demais)[!.\s]*$/i,
 ];
