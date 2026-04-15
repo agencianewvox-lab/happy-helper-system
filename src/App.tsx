@@ -16,7 +16,7 @@ import PesquisaNps from "./pages/PesquisaNps";
 import OnboardingClinica from "./pages/OnboardingClinica";
 import PainelAdmin from "./pages/PainelAdmin";
 import Configuracoes from "./pages/Configuracoes";
-import Escritorio from "./pages/Escritorio";
+
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
@@ -67,7 +67,7 @@ const App = () => (
           <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
           <Route path="/nps-real" element={<ProtectedRoute><NpsReal /></ProtectedRoute>} />
           <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
-          <Route path="/escritorio" element={<ProtectedRoute><Escritorio /></ProtectedRoute>} />
+          
           <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
           <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />

@@ -5,16 +5,15 @@ interface SidebarBadges {
   agenda: number;
   tarefas: number;
   pendencias: number;
-  escritorio: number;
 }
 
 export function useSidebarBadges() {
-  const [badges, setBadges] = useState<SidebarBadges>({ agenda: 0, tarefas: 0, pendencias: 0, escritorio: 0 });
+  const [badges, setBadges] = useState<SidebarBadges>({ agenda: 0, tarefas: 0, pendencias: 0 });
 
   const load = async () => {
     const today = new Date().toISOString().split("T")[0];
 
-    const [eventsRes, tasksRes, pendingsRes, officeRes] = await Promise.all([
+    const [eventsRes, tasksRes, pendingsRes] = await Promise.all([
       supabase
         .from("calendar_events")
         .select("start_time")
@@ -28,18 +27,12 @@ export function useSidebarBadges() {
         .from("pending_demand_resolutions")
         .select("id")
         .eq("resolved", false),
-      supabase
-        .from("office_presence")
-        .select("id")
-        .neq("status", "offline")
-        .gte("last_seen", new Date(Date.now() - 120000).toISOString()),
     ]);
 
     setBadges({
       agenda: eventsRes.data?.length || 0,
       tarefas: tasksRes.data?.length || 0,
       pendencias: pendingsRes.data?.length || 0,
-      escritorio: officeRes.data?.length || 0,
     });
   };
 
@@ -51,7 +44,6 @@ export function useSidebarBadges() {
       .on("postgres_changes", { event: "*", schema: "public", table: "calendar_events" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_demand_resolutions" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "office_presence" }, load)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
