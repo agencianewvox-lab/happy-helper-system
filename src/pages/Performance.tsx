@@ -140,8 +140,15 @@ export default function Performance() {
     gestorRanking,
   } = usePerformanceData(period, customRange);
 
-  // Fetch team-performance edge function data
+  // Fetch team-performance edge function data with caching
   useEffect(() => {
+    const cacheKey = period === "custom" ? `custom-${customDateRange.from?.toISOString()}-${customDateRange.to?.toISOString()}` : period;
+    const cached = teamDataCache.current[cacheKey];
+    if (cached && Date.now() - cached.ts < 5 * 60 * 1000) {
+      setTeamData(cached.data);
+      setTeamLoading(false);
+      return;
+    }
     async function fetchTeamData() {
       setTeamLoading(true);
       try {
@@ -153,7 +160,9 @@ export default function Performance() {
           },
         });
         if (!resp.ok) throw new Error("Erro ao buscar dados");
-        setTeamData(await resp.json());
+        const data = await resp.json();
+        teamDataCache.current[cacheKey] = { data, ts: Date.now() };
+        setTeamData(data);
       } catch (err) {
         console.error("Team performance fetch error:", err);
       } finally {
@@ -161,7 +170,7 @@ export default function Performance() {
       }
     }
     fetchTeamData();
-  }, [period]);
+  }, [period, customDateRange]);
 
   const gestorName = selectedGestor === "all" ? null : selectedGestor;
   const metrics = useMemo(() => computeGestorMetrics(gestorName), [computeGestorMetrics, gestorName]);
