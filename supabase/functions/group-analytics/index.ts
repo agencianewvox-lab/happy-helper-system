@@ -609,7 +609,12 @@ function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingI
     if (!SCHEDULE_PROMISE_PATTERNS.some((pattern) => pattern.test(text))) continue;
 
     const subsequent = ordered.slice(i + 1);
-    const fulfilled = subsequent.some((next) => next.direcao === "saida" && SCHEDULE_FOLLOW_THROUGH_PATTERNS.some((pattern) => pattern.test(next.mensagem || "")));
+    const fulfilled = subsequent.some((next) => {
+      const nextText = next.mensagem || "";
+      if (next.direcao === "saida" && SCHEDULE_FOLLOW_THROUGH_PATTERNS.some((pattern) => pattern.test(nextText))) return true;
+      if (next.direcao === "entrada" && /entrando|estou aqui|ja estou aqui|já estou aqui|entrei|no meet/i.test(normalizeText(nextText))) return true;
+      return false;
+    });
     if (fulfilled) continue;
 
     const relevantClientReply = [...subsequent]
