@@ -107,17 +107,18 @@ const SELF_RESOLVED_PATTERNS = [
   /^(?:ja|já)\s+estou\s+aqui[!.\s]*$/i,
   /^(?:deixa|deixa que eu)\s+(?:comigo|eu\s+(?:vejo|verifico|resolvo)\s+aqui)[!.\s]*$/i,
 ];
+// SCHEDULE_PROMISE_PATTERNS: Only match when team EXPLICITLY promises to schedule 
+// something with the client — must contain a clear commitment verb + scheduling context together.
+// Single words like "agendar" or "call" alone are NOT enough.
 const SCHEDULE_PROMISE_PATTERNS = [
-  /agend(ar|o|amos|ei)/i,
-  /reuni[aã]o/i,
-  /\bcall\b/i,
-  /logo aciono/i,
-  /te aciono/i,
-  /te chamo/i,
-  /vamos nos falar/i,
-  /podemos nos falar/i,
-  /vamos marcar/i,
-  /marcamos/i,
+  /vou\s+(?:te\s+)?(?:agendar|marcar)\s+(?:uma?\s+)?(?:call|reuni[aã]o|conversa)/i,
+  /vamos\s+(?:agendar|marcar)\s+(?:uma?\s+)?(?:call|reuni[aã]o|conversa)/i,
+  /(?:te\s+)?(?:aciono|chamo)\s+(?:para|pra)\s+(?:uma?\s+)?(?:call|reuni[aã]o|conversa)/i,
+  /logo\s+(?:te\s+)?aciono/i,
+  /te\s+chamo\s+(?:para|pra)/i,
+  /podemos\s+nos\s+falar/i,
+  /vamos\s+nos\s+falar/i,
+  /(?:vou|vamos)\s+marcar\s+(?:um\s+)?hor[aá]rio/i,
 ];
 const SCHEDULE_FOLLOW_THROUGH_PATTERNS = [
   /agendad[oa]/i,
