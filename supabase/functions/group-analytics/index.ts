@@ -622,24 +622,34 @@ function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingI
     });
     if (fulfilled) continue;
 
+    // If the LAST message in the conversation is a terminal ack (ok, perfeito, etc.) from the client,
+    // it means the conversation was concluded — NOT a pending demand
+    const lastMsg = ordered[ordered.length - 1];
+    if (lastMsg && lastMsg.direcao === "entrada" && isTerminalAcknowledgement(lastMsg.mensagem || "")) continue;
+    // Also skip if the last message is from the team (no client waiting)
+    if (lastMsg && lastMsg.direcao === "saida" && ordered.slice(i + 1).filter(m => m.direcao === "entrada" && !isTerminalAcknowledgement(m.mensagem || "")).length === 0) continue;
+
     const relevantClientReply = [...subsequent]
       .filter((next) => next.direcao === "entrada" && !isInformationalReport(next.mensagem || "") && !isTerminalAcknowledgement(next.mensagem || ""))
       .pop();
 
-    const waitingMinutes = businessMinutesBetween(getEffectiveTime(msg), new Date().toISOString());
-    if (waitingMinutes < 30) continue;
+    // Only flag if there's actually a client waiting for something
+    if (!relevantClientReply) continue;
 
-    const clientName = relevantClientReply?.nome_contato || "cliente";
+    const waitingMinutes = businessMinutesBetween(getEffectiveTime(msg), new Date().toISOString());
+    if (waitingMinutes < 60) continue; // Increased from 30 to 60 min
+
+    const clientName = relevantClientReply.nome_contato || "cliente";
     items.push({
       group_id: groupId,
       client_name: clientName,
-      message: relevantClientReply?.mensagem || text,
+      message: relevantClientReply.mensagem || text,
       type: "Demanda",
-      priority: relevantClientReply || waitingMinutes >= 120 ? "urgente" : "normal",
-      timestamp: relevantClientReply ? getEffectiveTime(relevantClientReply) : getEffectiveTime(msg),
-      suggested_action: `Agendar a call combinada e confirmar horário com ${clientName}`,
+      priority: waitingMinutes >= 240 ? "urgente" : "normal",
+      timestamp: getEffectiveTime(relevantClientReply),
+      suggested_action: `Verificar promessa de agendamento com ${clientName}`,
       hours_waiting: Math.round((waitingMinutes / 60) * 10) / 10,
-      confidence: "alta",
+      confidence: "media",
     });
     break;
   }
