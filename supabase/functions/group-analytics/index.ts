@@ -647,7 +647,7 @@ function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingI
       type: "Demanda",
       priority: waitingMinutes >= 240 ? "urgente" : "normal",
       timestamp: getEffectiveTime(relevantClientReply),
-      suggested_action: `Verificar promessa de agendamento com ${clientName}`,
+      suggested_action: `Agendar a call combinada e confirmar horário com ${clientName}`,
       hours_waiting: Math.round((waitingMinutes / 60) * 10) / 10,
       confidence: "media",
     });
@@ -848,7 +848,8 @@ async function detectPendingWithAI(allCandidates: CandidateMessage[], apiKey: st
 function postValidate(items: AIPendingItem[], resolvedSet: Set<string>): PendingDemandDetail[] {
   const seen = new Map<string, PendingDemandDetail>();
   for (const item of items) {
-        const term = item.suggested_action?.toLowerCase().includes("agendar a call")
+        const normalizedAction = (item.suggested_action || "").toLowerCase();
+        const term = normalizedAction.includes("agendar a call") || normalizedAction.includes("confirmar horário") || normalizedAction.includes("confirmar horario")
           ? "agendar call"
           : item.type === "Demanda"
             ? "demanda"
