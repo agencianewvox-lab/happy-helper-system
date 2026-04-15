@@ -1135,11 +1135,15 @@ Deno.serve(async (req) => {
       if (validated.length > 0) validatedByGroup.set(groupId, validated.slice(0, 5));
     }
 
-    // Step 4b: Auto-insert new pending demands into the database
+    // Step 4b: Sync auto-generated pending demands with the database
+    const AUTO_TERMS = new Set(["demanda", "pergunta sem resposta", "agendar call"]);
     const newDemandsToInsert: { group_id: string; term: string; requested_at: string; status: string; resolved: boolean }[] = [];
+    const activeAutoKeys = new Set<string>();
     for (const [groupId, details] of validatedByGroup) {
       for (const d of details) {
-        // Check it's not already in the resolved set (by group_id + term)
+        if (AUTO_TERMS.has(d.term)) {
+          activeAutoKeys.add(`${groupId}|${d.term}`);
+        }
         let alreadyExists = false;
         for (const rk of resolvedSet) {
           const parts = rk.split("|");
@@ -1159,12 +1163,28 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    const { data: existingUnresolved } = await supabase
+      .from("pending_demand_resolutions")
+      .select("id, group_id, term")
+      .eq("resolved", false);
+
+    if (existingUnresolved && existingUnresolved.length > 0) {
+      const staleIds = existingUnresolved
+        .filter((item: any) => AUTO_TERMS.has(item.term) && !activeAutoKeys.has(`${item.group_id}|${item.term}`))
+        .map((item: any) => item.id);
+
+      if (staleIds.length > 0) {
+        const { error: staleResolveError } = await supabase
+          .from("pending_demand_resolutions")
+          .update({ resolved: true, status: "feito", resolved_at: new Date().toISOString() })
+          .in("id", staleIds);
+        if (staleResolveError) console.error("Error auto-resolving stale demands:", staleResolveError);
+        else console.log(`Auto-resolved ${staleIds.length} stale pending demands`);
+      }
+    }
+
     if (newDemandsToInsert.length > 0) {
-      // Check existing unresolved demands to avoid duplicates
-      const { data: existingUnresolved } = await supabase
-        .from("pending_demand_resolutions")
-        .select("group_id, term")
-        .eq("resolved", false);
       const existingKeys = new Set((existingUnresolved || []).map((e: any) => `${e.group_id}|${e.term}`));
       const truly_new = newDemandsToInsert.filter(d => !existingKeys.has(`${d.group_id}|${d.term}`));
       if (truly_new.length > 0) {
