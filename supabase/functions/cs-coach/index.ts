@@ -88,6 +88,12 @@ const TERMINAL_ACK_PATTERNS = [
   /^(?:ok(?:ay)?|certo|fechado|combinado|perfeito|show|top|valeu|obrigad[oa]|blz|beleza|resolvido|joia|jóia|👍+|👍🏻+|👍🏽+|👍🏿+|🙏+|❤️+)[!.\s]*$/i,
   /^(?:👍|👍🏻|👍🏽|👍🏿|👏|🙏|❤️|✅|ok){1,4}$/i,
 ];
+const SELF_RESOLVED_PATTERNS = [
+  /^(?:ok[,.!\s]+)?vou\s+(?:fazer|pagar|realizar|resolver)\s+(?:isso\s+)?aqui[!.\s]*$/i,
+  /^(?:ok[,.!\s]+)?vou\s+ver(?:ificar)?\s+aqui[!.\s]*$/i,
+  /^(?:ja|já)\s+estou\s+aqui[!.\s]*$/i,
+  /^(?:deixa|deixa que eu)\s+(?:comigo|eu\s+(?:vejo|verifico|resolvo)\s+aqui)[!.\s]*$/i,
+];
 
 function isTeamMember(contactName: string): boolean {
   if (!contactName) return false;
@@ -106,6 +112,10 @@ function normalizeText(text: string): string {
   return (text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
+function stripTrailingSignature(text: string): string {
+  return text.replace(/[!.\s]+[a-z]{1,2}$/i, "").trim();
+}
+
 function isInformationalReport(text: string): boolean {
   const normalized = normalizeText(text);
   const matches = REPORT_PATTERNS.filter((pattern) => normalized.includes(pattern)).length;
@@ -114,7 +124,9 @@ function isInformationalReport(text: string): boolean {
 
 function isTerminalAcknowledgement(text: string): boolean {
   const normalized = normalizeText(text);
-  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized));
+  const sanitized = stripTrailingSignature(normalized);
+  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized))
+    || SELF_RESOLVED_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized));
 }
 
 function businessMinutesBetween(startIso: string, endIso: string, businessStart = 8, businessEnd = 18.5): number {

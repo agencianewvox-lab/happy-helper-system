@@ -97,6 +97,12 @@ const TERMINAL_ACK_PATTERNS = [
   /^(?:ok(?:ay)?|certo|fechado|combinado|perfeito|show|top|valeu|obrigad[oa]|blz|beleza|resolvido|joia|joia|👍+|👍🏻+|👍🏽+|👍🏿+|🙏+|❤️+)[!.\s]*$/i,
   /^(?:👍|👍🏻|👍🏽|👍🏿|👏|🙏|❤️|✅|ok){1,4}$/i,
 ];
+const SELF_RESOLVED_PATTERNS = [
+  /^(?:ok[,.!\s]+)?vou\s+(?:fazer|pagar|realizar|resolver)\s+(?:isso\s+)?aqui[!.\s]*$/i,
+  /^(?:ok[,.!\s]+)?vou\s+ver(?:ificar)?\s+aqui[!.\s]*$/i,
+  /^(?:ja|já)\s+estou\s+aqui[!.\s]*$/i,
+  /^(?:deixa|deixa que eu)\s+(?:comigo|eu\s+(?:vejo|verifico|resolvo)\s+aqui)[!.\s]*$/i,
+];
 const SCHEDULE_PROMISE_PATTERNS = [
   /agend(ar|o|amos|ei)/i,
   /reuni[aã]o/i,
@@ -112,6 +118,9 @@ const SCHEDULE_PROMISE_PATTERNS = [
 const SCHEDULE_FOLLOW_THROUGH_PATTERNS = [
   /agendad[oa]/i,
   /segue.*link/i,
+  /enviando.*link/i,
+  /link da reuni[aã]o/i,
+  /meet\.google\.com/i,
   /hor[aá]rio confirmado/i,
   /marquei/i,
   /chamei/i,
@@ -466,6 +475,10 @@ function normalizeText(text: string): string {
   return (text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
+function stripTrailingSignature(text: string): string {
+  return text.replace(/[!.\s]+[a-z]{1,2}$/i, "").trim();
+}
+
 function getEffectiveTime(msg: any): string {
   return msg.recebido_em && msg.recebido_em > msg.created_at ? msg.recebido_em : msg.created_at;
 }
@@ -478,7 +491,9 @@ function isInformationalReport(text: string): boolean {
 
 function isTerminalAcknowledgement(text: string): boolean {
   const normalized = normalizeText(text);
-  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized));
+  const sanitized = stripTrailingSignature(normalized);
+  return TERMINAL_ACK_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized))
+    || SELF_RESOLVED_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(sanitized));
 }
 
 function businessMinutesBetween(startIso: string, endIso: string, businessStart = 8, businessEnd = 18.5): number {
@@ -1039,8 +1054,8 @@ Deno.serve(async (req) => {
       let clientMsgTime: Date | null = null;
       for (const msg of msgs) {
         if (msg.direcao === "entrada" && !waitingForResponse) {
-          waitingForResponse = true;
           if (isInformationalReport(msg.mensagem || "") || isTerminalAcknowledgement(msg.mensagem || "")) continue;
+          waitingForResponse = true;
           clientMsgTime = new Date(getEffectiveTime(msg));
         } else if (msg.direcao === "saida" && waitingForResponse && clientMsgTime) {
           const bizMinutes = businessMinutesBetween(clientMsgTime, new Date(getEffectiveTime(msg)));
