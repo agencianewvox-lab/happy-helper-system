@@ -159,8 +159,12 @@ export function useClientData() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchAnalytics();
+    // Skip initial fetch if cache is fresh
+    const isCacheFresh = globalCache && (Date.now() - globalCache.lastFetch) < CACHE_TTL;
+    if (!isCacheFresh) {
+      fetchData();
+      fetchAnalytics();
+    }
 
     const channel = supabase
       .channel("conversas-realtime")
