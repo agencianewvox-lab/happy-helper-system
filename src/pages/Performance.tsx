@@ -219,13 +219,6 @@ export default function Performance() {
     }));
   }, [teamData]);
 
-  const chartData = useMemo(() => {
-    if (!teamData) return [];
-    return teamData.daily_volumes.map((d) => ({
-      ...d,
-      date: formatDate(d.date),
-    }));
-  }, [teamData]);
 
   const periodLabels: Record<Period, string> = {
     today: "Hoje",
