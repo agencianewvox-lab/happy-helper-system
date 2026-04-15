@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,19 +7,26 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Area, AreaChart, Cell, PieChart, Pie,
 } from "recharts";
 import {
   MessageSquare, Timer, CheckCircle, TrendingUp, Users, ArrowUpDown,
   Trophy, Medal, Award, Heart, ListChecks, AlertTriangle, Activity, Star, DollarSign,
+  CalendarIcon,
 } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { usePerformanceData, type GestorMetrics } from "@/hooks/usePerformanceData";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 
-type Period = "today" | "week" | "month" | "quarter";
+type Period = "today" | "week" | "month" | "quarter" | "custom";
 
 interface TeamPerfData {
   period: string;
@@ -98,9 +105,11 @@ const tooltipStyle = {
 
 export default function Performance() {
   const [period, setPeriod] = useState<Period>("week");
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [selectedGestor, setSelectedGestor] = useState<string>("all");
   const [teamData, setTeamData] = useState<TeamPerfData | null>(null);
   const [teamLoading, setTeamLoading] = useState(true);
+  const teamDataCache = useRef<Record<string, { data: TeamPerfData; ts: number }>>({});
   const { isAdmin, gestorFilter } = useProfile();
 
   // For non-admin users, force their own gestor view
@@ -109,6 +118,13 @@ export default function Performance() {
       setSelectedGestor(gestorFilter);
     }
   }, [isAdmin, gestorFilter]);
+
+  const customRange = useMemo(() => {
+    if (period === "custom" && customDateRange.from && customDateRange.to) {
+      return { start: customDateRange.from, end: customDateRange.to };
+    }
+    return null;
+  }, [period, customDateRange]);
 
   const {
     loading: dataLoading,
@@ -122,7 +138,7 @@ export default function Performance() {
     getLtvEvolution,
     getLtvStats,
     gestorRanking,
-  } = usePerformanceData(period);
+  } = usePerformanceData(period, customRange);
 
   // Fetch team-performance edge function data
   useEffect(() => {
