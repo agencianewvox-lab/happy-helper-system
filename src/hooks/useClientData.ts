@@ -147,6 +147,7 @@ export function useClientData() {
       });
 
       setGrupos(enriched);
+      globalCache = { ...(globalCache || { analyticsMap: {} }), grupos: enriched, lastFetch: Date.now() };
       setError(null);
     } catch (err: any) {
       setError(err.message);
