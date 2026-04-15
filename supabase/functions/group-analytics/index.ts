@@ -107,17 +107,18 @@ const SELF_RESOLVED_PATTERNS = [
   /^(?:ja|já)\s+estou\s+aqui[!.\s]*$/i,
   /^(?:deixa|deixa que eu)\s+(?:comigo|eu\s+(?:vejo|verifico|resolvo)\s+aqui)[!.\s]*$/i,
 ];
+// SCHEDULE_PROMISE_PATTERNS: Only match when team EXPLICITLY promises to schedule 
+// something with the client — must contain a clear commitment verb + scheduling context together.
+// Single words like "agendar" or "call" alone are NOT enough.
 const SCHEDULE_PROMISE_PATTERNS = [
-  /agend(ar|o|amos|ei)/i,
-  /reuni[aã]o/i,
-  /\bcall\b/i,
-  /logo aciono/i,
-  /te aciono/i,
-  /te chamo/i,
-  /vamos nos falar/i,
-  /podemos nos falar/i,
-  /vamos marcar/i,
-  /marcamos/i,
+  /vou\s+(?:te\s+)?(?:agendar|marcar)\s+(?:uma?\s+)?(?:call|reuni[aã]o|conversa)/i,
+  /vamos\s+(?:agendar|marcar)\s+(?:uma?\s+)?(?:call|reuni[aã]o|conversa)/i,
+  /(?:te\s+)?(?:aciono|chamo)\s+(?:para|pra)\s+(?:uma?\s+)?(?:call|reuni[aã]o|conversa)/i,
+  /logo\s+(?:te\s+)?aciono/i,
+  /te\s+chamo\s+(?:para|pra)/i,
+  /podemos\s+nos\s+falar/i,
+  /vamos\s+nos\s+falar/i,
+  /(?:vou|vamos)\s+marcar\s+(?:um\s+)?hor[aá]rio/i,
 ];
 const SCHEDULE_FOLLOW_THROUGH_PATTERNS = [
   /agendad[oa]/i,
@@ -621,24 +622,34 @@ function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingI
     });
     if (fulfilled) continue;
 
+    // If the LAST message in the conversation is a terminal ack (ok, perfeito, etc.) from the client,
+    // it means the conversation was concluded — NOT a pending demand
+    const lastMsg = ordered[ordered.length - 1];
+    if (lastMsg && lastMsg.direcao === "entrada" && isTerminalAcknowledgement(lastMsg.mensagem || "")) continue;
+    // Also skip if the last message is from the team (no client waiting)
+    if (lastMsg && lastMsg.direcao === "saida" && ordered.slice(i + 1).filter(m => m.direcao === "entrada" && !isTerminalAcknowledgement(m.mensagem || "")).length === 0) continue;
+
     const relevantClientReply = [...subsequent]
       .filter((next) => next.direcao === "entrada" && !isInformationalReport(next.mensagem || "") && !isTerminalAcknowledgement(next.mensagem || ""))
       .pop();
 
-    const waitingMinutes = businessMinutesBetween(getEffectiveTime(msg), new Date().toISOString());
-    if (waitingMinutes < 30) continue;
+    // Only flag if there's actually a client waiting for something
+    if (!relevantClientReply) continue;
 
-    const clientName = relevantClientReply?.nome_contato || "cliente";
+    const waitingMinutes = businessMinutesBetween(getEffectiveTime(msg), new Date().toISOString());
+    if (waitingMinutes < 60) continue; // Increased from 30 to 60 min
+
+    const clientName = relevantClientReply.nome_contato || "cliente";
     items.push({
       group_id: groupId,
       client_name: clientName,
-      message: relevantClientReply?.mensagem || text,
+      message: relevantClientReply.mensagem || text,
       type: "Demanda",
-      priority: relevantClientReply || waitingMinutes >= 120 ? "urgente" : "normal",
-      timestamp: relevantClientReply ? getEffectiveTime(relevantClientReply) : getEffectiveTime(msg),
-      suggested_action: `Agendar a call combinada e confirmar horário com ${clientName}`,
+      priority: waitingMinutes >= 240 ? "urgente" : "normal",
+      timestamp: getEffectiveTime(relevantClientReply),
+      suggested_action: `Verificar promessa de agendamento com ${clientName}`,
       hours_waiting: Math.round((waitingMinutes / 60) * 10) / 10,
-      confidence: "alta",
+      confidence: "media",
     });
     break;
   }
@@ -646,7 +657,7 @@ function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingI
 }
 
 // ─── LAYER 2: AI Analysis ───
-const NEW_PENDING_PROMPT = `Você é uma analista de atendimento RIGOROSA da agência de marketing New Vox. Sua tarefa é analisar mensagens candidatas a pendência e classificá-las. Seja AGRESSIVA na detecção — é preferível ter um falso positivo do que deixar passar uma pendência real.
+const NEW_PENDING_PROMPT = `Você é uma analista de atendimento da agência de marketing New Vox. Sua tarefa é analisar mensagens candidatas a pendência e classificá-las com PRECISÃO. Evite falsos positivos — só marque como pendência quando o cliente CLARAMENTE espera uma ação ou resposta da equipe.
 
 EQUIPE NEW VOX (mensagens dessas pessoas são da EQUIPE e NUNCA são pendências):
 - Jader: Gestor de tráfego
@@ -660,28 +671,39 @@ EQUIPE NEW VOX (mensagens dessas pessoas são da EQUIPE e NUNCA são pendências
 - Netto Monge: Gestor de tráfego
 - Jiza: Equipe
 
+REGRAS CRÍTICAS PARA ANÁLISE CONTEXTUAL:
+- Leia TODA a sequência de mensagens para entender o CONTEXTO da conversa
+- Se a conversa terminou com o cliente dizendo "ok", "top", "perfeito", "vou fazer", "beleza", etc → NÃO é pendência
+- Se o cliente está apenas informando algo (ex: "vou fazer aqui", "vou pagar", "vou enviar") → NÃO é pendência  
+- Se a equipe mencionou "agendar" ou "call" casualmente, sem compromisso direto → NÃO é pendência
+- Se a equipe enviou relatório e o cliente apenas reagiu → NÃO é pendência
+- Conversas retóricas onde ninguém precisa agir → NÃO é pendência
+
 CATEGORIAS DE CLASSIFICAÇÃO:
 
-1. "PENDÊNCIA CONFIRMADA" (confidence: alta) — O cliente fez QUALQUER solicitação, pedido, pergunta direta, ou requisição que exige ação da equipe, e ninguém da equipe respondeu. Inclui:
-   - Pedidos educados ("poderia me enviar...", "tem como...", "pode reenviar...")
-   - Perguntas diretas ("quando fica pronto?", "já foi feito?")
-   - Solicitações de reenvio, envio, ou compartilhamento de qualquer material
-   - Cobranças implícitas ("caso tenha sido enviado", "ainda não recebi")
+1. "PENDÊNCIA CONFIRMADA" (confidence: alta) — O cliente fez uma solicitação CLARA e EXPLÍCITA que exige ação da equipe, e ninguém respondeu:
+   - Pedidos diretos ("me envie o relatório", "preciso do acesso", "pode reenviar?")
+   - Perguntas que exigem resposta ("quando fica pronto?", "já foi feito?")
+   - Cobranças explícitas ("ainda não recebi", "cadê o material?")
 
-2. "POSSÍVEL PENDÊNCIA" (confidence: media) — Mensagem ambígua que pode ou não ser solicitação, MAS que contém qualquer indicação de espera ou necessidade do cliente.
+2. "POSSÍVEL PENDÊNCIA" (confidence: media) — Mensagem que PROVAVELMENTE requer ação mas o contexto é ambíguo.
 
-3. "NÃO É PENDÊNCIA" — SOMENTE quando: equipe respondeu claramente, assunto já tratado, ou cliente apenas compartilhando informação sem esperar retorno.
+3. "NÃO É PENDÊNCIA" — Quando: equipe já respondeu, assunto encerrado, cliente informando algo, conversas retóricas, ou cliente apenas reagindo/confirmando.
 
-4. "RESOLVIDA" — Havia solicitação mas mensagens posteriores mostram que equipe já tratou.
+4. "RESOLVIDA" — Havia solicitação mas já foi tratada.
 
-NÃO marque como pendência quando a última mensagem for apenas encerramento/ack do cliente (ex: "ok", "perfeito", "👍") ou quando for relatório diário/semanal meramente informativo.
+NÃO marque como pendência:
+- Encerramento/ack do cliente (ex: "ok", "perfeito", "👍", "vou fazer", "top bom demais")
+- Relatórios informativos da equipe
+- Conversas onde o cliente está apenas confirmando ou informando algo
+- Menções casuais da equipe a "call", "agendar", "reunião" sem compromisso direto com o cliente
 
 PRIORIDADE:
-- "urgente": afeta campanha ativa, cliente irritado, esperando há +4h em horário comercial, ou qualquer reenvio/solicitação sem resposta há +2h
+- "urgente": afeta campanha ativa, cliente irritado, esperando há +4h em horário comercial, ou solicitação sem resposta há +2h
 - "normal": solicitações regulares
 - "baixa": dúvidas puramente informativas
 
-REGRA DE OURO: NA DÚVIDA, MARQUE COMO PENDÊNCIA. É melhor a equipe verificar e descartar do que deixar um cliente sem resposta.
+REGRA DE OURO: Na dúvida, analise o CONTEXTO COMPLETO da conversa. Só marque como pendência quando for CLARO que o cliente espera uma ação.
 
 Use a função report_pending_demands para retornar APENAS as pendências confirmadas e possíveis. Se não encontrar nenhuma, chame com array vazio.`;
 
