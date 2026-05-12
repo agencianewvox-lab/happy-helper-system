@@ -69,32 +69,40 @@ Deno.serve(async (req) => {
     const gestorPhone = profile?.telefone;
     const clientDisplayName = client_name || grupo.nome;
 
-    // Build the notification message
-    const message = `🆕 *Novo Onboarding Preenchido!*
+    // Build the notification message for the GROUP
+    const groupMessage = `🆕 *Onboarding Preenchido!*
 
-O cliente *${clientDisplayName}* acabou de preencher o formulário de onboarding.
+O formulário de onboarding para *${clientDisplayName}* foi preenchido com sucesso.
 
-📋 *Próximo passo:* Agendar a call de onboarding com o cliente o mais rápido possível.
+🚀 *Próximo passo:* Time, vamos agendar a call de alinhamento o quanto antes!`;
 
-👉 Acesse o painel para ver as respostas completas e agende a reunião!`;
+    // Send WhatsApp message to the GROUP instead of gestor personal phone
+    try {
+      const groupUrl = new URL(WEBHOOK_URL);
+      groupUrl.searchParams.set("phone", group_id);
+      groupUrl.searchParams.set("message", groupMessage);
+      
+      const response = await fetch(groupUrl.toString(), { method: "GET" });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`N8N error sending to group (${response.status}):`, errorText);
+      } else {
+        console.log(`Onboarding notification sent to group: ${group_id}`);
+      }
+    } catch (groupErr) {
+      console.error("Failed to send group notification:", groupErr);
+    }
 
-    // Send WhatsApp message to the gestor's phone if available
+    // Optional: Also notify gestor privately if preferred, but primary is the group now
     if (gestorPhone) {
       try {
-        const phoneUrl = new URL(WEBHOOK_URL);
-        // Using common parameter names to be safe, though N8N node 'Grupo' suggests it might expect specific fields
-        phoneUrl.searchParams.set("phone", gestorPhone);
-        phoneUrl.searchParams.set("message", message);
-        
-        const response = await fetch(phoneUrl.toString(), { method: "GET" });
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`N8N error (${response.status}):`, errorText);
-        } else {
-          console.log(`Notification sent to gestor ${gestorName} (${gestorPhone})`);
-        }
-      } catch (phoneErr) {
-        console.error("Failed to send phone notification:", phoneErr);
+        const gestorMessage = `🆕 *Novo Onboarding Preenchido!* (Privado)\n\nO cliente *${clientDisplayName}* preencheu o formulário. Acabei de avisar no grupo do cliente também.`;
+        const gestorUrl = new URL(WEBHOOK_URL);
+        gestorUrl.searchParams.set("phone", gestorPhone);
+        gestorUrl.searchParams.set("message", gestorMessage);
+        await fetch(gestorUrl.toString(), { method: "GET" });
+      } catch (e) {
+        console.error("Failed to send private notification to gestor:", e);
       }
     }
 
