@@ -24,22 +24,32 @@ export function AddClientDialog() {
   });
 
   const handleSave = async () => {
-    if (!form.nome.trim() || !form.group_id.trim()) {
-      toast.error("Nome e Group ID são obrigatórios");
+    if (!form.nome.trim()) {
+      toast.error("Nome do grupo é obrigatório");
       return;
     }
+    
     setSaving(true);
+    
+    // If no Group ID is provided, create a placeholder based on the name
+    const finalGroupId = form.group_id.trim() || 
+      `placeholder-${form.nome.trim().toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
+
     const { error } = await supabase.from("whatsapp_grupos").insert({
       nome: form.nome.trim(),
-      group_id: form.group_id.trim(),
+      group_id: finalGroupId,
       categoria: form.categoria || null,
       gestor_responsavel: form.gestor_responsavel || null,
     } as any);
+    
     setSaving(false);
+    
     if (error) {
       toast.error("Erro ao adicionar cliente: " + error.message);
     } else {
-      toast.success("Cliente adicionado com sucesso!");
+      toast.success(form.group_id.trim() 
+        ? "Cliente adicionado com sucesso!" 
+        : "Cliente adicionado! O ID será vinculado automaticamente na primeira mensagem.");
       setForm({ nome: "", group_id: "", categoria: "", gestor_responsavel: "" });
       setOpen(false);
     }
