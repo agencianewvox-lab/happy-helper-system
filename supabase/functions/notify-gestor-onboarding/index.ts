@@ -82,10 +82,17 @@ O cliente *${clientDisplayName}* acabou de preencher o formulário de onboarding
     if (gestorPhone) {
       try {
         const phoneUrl = new URL(WEBHOOK_URL);
+        // Using common parameter names to be safe, though N8N node 'Grupo' suggests it might expect specific fields
         phoneUrl.searchParams.set("phone", gestorPhone);
         phoneUrl.searchParams.set("message", message);
-        await fetch(phoneUrl.toString(), { method: "GET" });
-        console.log(`Notification sent to gestor ${gestorName} (${gestorPhone})`);
+        
+        const response = await fetch(phoneUrl.toString(), { method: "GET" });
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`N8N error (${response.status}):`, errorText);
+        } else {
+          console.log(`Notification sent to gestor ${gestorName} (${gestorPhone})`);
+        }
       } catch (phoneErr) {
         console.error("Failed to send phone notification:", phoneErr);
       }
