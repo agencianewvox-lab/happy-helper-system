@@ -77,12 +77,15 @@ export function AddClientDialog() {
             />
           </div>
           <div>
-            <Label>Group ID (WhatsApp) *</Label>
+            <Label>Group ID (WhatsApp)</Label>
             <Input
-              placeholder="Ex: 120363012345678@g.us"
+              placeholder="Opcional - será identificado pelo nome se vazio"
               value={form.group_id}
               onChange={(e) => setForm({ ...form, group_id: e.target.value })}
             />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Deixe em branco para vincular automaticamente pela primeira mensagem do grupo.
+            </p>
           </div>
           <div>
             <Label>Categoria</Label>
