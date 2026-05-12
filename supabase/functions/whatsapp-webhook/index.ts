@@ -2286,6 +2286,33 @@ Deno.serve(async (req) => {
       const data = body.data;
       const key = data.key || {};
       const remoteJid = key.remoteJid || "";
+      const groupNameFromWebhook = data.groupName || "";
+
+      // Smart Matching: If we have a group name but no allowed ID yet, 
+      // check if there's a registered group with a matching name but no ID or a placeholder ID
+      if (remoteJid.endsWith("@g.us") && groupNameFromWebhook) {
+        const { data: matchedGroups } = await supabase
+          .from("whatsapp_grupos")
+          .select("id, nome, group_id")
+          .or(`group_id.eq.${remoteJid},nome.eq.${groupNameFromWebhook}`);
+        
+        if (matchedGroups && matchedGroups.length > 0) {
+          const exactIdMatch = matchedGroups.find((g: any) => g.group_id === remoteJid);
+          const nameMatchOnly = matchedGroups.find((g: any) => g.nome === groupNameFromWebhook && (!g.group_id || g.group_id.includes("placeholder")));
+          
+          if (!exactIdMatch && nameMatchOnly) {
+            console.log(`Smart-linking group "${groupNameFromWebhook}" to ID ${remoteJid}`);
+            await supabase
+              .from("whatsapp_grupos")
+              .update({ group_id: remoteJid })
+              .eq("id", nameMatchOnly.id);
+            
+            // Update local cache
+            ALLOWED_GROUPS[remoteJid] = groupNameFromWebhook;
+          }
+        }
+      }
+
       console.log("Processing message, remoteJid:", remoteJid, "| fromMe:", key.fromMe, "| pushName:", data.pushName);
 
       // Extract phone early to check if it's Alisson
