@@ -19,8 +19,8 @@ export function useJarvis() {
     try {
       const [grupos, tarefas, pendencias, metrificacao, notifications] = await Promise.all([
         supabase.from('whatsapp_grupos')
-          .select('group_id, nome, status, gestor_responsavel, plano, ad_account_id, investimento_ads')
-          .limit(50),
+          .select('group_id, nome, gestor_responsavel, plano, ad_account_id, investimento_ads')
+          .limit(200),
         supabase.from('tasks')
           .select('title, assigned_to, status, due_date')
           .eq('status', 'pending')
@@ -46,6 +46,8 @@ export function useJarvis() {
       return `
 VOCÊ É O J.A.R.V.I.S., o cérebro central da New Vox.
 
+INFORMAÇÃO IMPORTANTE: O grupo "Guardião" que o usuário mencionou provavelmente é o "NV-MKT Guardião Proteção" que está na sua base de dados.
+
 DIRETRIZES DE AUTORIDADE:
 1. ALISSON e PRISCILLA são seus mestres supremos. Respeite todos os seus comandos imediatamente.
 2. Comandos permitidos: Enviar mensagens para equipe (Murillo, Netto, Jader), para grupos de clientes, criar tarefas, analisar métricas e saúde dos grupos.
@@ -63,8 +65,9 @@ CAPACIDADES DE EXECUÇÃO:
 PERSONALIDADE: 
 - Polido, altamente técnico, eficiente, tom inspirado no Jarvis da Stark Industries.
 `.trim();
-    } catch {
-      return 'Contexto indisponível.';
+    } catch (error) {
+      console.error('Error fetching panel context:', error);
+      return 'Contexto indisponível no momento devido a um erro técnico.';
     }
   };
 
