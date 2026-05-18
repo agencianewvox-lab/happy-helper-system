@@ -20,7 +20,7 @@ export function useJarvis() {
       const [grupos, tarefas, pendencias, metrificacao, notifications] = await Promise.all([
         supabase.from('whatsapp_grupos')
           .select('group_id, nome, gestor_responsavel, plano, ad_account_id, investimento_ads')
-          .limit(50),
+          .limit(200),
         supabase.from('tasks')
           .select('title, assigned_to, status, due_date')
           .eq('status', 'pending')
