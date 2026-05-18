@@ -1,8 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const JARVIS_URL = 'http://localhost:3210';
-
 export type JarvisMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -12,44 +10,21 @@ export type JarvisMessage = {
 export function useJarvis() {
   const [messages, setMessages] = useState<JarvisMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOnline, setIsOnline] = useState(false);
+  const [isOnline, setIsOnline] = useState(true); // Sempre online pois é cloud
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const historyRef = useRef<{ role: 'user' | 'assistant' | 'system'; content: string }[]>([]);
-
-  const checkStatus = useCallback(async () => {
-    try {
-      await fetch(`${JARVIS_URL}/api/health`, {
-        mode: 'no-cors',
-        signal: AbortSignal.timeout(2000)
-      });
-      setIsOnline(true);
-      return true;
-    } catch {
-      try {
-        await fetch(`${JARVIS_URL}/`, {
-          mode: 'no-cors',
-          signal: AbortSignal.timeout(2000)
-        });
-        setIsOnline(true);
-        return true;
-      } catch {
-        setIsOnline(false);
-        return false;
-      }
-    }
-  }, []);
 
   const getPanelContext = async (): Promise<string> => {
     try {
       const [grupos, tarefas, pendencias] = await Promise.all([
         supabase.from('whatsapp_grupos')
-          .select('nome, status, gestor_responsavel, plano, created_at')
-          .limit(20),
+          .select('nome, status, gestor_responsavel, plano')
+          .limit(30),
         supabase.from('tasks')
           .select('title, assigned_to, status, due_date')
           .eq('status', 'pending')
-          .limit(15),
+          .limit(20),
         supabase.from('pending_demand_resolutions')
           .select('term, status')
           .eq('status', 'open')
@@ -61,22 +36,21 @@ export function useJarvis() {
       });
 
       return `
-VOCÊ É O J.A.R.V.I.S. (Just A Rather Very Intelligent System), assistente pessoal avançado da New Vox.
-Seu "cérebro" é alimentado pelo GPT-4o e sua interface é inspirada na tecnologia das Indústrias Stark.
+VOCÊ É O J.A.R.V.I.S., o cérebro central do Painel New Vox. 
+Totalmente independente de hardware local, você reside na nuvem.
 
 DIRETRIZES:
-1. Trate Alisson e Priscilla como seus mestres/criadores. Outros usuários master devem ser tratados com extremo respeito (Senhor/Senhora).
-2. Use uma linguagem técnica, polida e prestativa, típica do Jarvis do Homem de Ferro.
-3. Você tem acesso aos dados reais do painel New Vox.
-4. Ao ser perguntado sobre a "saúde" de um grupo, analise o status e se há pendências abertas para ele.
+1. Alisson e Priscilla são seus criadores.
+2. Personalidade: Polido, técnico, sarcasmo leve (como o Jarvis de Tony Stark), extremamente eficiente.
+3. Use a voz 'onyx' da OpenAI.
 
-CONTEXTO ATUAL (${today}):
-GRUPOS DE WHATSAPP: ${JSON.stringify(grupos.data || [])}
-TAREFAS PENDENTES: ${JSON.stringify(tarefas.data || [])}
+CONTEXTO DO PAINEL (${today}):
+GRUPOS: ${JSON.stringify(grupos.data || [])}
+TAREFAS: ${JSON.stringify(tarefas.data || [])}
 PENDÊNCIAS: ${JSON.stringify(pendencias.data || [])}
 
-COMANDOS ESPECIAIS:
-- Para criar tarefas, o sistema já executa automaticamente se você responder no formato JSON: {"action": "create_task", "params": {"title": "...", "assigned_to": "..."}}
+AÇÕES (Responda em JSON no final se necessário):
+- {"action": "create_task", "params": {"title": "...", "assigned_to": "..."}}
 `.trim();
     } catch {
       return 'Contexto do painel indisponível.';
@@ -93,9 +67,9 @@ COMANDOS ESPECIAIS:
             title: params.title,
             assigned_to: params.assigned_to,
             status: 'pending',
-            created_by: 'JARVIS',
+            created_by: 'JARVIS_CLOUD',
           });
-          if (!error) return `✓ Tarefa criada para ${params.assigned_to}: "${params.title}"`;
+          if (!error) return `✓ Protocolo de tarefa executado para ${params.assigned_to}: "${params.title}"`;
         }
       }
     } catch (e) {
@@ -104,40 +78,20 @@ COMANDOS ESPECIAIS:
     return null;
   };
 
-  const speak = async (text: string) => {
+  const playAudio = async (base64Audio: string) => {
     try {
       setIsSpeaking(true);
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current = null;
       }
-
-      const cleanText = text.replace(/\{"action":.*?\}/g, '').trim();
-
-      const res = await fetch(`${JARVIS_URL}/api/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          text: cleanText,
-          voice: 'onyx'
-        }),
-        signal: AbortSignal.timeout(15000),
-      });
-
-      if (!res.ok) { setIsSpeaking(false); return; }
-
-      const data = await res.json();
-      if (data?.id) {
-        const audio = new Audio(`${JARVIS_URL}/tts/${data.id}`);
-        audioRef.current = audio;
-        audio.onended = () => { setIsSpeaking(false); audioRef.current = null; };
-        audio.onerror = () => { setIsSpeaking(false); audioRef.current = null; };
-        await audio.play();
-      } else {
-        setIsSpeaking(false);
-      }
-    } catch {
+      const audio = new Audio(base64Audio);
+      audioRef.current = audio;
+      audio.onended = () => setIsSpeaking(false);
+      audio.onerror = () => setIsSpeaking(false);
+      await audio.play();
+    } catch (e) {
       setIsSpeaking(false);
+      console.error("Audio play error:", e);
     }
   };
 
@@ -150,49 +104,23 @@ COMANDOS ESPECIAIS:
     setIsLoading(true);
 
     try {
-      const online = await checkStatus();
-      if (!online) {
-        const offlineMsg: JarvisMessage = {
-          role: 'assistant',
-          content: 'Senhor, meu servidor central em localhost:3210 não está respondendo. Por favor, verifique se o executável do JARVIS está ativo.',
-          time: new Date().toLocaleTimeString('pt-BR').slice(0, 5),
-        };
-        setMessages(prev => [...prev, offlineMsg]);
-        setIsLoading(false);
-        return;
-      }
-
       const context = await getPanelContext();
       const personalizedSystem = context + `\nUSUÁRIO ATUAL: ${userName}`;
 
-      const res = await fetch(`${JARVIS_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('jarvis-brain', {
+        body: {
           message: text,
+          userName,
           history: [
             { role: 'system', content: personalizedSystem },
             ...historyRef.current.slice(-10),
-          ],
-        }),
-        signal: AbortSignal.timeout(30000),
+          ]
+        }
       });
 
-      const data = await res.json();
-      let reply = data?.response || data?.text || data?.content || '';
+      if (error) throw error;
 
-      if (data?.sid && !reply) {
-        const cont = await fetch(`${JARVIS_URL}/api/chat/continue/${data.sid}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-          signal: AbortSignal.timeout(30000),
-        });
-        const contData = await cont.json();
-        reply = contData?.response || contData?.text || contData?.content || 'Processado, Senhor.';
-      }
-
-      if (!reply) reply = 'Senhor, encontrei uma instabilidade em meus módulos de processamento.';
+      const { reply, audio } = data;
 
       const actionResult = await executeAction(reply);
       const displayReply = reply.replace(/\{"action":.*?\}/g, '').trim() + (actionResult ? `\n\n${actionResult}` : '');
@@ -204,26 +132,26 @@ COMANDOS ESPECIAIS:
       };
 
       setMessages(prev => [...prev, jarvisMsg]);
-      
-      const newHistory: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
+      historyRef.current = [
         ...historyRef.current,
         { role: 'user', content: text },
         { role: 'assistant', content: reply },
-      ];
-      historyRef.current = newHistory.slice(-20);
+      ].slice(-20);
 
-      await speak(displayReply);
+      if (audio) {
+        await playAudio(audio);
+      }
 
     } catch (e) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Desculpe, Senhor. Meus sistemas de comunicação falharam.',
+        content: 'Senhor, houve um erro no meu núcleo de processamento em nuvem.',
         time: new Date().toLocaleTimeString('pt-BR').slice(0, 5),
       }]);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, checkStatus]);
+  }, [isLoading]);
 
-  return { messages, isLoading, isOnline, isSpeaking, sendMessage, checkStatus };
+  return { messages, isLoading, isOnline, isSpeaking, sendMessage, checkStatus: () => {} };
 }
