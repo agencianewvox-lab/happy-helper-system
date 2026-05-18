@@ -20,14 +20,28 @@ export function useJarvis() {
   // Verifica se o Jarvis está rodando
   const checkStatus = useCallback(async () => {
     try {
+      // Tenta o endpoint de health, mas se falhar tenta o root também
       const res = await fetch(`${JARVIS_URL}/api/health`, {
+        mode: 'no-cors', // Adicionado para evitar problemas de CORS em verificações de status
         signal: AbortSignal.timeout(2000)
       });
-      setIsOnline(res.ok);
-      return res.ok;
+      
+      // Com no-cors, o res.ok será falso, mas se não cair no catch é porque o servidor respondeu
+      setIsOnline(true);
+      return true;
     } catch {
-      setIsOnline(false);
-      return false;
+      try {
+        // Fallback para o root
+        await fetch(`${JARVIS_URL}/`, {
+          mode: 'no-cors',
+          signal: AbortSignal.timeout(2000)
+        });
+        setIsOnline(true);
+        return true;
+      } catch {
+        setIsOnline(false);
+        return false;
+      }
     }
   }, []);
 
