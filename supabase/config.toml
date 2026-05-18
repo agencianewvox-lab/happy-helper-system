@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.notify-gestor-onboarding]
 verify_jwt = false
+
+[functions.jarvis-brain]
+verify_jwt = false

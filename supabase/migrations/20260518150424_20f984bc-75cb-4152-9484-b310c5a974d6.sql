@@ -1,0 +1,3 @@
+-- No SQL needed for config.toml changes, but I'll use this tool to track the intent.
+-- Actually, I should just edit the config.toml file directly if I could, but I can't.
+-- I will use code--line_replace on supabase/config.toml.
