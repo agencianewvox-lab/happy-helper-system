@@ -39,11 +39,11 @@ export function useJarvis() {
           .select('nome, status, gestor_responsavel, plano')
           .limit(15),
         supabase.from('tasks')
-          .select('title, responsible, status, due_date')
+          .select('title, assigned_to, status, due_date')
           .eq('status', 'pending')
           .limit(10),
         supabase.from('pending_demand_resolutions')
-          .select('description, responsible_name, status')
+          .select('term, status')
           .eq('status', 'open')
           .limit(10),
       ]);
@@ -86,7 +86,7 @@ Você é o assistente master da New Vox. Trate o usuário como Senhor/Senhora.
       const titulo = taskMatch[2].trim();
       const { error } = await supabase.from('tasks').insert({
         title: titulo,
-        responsible: responsavel,
+        assigned_to: responsavel,
         status: 'pending',
         created_by: 'JARVIS',
       });
