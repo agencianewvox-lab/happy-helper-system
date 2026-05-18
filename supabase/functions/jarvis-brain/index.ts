@@ -23,9 +23,11 @@ serve(async (req) => {
 
   try {
     const { message, history, userName } = await req.json()
+    console.log(`Recebendo comando de ${userName}: ${message}`);
+    
     const openAiKey = Deno.env.get('openai')
-
     if (!openAiKey) {
+      console.error('Chave OpenAI não configurada');
       throw new Error('Chave OpenAI não configurada')
     }
 
