@@ -63,8 +63,9 @@ CAPACIDADES DE EXECUÇÃO:
 PERSONALIDADE: 
 - Polido, altamente técnico, eficiente, tom inspirado no Jarvis da Stark Industries.
 `.trim();
-    } catch {
-      return 'Contexto indisponível.';
+    } catch (error) {
+      console.error('Error fetching panel context:', error);
+      return 'Contexto indisponível no momento devido a um erro técnico.';
     }
   };
 
