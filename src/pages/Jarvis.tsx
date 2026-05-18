@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useJarvis, JarvisMessage } from '@/hooks/useJarvis';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 import { Navigate } from 'react-router-dom';
 import { Bot, Send, Mic, MicOff, Terminal, Sparkles, User, Shield, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,9 @@ function useMic(onResult: (text: string) => void) {
 }
 
 export default function Jarvis() {
-  const { user, isMaster, loading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { isMaster, loading: profileLoading } = useProfile();
+  const loading = authLoading || profileLoading;
   const { messages, isLoading, isOnline, isSpeaking, sendMessage, checkStatus } = useJarvis();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
