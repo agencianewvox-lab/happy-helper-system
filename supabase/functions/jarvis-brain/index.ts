@@ -115,9 +115,10 @@ serve(async (req) => {
         try {
           if (toolCall.function.name === "send_whatsapp_message") {
             const args = JSON.parse(toolCall.function.arguments)
-            const webhookUrl = args.recipient_name.toLowerCase() === "alisson" 
+            const recipient = args.recipient_name.toLowerCase();
+            const webhookUrl = recipient === "alisson" 
               ? ALISSON_WEBHOOK_URL 
-              : TEAM_WEBHOOK_MAP[args.recipient_name];
+              : TEAM_WEBHOOK_MAP[recipient];
 
             if (webhookUrl) {
               await fetch(webhookUrl, {
