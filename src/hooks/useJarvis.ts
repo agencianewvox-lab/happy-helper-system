@@ -112,7 +112,6 @@ COMANDOS ESPECIAIS:
         audioRef.current = null;
       }
 
-      // Limpa o texto de marcações JSON para a voz não ler o código
       const cleanText = text.replace(/\{"action":.*?\}/g, '').trim();
 
       const res = await fetch(`${JARVIS_URL}/api/tts`, {
@@ -120,7 +119,7 @@ COMANDOS ESPECIAIS:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           text: cleanText,
-          voice: 'onyx' // Voz mais imponente e humana da OpenAI (se suportado pelo backend local)
+          voice: 'onyx'
         }),
         signal: AbortSignal.timeout(15000),
       });
@@ -195,7 +194,6 @@ COMANDOS ESPECIAIS:
 
       if (!reply) reply = 'Senhor, encontrei uma instabilidade em meus módulos de processamento.';
 
-      // Executa ações se o Jarvis decidiu criar algo
       const actionResult = await executeAction(reply);
       const displayReply = reply.replace(/\{"action":.*?\}/g, '').trim() + (actionResult ? `\n\n${actionResult}` : '');
 
@@ -206,11 +204,13 @@ COMANDOS ESPECIAIS:
       };
 
       setMessages(prev => [...prev, jarvisMsg]);
-      historyRef.current = [
+      
+      const newHistory: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
         ...historyRef.current,
         { role: 'user', content: text },
         { role: 'assistant', content: reply },
-      ].slice(-20);
+      ];
+      historyRef.current = newHistory.slice(-20);
 
       await speak(displayReply);
 
