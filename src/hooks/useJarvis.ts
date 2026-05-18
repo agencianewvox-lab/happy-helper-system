@@ -38,13 +38,13 @@ export function useJarvis() {
         supabase.from('whatsapp_grupos')
           .select('nome, status, gestor_responsavel, plano')
           .limit(15),
-        supabase.from('tarefas')
-          .select('titulo, responsavel, status, data_vencimento')
-          .eq('status', 'pendente')
+        supabase.from('tasks')
+          .select('title, responsible, status, due_date')
+          .eq('status', 'pending')
           .limit(10),
-        supabase.from('pendencias')
-          .select('descricao, responsavel, status')
-          .eq('status', 'aberta')
+        supabase.from('pending_demand_resolutions')
+          .select('description, responsible_name, status')
+          .eq('status', 'open')
           .limit(10),
       ]);
 
@@ -84,11 +84,11 @@ Você é o assistente master da New Vox. Trate o usuário como Senhor/Senhora.
     if (taskMatch) {
       const responsavel = taskMatch[1];
       const titulo = taskMatch[2].trim();
-      const { error } = await supabase.from('tarefas').insert({
-        titulo,
-        responsavel,
-        status: 'pendente',
-        criado_por: 'JARVIS',
+      const { error } = await supabase.from('tasks').insert({
+        title: titulo,
+        responsible: responsavel,
+        status: 'pending',
+        created_by: 'JARVIS',
       });
       if (!error) return `✓ Tarefa criada para ${responsavel}: "${titulo}"`;
     }
