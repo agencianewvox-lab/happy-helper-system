@@ -132,6 +132,7 @@ PERSONALIDADE:
       }
 
     } catch (e) {
+      console.error('Error calling jarvis-brain:', e);
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Senhor, perdi a conexão com meu núcleo neural na nuvem.',
