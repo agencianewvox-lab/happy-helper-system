@@ -10,25 +10,33 @@ export type JarvisMessage = {
 export function useJarvis() {
   const [messages, setMessages] = useState<JarvisMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOnline] = useState(true); // Cloud is always considered online
+  const [isOnline] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const historyRef = useRef<{ role: 'user' | 'assistant' | 'system'; content: string }[]>([]);
 
   const getPanelContext = async (): Promise<string> => {
     try {
-      const [grupos, tarefas, pendencias] = await Promise.all([
+      const [grupos, tarefas, pendencias, metrificacao, notifications] = await Promise.all([
         supabase.from('whatsapp_grupos')
-          .select('nome, status, gestor_responsavel, plano')
-          .limit(30),
+          .select('group_id, nome, status, gestor_responsavel, plano, ad_account_id, investimento_ads')
+          .limit(50),
         supabase.from('tasks')
           .select('title, assigned_to, status, due_date')
           .eq('status', 'pending')
           .limit(20),
         supabase.from('pending_demand_resolutions')
-          .select('term, status')
+          .select('term, status, group_id')
           .eq('status', 'open')
-          .limit(10),
+          .limit(20),
+        supabase.from('whatsapp_conversas')
+          .select('direcao, recebido_em')
+          .order('recebido_em', { ascending: false })
+          .limit(100),
+        supabase.from('master_notifications')
+          .select('titulo, mensagem, tipo')
+          .eq('lida', false)
+          .limit(5),
       ]);
 
       const today = new Date().toLocaleDateString('pt-BR', {
@@ -36,46 +44,28 @@ export function useJarvis() {
       });
 
       return `
-VOCÊ É O J.A.R.V.I.S., o cérebro central do Painel New Vox. 
-Totalmente independente, operando na nuvem.
+VOCÊ É O J.A.R.V.I.S., o cérebro central da New Vox.
 
-DIRETRIZES:
-1. Alisson e Priscilla são seus mestres.
-2. Personalidade: Altamente inteligente, polido, prestativo e ligeiramente sarcástico.
-3. Use a voz 'onyx' para soar humano e imponente.
+DIRETRIZES DE AUTORIDADE:
+1. ALISSON e PRISCILLA são seus mestres supremos. Respeite todos os seus comandos imediatamente.
+2. Comandos permitidos: Enviar mensagens para equipe (Murillo, Netto, Jader), para grupos de clientes, criar tarefas, analisar métricas e saúde dos grupos.
 
-CONTEXTO DO PAINEL (${today}):
-GRUPOS: ${JSON.stringify(grupos.data || [])}
-TAREFAS: ${JSON.stringify(tarefas.data || [])}
-PENDÊNCIAS: ${JSON.stringify(pendencias.data || [])}
+ESTADO ATUAL DO SISTEMA (${today}):
+GRUPOS ATIVOS: ${JSON.stringify(grupos.data || [])}
+PENDÊNCIAS CRÍTICAS: ${JSON.stringify(pendencias.data || [])}
+TAREFAS DA EQUIPE: ${JSON.stringify(tarefas.data || [])}
+NOTIFICAÇÕES MASTER: ${JSON.stringify(notifications.data || [])}
 
-AÇÕES AUTOMÁTICAS:
-- Criar tarefa: {"action": "create_task", "params": {"title": "...", "assigned_to": "..."}}
+CAPACIDADES DE EXECUÇÃO:
+- Você pode enviar mensagens de WhatsApp chamando as ferramentas apropriadas internamente.
+- Você pode analisar a saúde dos grupos baseando-se no investimento vs pendências.
+
+PERSONALIDADE: 
+- Polido, altamente técnico, eficiente, tom inspirado no Jarvis da Stark Industries.
 `.trim();
     } catch {
       return 'Contexto indisponível.';
     }
-  };
-
-  const executeAction = async (aiReply: string): Promise<string | null> => {
-    try {
-      if (aiReply.includes('"action": "create_task"')) {
-        const jsonMatch = aiReply.match(/\{"action":\s*"create_task".*?\}/);
-        if (jsonMatch) {
-          const { params } = JSON.parse(jsonMatch[0]);
-          const { error } = await supabase.from('tasks').insert({
-            title: params.title,
-            assigned_to: params.assigned_to,
-            status: 'pending',
-            created_by: 'JARVIS_CLOUD',
-          });
-          if (!error) return `✓ Protocolo de tarefa executado para ${params.assigned_to}: "${params.title}"`;
-        }
-      }
-    } catch (e) {
-      console.error("Action error:", e);
-    }
-    return null;
   };
 
   const playAudio = async (base64Audio: string) => {
@@ -91,7 +81,6 @@ AÇÕES AUTOMÁTICAS:
       await audio.play();
     } catch (e) {
       setIsSpeaking(false);
-      console.error("Audio error:", e);
     }
   };
 
@@ -105,7 +94,7 @@ AÇÕES AUTOMÁTICAS:
 
     try {
       const context = await getPanelContext();
-      const personalizedSystem = context + `\nUSUÁRIO ATUAL: ${userName}`;
+      const personalizedSystem = context + `\nUSUÁRIO COM AUTORIDADE ATUAL: ${userName}`;
 
       const { data, error } = await supabase.functions.invoke('jarvis-brain', {
         body: {
@@ -123,12 +112,9 @@ AÇÕES AUTOMÁTICAS:
       const reply = data.reply;
       const audio = data.audio;
 
-      const actionResult = await executeAction(reply);
-      const displayReply = reply.replace(/\{"action":.*?\}/g, '').trim() + (actionResult ? `\n\n${actionResult}` : '');
-
       const jarvisMsg: JarvisMessage = {
         role: 'assistant',
-        content: displayReply,
+        content: reply,
         time: new Date().toLocaleTimeString('pt-BR').slice(0, 5),
       };
 
