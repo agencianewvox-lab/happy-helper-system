@@ -24,6 +24,7 @@ const navItems = [
   { title: "Início", url: "/", icon: Home, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Performance", url: "/performance", icon: BarChart3, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Chat IA", url: "/chat", icon: Brain, adminOnly: false, masterOnly: false, badgeKey: null },
+  { title: "JARVIS", url: "/jarvis", icon: Bot, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
   { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false, masterOnly: false, badgeKey: "agenda" as const },
   { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false, masterOnly: false, badgeKey: "pendencias" as const },
@@ -76,11 +77,18 @@ export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: Dashb
                       tooltip={item.title}
                       className={cn(
                         "transition-colors cursor-pointer relative",
-                        isActive && "bg-primary/10 text-primary font-medium"
+                        isActive && (item.title === "JARVIS" 
+                          ? "bg-cyan-500/10 text-cyan-500 font-medium" 
+                          : "bg-primary/10 text-primary font-medium")
                       )}
                     >
                       <div className="relative">
-                        <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
+                        <item.icon className={cn(
+                          "h-5 w-5", 
+                          isActive 
+                            ? (item.title === "JARVIS" ? "text-cyan-500" : "text-primary") 
+                            : "text-muted-foreground"
+                        )} />
                         {badgeCount > 0 && (
                           <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground px-0.5 animate-pulse">
                             {badgeCount > 99 ? "99+" : badgeCount}

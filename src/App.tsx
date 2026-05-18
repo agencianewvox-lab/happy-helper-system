@@ -16,6 +16,7 @@ import PesquisaNps from "./pages/PesquisaNps";
 import OnboardingClinica from "./pages/OnboardingClinica";
 import PainelAdmin from "./pages/PainelAdmin";
 import Configuracoes from "./pages/Configuracoes";
+import Jarvis from "./pages/Jarvis";
 
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -70,6 +71,7 @@ const App = () => (
           
           <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+          <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
           <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
           <Route path="/onboardingnv/:groupId/:surveyType?" element={<OnboardingClinica />} />
           <Route path="*" element={<NotFound />} />
