@@ -114,7 +114,7 @@ export default function Jarvis() {
                 <div className="flex items-center gap-2 mt-1">
                   <Activity className={cn("w-3 h-3", isOnline ? "text-cyan-400 animate-pulse" : "text-red-500")} />
                   <span className="text-[10px] text-cyan-500/60 uppercase tracking-widest font-bold">
-                    {isOnline ? 'Sistemas Operacionais: Online' : 'Alerta: Núcleo Desconectado'}
+                    {isOnline ? 'Núcleo Neural: Conectado' : 'Alerta: Núcleo Desconectado'}
                   </span>
                 </div>
               </div>
