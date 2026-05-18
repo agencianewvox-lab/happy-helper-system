@@ -125,6 +125,7 @@ serve(async (req) => {
 
     // 2. OpenAI TTS
     const cleanSpeech = reply.replace(/\{"action":.*?\}/g, '').trim()
+    console.log('Gerando áudio TTS...');
     
     const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
