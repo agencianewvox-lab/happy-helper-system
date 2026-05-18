@@ -10,7 +10,7 @@ export type JarvisMessage = {
 export function useJarvis() {
   const [messages, setMessages] = useState<JarvisMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOnline, setIsOnline] = useState(true); // Sempre online pois é cloud
+  const [isOnline] = useState(true); // Cloud is always considered online
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const historyRef = useRef<{ role: 'user' | 'assistant' | 'system'; content: string }[]>([]);
@@ -37,23 +37,23 @@ export function useJarvis() {
 
       return `
 VOCÊ É O J.A.R.V.I.S., o cérebro central do Painel New Vox. 
-Totalmente independente de hardware local, você reside na nuvem.
+Totalmente independente, operando na nuvem.
 
 DIRETRIZES:
-1. Alisson e Priscilla são seus criadores.
-2. Personalidade: Polido, técnico, sarcasmo leve (como o Jarvis de Tony Stark), extremamente eficiente.
-3. Use a voz 'onyx' da OpenAI.
+1. Alisson e Priscilla são seus mestres.
+2. Personalidade: Altamente inteligente, polido, prestativo e ligeiramente sarcástico.
+3. Use a voz 'onyx' para soar humano e imponente.
 
 CONTEXTO DO PAINEL (${today}):
 GRUPOS: ${JSON.stringify(grupos.data || [])}
 TAREFAS: ${JSON.stringify(tarefas.data || [])}
 PENDÊNCIAS: ${JSON.stringify(pendencias.data || [])}
 
-AÇÕES (Responda em JSON no final se necessário):
-- {"action": "create_task", "params": {"title": "...", "assigned_to": "..."}}
+AÇÕES AUTOMÁTICAS:
+- Criar tarefa: {"action": "create_task", "params": {"title": "...", "assigned_to": "..."}}
 `.trim();
     } catch {
-      return 'Contexto do painel indisponível.';
+      return 'Contexto indisponível.';
     }
   };
 
@@ -91,7 +91,7 @@ AÇÕES (Responda em JSON no final se necessário):
       await audio.play();
     } catch (e) {
       setIsSpeaking(false);
-      console.error("Audio play error:", e);
+      console.error("Audio error:", e);
     }
   };
 
@@ -120,7 +120,8 @@ AÇÕES (Responda em JSON no final se necessário):
 
       if (error) throw error;
 
-      const { reply, audio } = data;
+      const reply = data.reply;
+      const audio = data.audio;
 
       const actionResult = await executeAction(reply);
       const displayReply = reply.replace(/\{"action":.*?\}/g, '').trim() + (actionResult ? `\n\n${actionResult}` : '');
@@ -132,11 +133,13 @@ AÇÕES (Responda em JSON no final se necessário):
       };
 
       setMessages(prev => [...prev, jarvisMsg]);
-      historyRef.current = [
+      
+      const newHistory: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
         ...historyRef.current,
         { role: 'user', content: text },
         { role: 'assistant', content: reply },
-      ].slice(-20);
+      ];
+      historyRef.current = newHistory.slice(-20);
 
       if (audio) {
         await playAudio(audio);
@@ -145,7 +148,7 @@ AÇÕES (Responda em JSON no final se necessário):
     } catch (e) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Senhor, houve um erro no meu núcleo de processamento em nuvem.',
+        content: 'Senhor, perdi a conexão com meu núcleo neural na nuvem.',
         time: new Date().toLocaleTimeString('pt-BR').slice(0, 5),
       }]);
     } finally {
