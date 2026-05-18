@@ -24,15 +24,18 @@ serve(async (req) => {
   try {
     const { message, history, userName } = await req.json()
     console.log(`Recebendo comando de ${userName}: ${message}`);
-    
+
     const openAiKey = Deno.env.get('openai')
     if (!openAiKey) {
-      console.error('Chave OpenAI não configurada');
-      throw new Error('Chave OpenAI não configurada')
+      console.error('Erro: Chave OpenAI não encontrada no ambiente');
+      return new Response(
+        JSON.stringify({ error: 'Configuração ausente: Chave OpenAI não encontrada' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // 1. ChatGPT Chat Completion with Tool Calling
-    console.log('Chamando OpenAI Chat Completion...');
+    console.log('Chamando OpenAI...');
     const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -82,37 +85,62 @@ serve(async (req) => {
       }),
     })
 
+    if (!chatResponse.ok) {
+      const errorText = await chatResponse.text();
+      console.error('Erro OpenAI Chat:', errorText);
+      return new Response(
+        JSON.stringify({ error: `Erro na API da OpenAI: ${chatResponse.status}`, details: errorText }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const chatData = await chatResponse.json()
+    
+    if (!chatData.choices || chatData.choices.length === 0) {
+      console.error('Resposta inesperada da OpenAI:', JSON.stringify(chatData));
+      return new Response(
+        JSON.stringify({ error: 'Resposta inesperada da OpenAI' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     let reply = chatData.choices[0].message.content
     const toolCalls = chatData.choices[0].message.tool_calls
 
     const executedActions: string[] = []
 
     if (toolCalls) {
+      console.log(`Executando ${toolCalls.length} chamadas de ferramenta...`);
       for (const toolCall of toolCalls) {
-        if (toolCall.function.name === "send_whatsapp_message") {
-          const args = JSON.parse(toolCall.function.arguments)
-          const webhookUrl = args.recipient_name.toLowerCase() === "alisson" 
-            ? ALISSON_WEBHOOK_URL 
-            : TEAM_WEBHOOK_MAP[args.recipient_name];
+        try {
+          if (toolCall.function.name === "send_whatsapp_message") {
+            const args = JSON.parse(toolCall.function.arguments)
+            const webhookUrl = args.recipient_name.toLowerCase() === "alisson" 
+              ? ALISSON_WEBHOOK_URL 
+              : TEAM_WEBHOOK_MAP[args.recipient_name];
 
-          if (webhookUrl) {
-            await fetch(webhookUrl, {
+            if (webhookUrl) {
+              await fetch(webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: args.text }),
+              })
+              executedActions.push(`✓ Mensagem enviada para ${args.recipient_name} via WhatsApp.`)
+            } else {
+              executedActions.push(`✗ Destinatário ${args.recipient_name} não configurado.`)
+            }
+          } else if (toolCall.function.name === "send_group_message") {
+            const args = JSON.parse(toolCall.function.arguments)
+            await fetch(ALISSON_WEBHOOK_URL, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ message: args.text }),
+              body: JSON.stringify({ message: args.text, groupId: args.group_id }),
             })
-            executedActions.push(`✓ Mensagem enviada para ${args.recipient_name} via WhatsApp.`)
+            executedActions.push(`✓ Mensagem enviada para o grupo ${args.group_id}.`)
           }
-        } else if (toolCall.function.name === "send_group_message") {
-          const args = JSON.parse(toolCall.function.arguments)
-          // Usamos o webhook do Alisson que tem permissão para enviar em grupos
-          await fetch(ALISSON_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: args.text, groupId: args.group_id }),
-          })
-          executedActions.push(`✓ Mensagem enviada para o grupo ${args.group_id}.`)
+        } catch (toolError) {
+          console.error(`Erro ao executar ferramenta ${toolCall.function.name}:`, toolError);
+          executedActions.push(`✗ Erro ao executar ${toolCall.function.name}.`)
         }
       }
       
@@ -140,20 +168,32 @@ serve(async (req) => {
       }),
     })
 
-    const audioBlob = await ttsResponse.blob()
-    const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(await audioBlob.arrayBuffer())))
+    let audioBase64 = null;
+    if (ttsResponse.ok) {
+      const audioBlob = await ttsResponse.blob()
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < uint8Array.byteLength; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
+      }
+      audioBase64 = btoa(binary);
+      console.log('Áudio gerado com sucesso.');
+    } else {
+      console.error('Erro ao gerar áudio TTS:', await ttsResponse.text());
+    }
 
     return new Response(
       JSON.stringify({ 
         reply, 
-        audio: `data:audio/mp3;base64,${audioBase64}` 
+        audio: audioBase64 ? `data:audio/mp3;base64,${audioBase64}` : null
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Erro no Jarvis Brain:', error);
+    console.error('Erro fatal no Jarvis Brain:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, stack: error.stack }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
