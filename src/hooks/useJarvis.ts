@@ -131,10 +131,12 @@ PERSONALIDADE:
         await playAudio(audio);
       }
 
-    } catch (e) {
+    } catch (e: any) {
+      console.error('Error calling jarvis-brain:', e);
+      const errorMessage = e.message || 'Senhor, perdi a conexão com meu núcleo neural na nuvem.';
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Senhor, perdi a conexão com meu núcleo neural na nuvem.',
+        content: `Sistema em alerta. Erro técnico detectado: ${errorMessage}`,
         time: new Date().toLocaleTimeString('pt-BR').slice(0, 5),
       }]);
     } finally {

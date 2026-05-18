@@ -114,7 +114,7 @@ export default function Jarvis() {
                 <div className="flex items-center gap-2 mt-1">
                   <Activity className={cn("w-3 h-3", isOnline ? "text-cyan-400 animate-pulse" : "text-red-500")} />
                   <span className="text-[10px] text-cyan-500/60 uppercase tracking-widest font-bold">
-                    {isOnline ? 'Sistemas Operacionais: Online' : 'Alerta: Núcleo Desconectado'}
+                    {isOnline ? 'Núcleo Neural: Conectado' : 'Alerta: Núcleo Desconectado'}
                   </span>
                 </div>
               </div>
@@ -156,8 +156,8 @@ export default function Jarvis() {
                        </h3>
                        <p className="text-sm leading-relaxed text-cyan-100/90 font-medium italic">
                         {isOnline 
-                          ? `Bem-vindo de volta, ${userName}. Carregando todos os módulos de análise do Painel New Vox. Como posso auxiliá-lo nesta jornada hoje?`
-                          : `Sinto muito, ${userName}. Estou operando apenas em modo de emergência. Por favor, reinicie meu núcleo local em localhost:3210.`}
+                          ? `Bem-vindo de volta, ${userName}. Estou conectado ao núcleo neural na nuvem e pronto para processar seus comandos. Como posso auxiliá-lo hoje?`
+                          : `Sinto muito, ${userName}. Estou operando em modo offline. Verifique sua conexão com a nuvem.`}
                        </p>
                     </div>
                   </div>
