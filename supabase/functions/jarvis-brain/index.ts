@@ -32,6 +32,7 @@ serve(async (req) => {
     }
 
     // 1. ChatGPT Chat Completion with Tool Calling
+    console.log('Chamando OpenAI Chat Completion...');
     const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
