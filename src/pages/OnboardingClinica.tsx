@@ -46,14 +46,14 @@ const AGE_RANGES = ["18-25", "26-35", "36-45", "46-55", "56-65", "65+"];
 const GENDERS = ["Feminino", "Masculino", "Ambos igualmente"];
 const SOCIO_CLASSES = ["Classe A", "Classe B", "Classe C", "Classes D/E", "Misto"];
 
-const STEPS = [
-  { label: "Dados da Clínica", icon: "📋" },
-  { label: "Especialidades & Serviços", icon: "⚕️" },
-  { label: "Estrutura & Negócio", icon: "🏥" },
-  { label: "Público-Alvo", icon: "👥" },
-  { label: "Concorrência", icon: "🏆" },
-  { label: "Investimento", icon: "💰" },
-];
+  const getSteps = (clinica: boolean) => [
+    { label: clinica ? "Dados da Clínica" : "Dados da Empresa", icon: "📋" },
+    { label: clinica ? "Especialidades & Serviços" : "Produtos & Serviços", icon: "⚕️" },
+    { label: "Estrutura & Negócio", icon: "🏥" },
+    { label: "Público-Alvo", icon: "👥" },
+    { label: "Concorrência", icon: "🏆" },
+    { label: "Investimento", icon: "💰" },
+  ];
 
 function SelectableChip({ selected, label, onClick }: { selected: boolean; label: string; onClick: () => void }) {
   return (
@@ -106,7 +106,9 @@ function FormInput({ label, value, onChange, type = "text", placeholder = "" }: 
 }
 
 export default function OnboardingClinica() {
-  const { groupId } = useParams();
+  const { groupId, surveyType } = useParams();
+  const isClinica = surveyType === "clinica";
+  
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -135,8 +137,8 @@ export default function OnboardingClinica() {
     try {
       const { error } = await supabase.from("onboarding_responses" as any).insert({
         group_id: groupId,
-        survey_type: "clinica",
-        respondent_name: form.clinic_name || null,
+        survey_type: isClinica ? "clinica" : "generico",
+        respondent_name: isClinica ? (form.clinic_name || null) : (form.business_name || null),
         respondent_email: form.commercial_email || null,
         responses: form,
       } as any);
@@ -200,14 +202,25 @@ export default function OnboardingClinica() {
       case 0:
         return (
           <div className="space-y-4">
-            {[
-              { key: "clinic_name", label: "Nome da Clínica" },
-              { key: "cnpj", label: "CNPJ" },
-              { key: "responsible_name", label: "Nome do Responsável / Dentista Principal" },
-              { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
-            ].map(({ key, label, placeholder }: any) => (
-              <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} placeholder={placeholder} />
-            ))}
+            {isClinica ? (
+              [
+                { key: "clinic_name", label: "Nome da Clínica" },
+                { key: "cnpj", label: "CNPJ" },
+                { key: "responsible_name", label: "Nome do Responsável / Dentista Principal" },
+                { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
+              ].map(({ key, label, placeholder }: any) => (
+                <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} placeholder={placeholder} />
+              ))
+            ) : (
+              [
+                { key: "business_name", label: "Nome da Empresa" },
+                { key: "cnpj", label: "CNPJ" },
+                { key: "responsible_name", label: "Nome do Responsável" },
+                { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
+              ].map(({ key, label, placeholder }: any) => (
+                <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} placeholder={placeholder} />
+              ))
+            )}
             {/* Cargo do Responsável - selectable chips */}
             <div className="space-y-2">
               <Label className="text-white/70 text-sm font-medium">Cargo do Responsável</Label>
@@ -239,9 +252,9 @@ export default function OnboardingClinica() {
               )}
             </div>
             {[
-              { key: "whatsapp", label: "WhatsApp para Atendimento de Pacientes" },
+              { key: "whatsapp", label: isClinica ? "WhatsApp para Atendimento de Pacientes" : "WhatsApp de Atendimento" },
               { key: "attendant_name", label: "Nome do(a) Atendente no WhatsApp" },
-              { key: "instagram", label: "Instagram da Clínica" },
+              { key: "instagram", label: isClinica ? "Instagram da Clínica" : "Instagram da Empresa" },
               { key: "website", label: "Site / Landing Page (se tiver)" },
               { key: "commercial_email", label: "E-mail Comercial" },
               { key: "city", label: "Cidade" },
@@ -257,16 +270,25 @@ export default function OnboardingClinica() {
         return (
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-white/70 text-sm font-medium">Quais especialidades a clínica oferece?</Label>
-              <div className="flex flex-wrap gap-2">
-                {SPECIALTIES.map((s) => (
-                  <SelectableChip key={s} label={s} selected={(form.specialties || []).includes(s)} onClick={() => toggleArray("specialties", s)} />
-                ))}
-              </div>
+              <Label className="text-white/70 text-sm font-medium">{isClinica ? "Quais especialidades a clínica oferece?" : "Quais serviços/produtos sua empresa oferece?"}</Label>
+              {isClinica ? (
+                <div className="flex flex-wrap gap-2">
+                  {SPECIALTIES.map((s) => (
+                    <SelectableChip key={s} label={s} selected={(form.specialties || []).includes(s)} onClick={() => toggleArray("specialties", s)} />
+                  ))}
+                </div>
+              ) : (
+                <Textarea 
+                  placeholder="Liste seus principais produtos ou serviços..."
+                  value={form.services_list || ""} 
+                  onChange={(e) => set("services_list", e.target.value)} 
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/25 rounded-xl focus:border-cyan-400/50" 
+                />
+              )}
             </div>
-            <FormInput label="Qual tratamento você MAIS quer divulgar?" value={form.main_treatment || ""} onChange={(v) => set("main_treatment", v)} />
+            <FormInput label="Qual serviço/produto você MAIS quer divulgar?" value={form.main_treatment || ""} onChange={(v) => set("main_treatment", v)} />
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-sm font-medium">Por que esse tratamento?</Label>
+              <Label className="text-white/70 text-sm font-medium">Por que este?</Label>
               <Textarea value={form.treatment_reason || ""} onChange={(e) => set("treatment_reason", e.target.value)} className="bg-white/5 border-white/10 text-white placeholder:text-white/25 rounded-xl focus:border-cyan-400/50" />
             </div>
             <FormInput label="Ticket Médio Atual" value={form.avg_ticket || ""} onChange={(v) => set("avg_ticket", v)} />
@@ -320,19 +342,19 @@ export default function OnboardingClinica() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-white/70 text-sm font-medium">Principais dores do paciente que você resolve</Label>
+              <Label className="text-white/70 text-sm font-medium">{isClinica ? "Principais dores do paciente que você resolve" : "Principais dores/problemas do seu cliente que você resolve"}</Label>
               <div className="flex flex-wrap gap-2">
-                {PATIENT_PAINS.map((p) => (
+                {(isClinica ? PATIENT_PAINS : ["Preço", "Prazo", "Qualidade", "Confiança", "Suporte", "Atendimento", "Praticidade"]).map((p) => (
                   <SelectableChip key={p} label={p} selected={(form.patient_pains || []).includes(p)} onClick={() => toggleArray("patient_pains", p)} />
                 ))}
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-sm font-medium">Na sua visão: qual a principal dor do seu paciente?</Label>
+              <Label className="text-white/70 text-sm font-medium">{isClinica ? "Na sua visão: qual a principal dor do seu paciente?" : "Na sua visão: qual a principal dor do seu cliente?"}</Label>
               <Textarea value={form.main_patient_pain || ""} onChange={(e) => set("main_patient_pain", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-sm font-medium">O que o paciente ganha / sente depois do tratamento?</Label>
+              <Label className="text-white/70 text-sm font-medium">{isClinica ? "O que o paciente ganha / sente depois do tratamento?" : "O que o cliente ganha / sente depois de contratar você?"}</Label>
               <Textarea value={form.post_treatment_feeling || ""} onChange={(e) => set("post_treatment_feeling", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
           </div>
@@ -341,7 +363,7 @@ export default function OnboardingClinica() {
         return (
           <div className="space-y-5">
             <div className="space-y-1.5">
-              <Label className="text-white/70 text-sm font-medium">Principais concorrentes da clínica</Label>
+              <Label className="text-white/70 text-sm font-medium">{isClinica ? "Principais concorrentes da clínica" : "Principais concorrentes da sua empresa"}</Label>
               <Textarea value={form.competitors || ""} onChange={(e) => set("competitors", e.target.value)} className="bg-white/5 border-white/10 text-white rounded-xl focus:border-cyan-400/50" />
             </div>
             <div className="space-y-1.5">
@@ -427,14 +449,14 @@ export default function OnboardingClinica() {
         <div className="text-center mb-6">
           <img src={newvoxLogo} alt="New Vox" className="h-14 mx-auto mb-4 rounded-lg" />
           <div className="flex items-center justify-center gap-2 mb-1">
-            <span className="text-lg">{STEPS[step].icon}</span>
-            <h2 className="text-lg font-semibold text-white">{STEPS[step].label}</h2>
+            <span className="text-lg">{getSteps(isClinica)[step].icon}</span>
+            <h2 className="text-lg font-semibold text-white">{getSteps(isClinica)[step].label}</h2>
           </div>
-          <p className="text-white/40 text-xs">Etapa {step + 1} de {STEPS.length}</p>
+          <p className="text-white/40 text-xs">Etapa {step + 1} de {getSteps(isClinica).length}</p>
 
           {/* Progress */}
           <div className="flex gap-1.5 mt-4">
-            {STEPS.map((_, i) => (
+            {getSteps(isClinica).map((_, i) => (
               <div
                 key={i}
                 className={cn(
@@ -461,7 +483,7 @@ export default function OnboardingClinica() {
           >
             <ChevronLeft className="w-4 h-4 mr-1" /> Voltar
           </Button>
-          {step < STEPS.length - 1 ? (
+          {step < getSteps(isClinica).length - 1 ? (
             <Button
               onClick={() => setStep(step + 1)}
               className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,200,255,0.3)] transition-all"
