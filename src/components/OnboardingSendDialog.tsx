@@ -42,7 +42,7 @@ export function OnboardingSendDialog({ groupId, groupName, categoria, responsave
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const isClinica = categoria?.toLowerCase() === "clínicas";
+  const isClinica = categoria?.toLowerCase().includes("clínica") || categoria?.toLowerCase().includes("odonto");
   const surveyType = isClinica ? "clinica" : "generico";
   const onboardingLink = `${PUBLISHED_APP_URL}/onboardingnv/${encodeURIComponent(groupId)}/${surveyType}`;
 
