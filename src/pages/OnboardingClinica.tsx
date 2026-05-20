@@ -302,13 +302,14 @@ export default function OnboardingClinica() {
             </div>
           </div>
         );
+      case 2:
         return (
           <div className="space-y-4">
             {[
-              { key: "capacity_per_day", label: "Capacidade de Atendimento (pacientes/dia)", type: "number" },
+              { key: "capacity_per_day", label: isClinica ? "Capacidade de Atendimento (pacientes/dia)" : "Capacidade de Atendimento (clientes/dia)", type: "number" },
               { key: "monthly_revenue", label: "Faturamento Mensal Médio" },
               { key: "revenue_goal", label: "Meta de Faturamento Mensal (com marketing)" },
-              { key: "management_software", label: "Software de gestão / CRM de pacientes?" },
+              { key: "management_software", label: isClinica ? "Software de gestão / CRM de pacientes?" : "Software de gestão / CRM?" },
             ].map(({ key, label, type }) => (
               <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} type={type} />
             ))}
@@ -334,7 +335,7 @@ export default function OnboardingClinica() {
               </RadioGroup>
             </div>
             <div className="space-y-2">
-              <Label className="text-white/70 text-sm font-medium">Classe socioeconômica do paciente ideal</Label>
+              <Label className="text-white/70 text-sm font-medium">{isClinica ? "Classe socioeconômica do paciente ideal" : "Classe socioeconômica do cliente ideal"}</Label>
               <div className="flex flex-wrap gap-2">
                 {SOCIO_CLASSES.map((c) => (
                   <SelectableChip key={c} label={c} selected={form.socioeconomic_class === c} onClick={() => set("socioeconomic_class", c)} />
