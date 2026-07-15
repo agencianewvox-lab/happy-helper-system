@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,30 +9,32 @@ const corsHeaders = {
 
 // Alisson's phone for AI auto-reply (with country-code and 9th-digit variations)
 const ALISSON_PHONES = ["64992565779", "5564992565779"];
-const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
+const ALISSON_PHONE_SEND = "5564992565779";
+const ALISSON_NAME_VARIANTS = ["Alisson", "Alisson Ferreira"];
 
-// Team member webhook map for coach replies
-const TEAM_WEBHOOK_MAP: Record<string, string> = {
-  "Murillo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-  "Murilo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-  "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-  "Priscila": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-  "Netto": "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
-  "Jader": "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
+// Team member name variants — phone resolved dynamically from profiles.telefone
+const TEAM_NAME_VARIANTS: Record<string, string[]> = {
+  "Murillo": ["Murillo", "Murilo Araújo"],
+  "Murilo": ["Murillo", "Murilo Araújo"],
+  "Priscilla": ["Priscilla", "Priscilla Borges"],
+  "Priscila": ["Priscilla", "Priscilla Borges"],
+  "Netto": ["Netto", "Netto Monge"],
+  "Jader": ["Jader", "Jader Costa"],
 };
 
 // Team member phone numbers for identification
 const TEAM_PHONES: Record<string, string[]> = {};
 
-function findTeamWebhookByName(pushName: string): { name: string; url: string } | null {
+function findTeamMemberByName(pushName: string): { name: string; variants: string[] } | null {
   const normalized = (pushName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  for (const [key, url] of Object.entries(TEAM_WEBHOOK_MAP)) {
+  for (const [key, variants] of Object.entries(TEAM_NAME_VARIANTS)) {
     if (normalized.includes(key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
-      return { name: key, url };
+      return { name: key, variants };
     }
   }
   return null;
 }
+
 
 function digitsOnly(value: string | null | undefined): string {
   return (value || "").replace(/\D/g, "");
