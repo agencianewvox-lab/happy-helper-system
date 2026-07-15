@@ -1113,13 +1113,14 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
       if (fnName === "enviar_cutucada") {
         // Find the webhook for the target person
         const targetName = args.destinatario;
-        const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+        const targetVariants = Object.entries(TEAM_NAME_VARIANTS).find(([key]) =>
           targetName.toLowerCase().includes(key.toLowerCase()) ||
           key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
         )?.[1];
 
-        if (!targetWebhookUrl) {
-          toolResults.push(`❌ Não encontrei webhook para "${targetName}". Pessoas disponíveis: ${Object.keys(TEAM_WEBHOOK_MAP).join(", ")}`);
+        if (!targetVariants) {
+          toolResults.push(`❌ Não encontrei "${targetName}" na equipe. Disponíveis: ${Object.keys(TEAM_NAME_VARIANTS).join(", ")}`);
+
         } else {
           // Find matched group if specified
           let matchedGroup: any = null;
