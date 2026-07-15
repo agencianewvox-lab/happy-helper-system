@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,30 +9,32 @@ const corsHeaders = {
 
 // Alisson's phone for AI auto-reply (with country-code and 9th-digit variations)
 const ALISSON_PHONES = ["64992565779", "5564992565779"];
-const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
+const ALISSON_PHONE_SEND = "5564992565779";
+const ALISSON_NAME_VARIANTS = ["Alisson", "Alisson Ferreira"];
 
-// Team member webhook map for coach replies
-const TEAM_WEBHOOK_MAP: Record<string, string> = {
-  "Murillo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-  "Murilo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-  "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-  "Priscila": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-  "Netto": "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
-  "Jader": "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
+// Team member name variants — phone resolved dynamically from profiles.telefone
+const TEAM_NAME_VARIANTS: Record<string, string[]> = {
+  "Murillo": ["Murillo", "Murilo Araújo"],
+  "Murilo": ["Murillo", "Murilo Araújo"],
+  "Priscilla": ["Priscilla", "Priscilla Borges"],
+  "Priscila": ["Priscilla", "Priscilla Borges"],
+  "Netto": ["Netto", "Netto Monge"],
+  "Jader": ["Jader", "Jader Costa"],
 };
 
 // Team member phone numbers for identification
 const TEAM_PHONES: Record<string, string[]> = {};
 
-function findTeamWebhookByName(pushName: string): { name: string; url: string } | null {
+function findTeamMemberByName(pushName: string): { name: string; variants: string[] } | null {
   const normalized = (pushName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  for (const [key, url] of Object.entries(TEAM_WEBHOOK_MAP)) {
+  for (const [key, variants] of Object.entries(TEAM_NAME_VARIANTS)) {
     if (normalized.includes(key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
-      return { name: key, url };
+      return { name: key, variants };
     }
   }
   return null;
 }
+
 
 function digitsOnly(value: string | null | undefined): string {
   return (value || "").replace(/\D/g, "");
@@ -603,11 +606,8 @@ async function handleAlissonAIReply(
           status: "enviada",
           recebido_em: new Date().toISOString(),
         });
-        await fetch(ALISSON_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: "5564992565779", message: exactReply, groupId, type: "ai_response" }),
-        });
+        await sendWhatsApp(ALISSON_PHONE_SEND, exactReply);
+
         return;
       }
     }
@@ -1113,13 +1113,14 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
       if (fnName === "enviar_cutucada") {
         // Find the webhook for the target person
         const targetName = args.destinatario;
-        const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+        const targetVariants = Object.entries(TEAM_NAME_VARIANTS).find(([key]) =>
           targetName.toLowerCase().includes(key.toLowerCase()) ||
           key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
         )?.[1];
 
-        if (!targetWebhookUrl) {
-          toolResults.push(`❌ Não encontrei webhook para "${targetName}". Pessoas disponíveis: ${Object.keys(TEAM_WEBHOOK_MAP).join(", ")}`);
+        if (!targetVariants) {
+          toolResults.push(`❌ Não encontrei "${targetName}" na equipe. Disponíveis: ${Object.keys(TEAM_NAME_VARIANTS).join(", ")}`);
+
         } else {
           // Find matched group if specified
           let matchedGroup: any = null;
@@ -1162,26 +1163,32 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
             cutucadaMsg = `E aí ${firstName}! 👋 ${args.mensagem_contexto}${matchedGroup ? ` (${matchedGroup.nome})` : ""}. Bora resolver isso? (responda 👍 se já fez)`;
           }
 
-          // Send via webhook
+          // Send via Evolution API
           try {
-            const encodedMsg = encodeURIComponent(cutucadaMsg);
-            const sendResp = await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
-            console.log(`Cutucada sent to ${targetName}: ${sendResp.status}`);
+            const phoneCut = await lookupTeamPhone(supabase, targetVariants);
+            if (!phoneCut) {
+              toolResults.push(`❌ Telefone de ${targetName} não cadastrado no perfil.`);
+            } else {
+              const sendRes = await sendWhatsApp(phoneCut, cutucadaMsg);
+              console.log(`Cutucada sent to ${targetName}: ${sendRes.status}`);
 
-            // Save to coach_messages
-            await supabase.from("coach_messages").insert({
-              destinatario_nome: targetName,
-              mensagem: cutucadaMsg,
-              tipo: args.tipo || "geral",
-              group_id: matchedGroup?.group_id || null,
-              enviada: true,
-              enviada_em: new Date().toISOString(),
-            });
+              await supabase.from("coach_messages").insert({
+                destinatario_nome: targetName,
+                mensagem: cutucadaMsg,
+                tipo: args.tipo || "geral",
+                group_id: matchedGroup?.group_id || null,
+                enviada: sendRes.ok,
+                enviada_em: new Date().toISOString(),
+              });
 
-            toolResults.push(`✅ Cutucada enviada para ${targetName}! Mensagem: "${cutucadaMsg.slice(0, 80)}..."`);
+              toolResults.push(sendRes.ok
+                ? `✅ Cutucada enviada para ${targetName}! Mensagem: "${cutucadaMsg.slice(0, 80)}..."`
+                : `❌ Falha ao enviar cutucada (${sendRes.status})`);
+            }
           } catch (e) {
             console.error(`Failed to send cutucada to ${targetName}:`, e);
             toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
+
           }
         }
       }
@@ -1352,19 +1359,10 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
       recebido_em: new Date().toISOString(),
     });
 
-    // Send response via n8n webhook
-    const webhookResponse = await fetch(ALISSON_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        phone: "5564992565779",
-        message: aiReply,
-        groupId: groupId,
-        type: "ai_response",
-      }),
-    });
+    // Send response via Evolution API
+    const sendResult = await sendWhatsApp(ALISSON_PHONE_SEND, aiReply);
+    console.log("Evolution send status:", sendResult.status);
 
-    console.log("Webhook response status:", webhookResponse.status);
   } catch (err) {
     console.error("Error in Alisson AI reply:", err);
   }
@@ -1443,8 +1441,9 @@ async function handleTeamCoachReply(
       const exactReply = await tryExactAdsReply(messageText, allGrupos || allGroups, META_TOKEN);
       if (exactReply) {
         console.log(`Deterministic ads reply for ${firstName}:`, exactReply.substring(0, 80));
-        const encodedReply = encodeURIComponent(exactReply);
-        await fetch(`${teamWebhook.url}?message=${encodedReply}`);
+        const phoneTm = await lookupTeamPhone(supabase, teamWebhook.variants);
+        if (phoneTm) await sendWhatsApp(phoneTm, exactReply);
+
         return;
       }
     }
@@ -1848,13 +1847,13 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
         if (fnName === "enviar_cutucada") {
           const targetName = args.destinatario;
-          const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+          const targetVariants = Object.entries(TEAM_NAME_VARIANTS).find(([key]) =>
             targetName.toLowerCase().includes(key.toLowerCase()) ||
             key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
           )?.[1];
 
-          if (!targetWebhookUrl) {
-            toolResults.push(`❌ Não encontrei webhook para "${targetName}".`);
+          if (!targetVariants) {
+            toolResults.push(`❌ Não encontrei "${targetName}" na equipe.`);
           } else {
             let matchedGroup: any = null;
             if (args.group_name) {
@@ -1891,22 +1890,27 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
             }
 
             try {
-              const encodedMsg = encodeURIComponent(cutucadaMsg);
-              await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
-              await supabase.from("coach_messages").insert({
-                destinatario_nome: targetName,
-                mensagem: cutucadaMsg,
-                tipo: args.tipo || "geral",
-                group_id: matchedGroup?.group_id || null,
-                enviada: true,
-                enviada_em: new Date().toISOString(),
-              });
-              toolResults.push(`✅ Cutucada enviada para ${targetName}!`);
+              const phoneCut2 = await lookupTeamPhone(supabase, targetVariants);
+              if (!phoneCut2) {
+                toolResults.push(`❌ Telefone de ${targetName} não cadastrado.`);
+              } else {
+                const sendRes = await sendWhatsApp(phoneCut2, cutucadaMsg);
+                await supabase.from("coach_messages").insert({
+                  destinatario_nome: targetName,
+                  mensagem: cutucadaMsg,
+                  tipo: args.tipo || "geral",
+                  group_id: matchedGroup?.group_id || null,
+                  enviada: sendRes.ok,
+                  enviada_em: new Date().toISOString(),
+                });
+                toolResults.push(sendRes.ok ? `✅ Cutucada enviada para ${targetName}!` : `❌ Falha ao enviar (${sendRes.status})`);
+              }
             } catch (e) {
               toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
             }
           }
         }
+
 
         // Handle salvar_nota_cliente
         if (fnName === "salvar_nota_cliente") {
@@ -2027,10 +2031,15 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
     if (!reply) return;
 
-    // Send reply via webhook (GET)
-    const encodedReply = encodeURIComponent(reply);
-    const sendResp = await fetch(`${teamWebhook.url}?message=${encodedReply}`);
-    console.log(`Coach reply to ${firstName}: ${sendResp.status}`);
+    // Send reply via Evolution API
+    const phoneTeam = await lookupTeamPhone(supabase, teamWebhook.variants);
+    if (phoneTeam) {
+      const sendRes = await sendWhatsApp(phoneTeam, reply);
+      console.log(`Coach reply to ${firstName}: ${sendRes.status}`);
+    } else {
+      console.warn(`Coach reply skipped: no phone for ${teamWebhook.name}`);
+    }
+
   } catch (err) {
     console.error("Error in team coach reply:", err);
   }
@@ -2324,7 +2333,7 @@ Deno.serve(async (req) => {
       console.log("isGroup:", isGroup, "| earlyPhone:", earlyPhone, "| isAlisson:", isAlisson, "| isAllowedGroup:", isGroup && isAllowedGroup(remoteJid));
 
       // Check if it's a team member (for coach replies in DMs)
-      const teamWebhook = !isGroup ? findTeamWebhookByName(data.pushName || "") : null;
+      const teamWebhook = !isGroup ? findTeamMemberByName(data.pushName || "") : null;
       const isTeamMember = !!teamWebhook;
 
       // Allow Alisson's messages and team member DMs through even from non-whitelisted groups/DMs

@@ -1,20 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const ALISSON_WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd";
-const TEAM_WEBHOOK_MAP: Record<string, string> = {
-  "murillo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-  "murilo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-  "priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-  "priscila": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-  "netto": "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
-  "jader": "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
+// Map lowercase recipient → profile full_name variants used to look up profiles.telefone
+const RECIPIENT_LOOKUP: Record<string, string[]> = {
+  "alisson": ["Alisson"],
+  "murillo": ["Murillo", "Murilo Araújo"],
+  "murilo": ["Murillo", "Murilo Araújo"],
+  "priscilla": ["Priscilla", "Priscilla Borges"],
+  "priscila": ["Priscilla", "Priscilla Borges"],
+  "netto": ["Netto", "Netto Monge"],
+  "jader": ["Jader", "Jader Costa"],
 };
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -110,40 +114,50 @@ serve(async (req) => {
     const executedActions: string[] = []
 
     if (toolCalls) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, serviceKey);
+
       console.log(`Executando ${toolCalls.length} chamadas de ferramenta...`);
       for (const toolCall of toolCalls) {
         try {
           if (toolCall.function.name === "send_whatsapp_message") {
             const args = JSON.parse(toolCall.function.arguments)
             const recipient = args.recipient_name.toLowerCase();
-            const webhookUrl = recipient === "alisson" 
-              ? ALISSON_WEBHOOK_URL 
-              : TEAM_WEBHOOK_MAP[recipient];
+            const variants = RECIPIENT_LOOKUP[recipient];
 
-            if (webhookUrl) {
-              await fetch(webhookUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: args.text }),
-              })
+            if (!variants) {
+              executedActions.push(`✗ Destinatário ${args.recipient_name} não configurado.`)
+              continue;
+            }
+
+            const phone = await lookupTeamPhone(supabase, variants);
+            if (!phone) {
+              executedActions.push(`✗ Telefone de ${args.recipient_name} não cadastrado no perfil.`)
+              continue;
+            }
+
+            const result = await sendWhatsApp(phone, args.text);
+            if (result.ok) {
               executedActions.push(`✓ Mensagem enviada para ${args.recipient_name} via WhatsApp.`)
             } else {
-              executedActions.push(`✗ Destinatário ${args.recipient_name} não configurado.`)
+              executedActions.push(`✗ Falha ao enviar para ${args.recipient_name} (${result.status}).`)
             }
           } else if (toolCall.function.name === "send_group_message") {
             const args = JSON.parse(toolCall.function.arguments)
-            await fetch(ALISSON_WEBHOOK_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ message: args.text, groupId: args.group_id }),
-            })
-            executedActions.push(`✓ Mensagem enviada para o grupo ${args.group_id}.`)
+            const result = await sendWhatsApp(args.group_id, args.text);
+            if (result.ok) {
+              executedActions.push(`✓ Mensagem enviada para o grupo ${args.group_id}.`)
+            } else {
+              executedActions.push(`✗ Falha ao enviar para o grupo ${args.group_id} (${result.status}).`)
+            }
           }
         } catch (toolError) {
           console.error(`Erro ao executar ferramenta ${toolCall.function.name}:`, toolError);
           executedActions.push(`✗ Erro ao executar ${toolCall.function.name}.`)
         }
       }
+
       
       if (!reply) {
         reply = executedActions.join("\n") || "Comando executado, Senhor."

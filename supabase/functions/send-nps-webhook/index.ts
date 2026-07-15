@@ -1,9 +1,9 @@
+import { sendWhatsApp } from "../_shared/evolution.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/03f12fb5-48ed-4f30-8aaa-02a8912768e3";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,22 +20,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const url = new URL(WEBHOOK_URL);
-    url.searchParams.set("group_id", group_id);
-    url.searchParams.set("message", message);
+    const result = await sendWhatsApp(group_id, message);
 
-    const res = await fetch(url.toString(), {
-      method: "GET",
-    });
-
-    const body = await res.text();
-
-    return new Response(body, {
-      status: res.status,
+    return new Response(JSON.stringify({ ok: result.ok, status: result.status, body: result.body }), {
+      status: result.ok ? 200 : result.status || 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

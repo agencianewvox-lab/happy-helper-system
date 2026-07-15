@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,11 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Master webhooks
-const MASTER_WEBHOOKS: Record<string, string> = {
-  "Alisson": "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd",
-  "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-};
+const MASTER_NAMES = ["Alisson", "Priscilla"];
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -207,27 +205,31 @@ REGRAS:
       dados_base: { totalClientes, mrrTotal, avgNps, detratores: detratores.length, promotores: promotores.length, pendenciasAbertas },
     });
 
-    // Send to both masters
+    // Send to both masters via Evolution API
     const results: any[] = [];
-    for (const [name, webhook] of Object.entries(MASTER_WEBHOOKS)) {
+    for (const name of MASTER_NAMES) {
       try {
-        const encodedMsg = encodeURIComponent(briefingContent);
-        const sendResp = await fetch(`${webhook}?message=${encodedMsg}`);
+        const phone = await lookupTeamPhone(supabase, [name]);
+        if (!phone) {
+          console.warn(`[executive-briefing] No phone for ${name}`);
+          results.push({ name, sent: false, error: "no_phone" });
+          continue;
+        }
+        const sendResp = await sendWhatsApp(phone, briefingContent);
         console.log(`Briefing sent to ${name}: ${sendResp.status}`);
 
-        // Update sent flag
         const updateField = name === "Alisson" ? "enviado_alisson" : "enviado_priscilla";
         await supabase.from("executive_briefings").update({ [updateField]: true }).eq("briefing_date", todayStr);
 
-        results.push({ name, sent: true });
+        results.push({ name, sent: sendResp.ok });
       } catch (e) {
         console.error(`Failed to send briefing to ${name}:`, e);
         results.push({ name, sent: false });
       }
 
-      // Delay between sends
       await new Promise(r => setTimeout(r, 1000));
     }
+
 
     return new Response(JSON.stringify({ status: "ok", briefing_date: todayStr, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

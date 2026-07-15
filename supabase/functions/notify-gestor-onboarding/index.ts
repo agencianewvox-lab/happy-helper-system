@@ -1,11 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const WEBHOOK_URL = "https://bot-n8n.1lxz8u.easypanel.host/webhook/03f12fb5-48ed-4f30-8aaa-02a8912768e3";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -26,7 +25,6 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch the group to get gestor_responsavel
     const { data: grupo, error: grupoError } = await supabase
       .from("whatsapp_grupos")
       .select("nome, gestor_responsavel")
@@ -49,7 +47,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Map gestor_responsavel to profile name to find phone
+    // Map gestor_responsavel to profile name
     const GESTOR_PROFILE_MAP: Record<string, string> = {
       "Murilo Araújo": "Murillo",
       "Netto Monge": "Netto",
@@ -58,55 +56,30 @@ Deno.serve(async (req) => {
     };
 
     const profileName = GESTOR_PROFILE_MAP[gestorName] || gestorName;
-
-    // Find the gestor's phone number from profiles
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("telefone, full_name")
-      .eq("full_name", profileName)
-      .single();
-
-    const gestorPhone = profile?.telefone;
+    const gestorPhone = await lookupTeamPhone(supabase, [profileName, gestorName]);
     const clientDisplayName = client_name || grupo.nome;
 
-    // Build the notification message for the GROUP
+    // Message for the GROUP
     const groupMessage = `🆕 *Onboarding Preenchido!*
 
 O formulário de onboarding para *${clientDisplayName}* foi preenchido com sucesso.
 
 🚀 *Próximo passo:* Time, vamos agendar a call de alinhamento o quanto antes!`;
 
-    // Send WhatsApp message to the GROUP instead of gestor personal phone
-    try {
-      const groupUrl = new URL(WEBHOOK_URL);
-      groupUrl.searchParams.set("phone", group_id);
-      groupUrl.searchParams.set("message", groupMessage);
-      
-      const response = await fetch(groupUrl.toString(), { method: "GET" });
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`N8N error sending to group (${response.status}):`, errorText);
-      } else {
-        console.log(`Onboarding notification sent to group: ${group_id}`);
-      }
-    } catch (groupErr) {
-      console.error("Failed to send group notification:", groupErr);
+    const groupResult = await sendWhatsApp(group_id, groupMessage);
+    if (!groupResult.ok) {
+      console.error(`Failed to send onboarding notice to group ${group_id}`, groupResult);
     }
 
-    // Optional: Also notify gestor privately if preferred, but primary is the group now
+    // Optional private notification to gestor
     if (gestorPhone) {
-      try {
-        const gestorMessage = `🆕 *Novo Onboarding Preenchido!* (Privado)\n\nO cliente *${clientDisplayName}* preencheu o formulário. Acabei de avisar no grupo do cliente também.`;
-        const gestorUrl = new URL(WEBHOOK_URL);
-        gestorUrl.searchParams.set("phone", gestorPhone);
-        gestorUrl.searchParams.set("message", gestorMessage);
-        await fetch(gestorUrl.toString(), { method: "GET" });
-      } catch (e) {
-        console.error("Failed to send private notification to gestor:", e);
-      }
+      const gestorMessage = `🆕 *Novo Onboarding Preenchido!* (Privado)\n\nO cliente *${clientDisplayName}* preencheu o formulário. Acabei de avisar no grupo do cliente também.`;
+      await sendWhatsApp(gestorPhone, gestorMessage);
+    } else {
+      console.log(`No phone for gestor ${profileName} — skipping private notice`);
     }
 
-    // Auto-create a task for the gestor to schedule the onboarding call
+    // Auto-create task
     try {
       await supabase.from("tasks").insert({
         title: `Agendar call de onboarding — ${clientDisplayName}`,
@@ -117,7 +90,6 @@ O formulário de onboarding para *${clientDisplayName}* foi preenchido com suces
         status: "pendente",
         created_by: "Sistema (Onboarding Automático)",
       });
-      console.log(`Task created for ${gestorName} to schedule onboarding call`);
     } catch (taskErr) {
       console.error("Failed to create task:", taskErr);
     }
@@ -127,7 +99,7 @@ O formulário de onboarding para *${clientDisplayName}* foi preenchido com suces
     });
   } catch (e) {
     console.error("Error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

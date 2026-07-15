@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -903,15 +905,16 @@ REGRAS:
       });
     }
 
-    // Webhook map for cutucadas
-    const CUTUCADA_WEBHOOK_MAP: Record<string, string> = {
-      "Murillo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-      "Murilo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-      "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-      "Priscila": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-      "Netto": "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
-      "Jader": "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
+    // Map cutucada recipient → profile full_name variants (phone resolved from profiles.telefone)
+    const CUTUCADA_NAME_MAP: Record<string, string[]> = {
+      "Murillo": ["Murillo", "Murilo Araújo"],
+      "Murilo": ["Murillo", "Murilo Araújo"],
+      "Priscilla": ["Priscilla", "Priscilla Borges"],
+      "Priscila": ["Priscilla", "Priscilla Borges"],
+      "Netto": ["Netto", "Netto Monge"],
+      "Jader": ["Jader", "Jader Costa"],
     };
+
 
     // Check for cutucada intent
     const isCutucada = detectCutucadaIntent(safeMessages);
@@ -963,16 +966,17 @@ Se não especificou para quem, pergunte antes de gerar o JSON.`;
           const info = JSON.parse(cutucadaMatch[1].trim());
           const targetName = info.destinatario;
           
-          // Find webhook
-          const targetWebhookUrl = Object.entries(CUTUCADA_WEBHOOK_MAP).find(([key]) =>
+          // Find profile name variants for target
+          const targetVariants = Object.entries(CUTUCADA_NAME_MAP).find(([key]) =>
             targetName.toLowerCase().includes(key.toLowerCase()) ||
             key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
           )?.[1];
 
-          if (!targetWebhookUrl) {
+          if (!targetVariants) {
             content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
-            content += "\n\n⚠️ Não encontrei o webhook para essa pessoa.";
+            content += "\n\n⚠️ Não encontrei essa pessoa na equipe.";
           } else {
+
             // Find matched group
             let matchedGroup: any = null;
             if (info.group_name) {
@@ -1009,28 +1013,35 @@ Se não especificou para quem, pergunte antes de gerar o JSON.`;
               cutucadaMsg = `E aí ${targetFirstName}! 👋 ${info.mensagem_contexto}. Bora resolver? (responda 👍 se já fez)`;
             }
 
-            // Send via webhook
+            // Send via Evolution API
             try {
-              const encodedMsg = encodeURIComponent(cutucadaMsg);
-              await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
-              
-              // Save to coach_messages
-              await supabase.from("coach_messages").insert({
-                destinatario_nome: targetName,
-                mensagem: cutucadaMsg,
-                tipo: info.tipo || "geral",
-                group_id: matchedGroup?.group_id || null,
-                enviada: true,
-                enviada_em: new Date().toISOString(),
-              });
+              const phone = await lookupTeamPhone(supabase, targetVariants);
+              if (!phone) {
+                content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
+                content += `\n\n⚠️ Telefone de ${targetName} não cadastrado no perfil.`;
+              } else {
+                const result = await sendWhatsApp(phone, cutucadaMsg);
 
-              content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
-              content += `\n\n✅ **Cutucada enviada para ${targetName}!** Mensagem: "${cutucadaMsg.slice(0, 100)}..."`;
+                await supabase.from("coach_messages").insert({
+                  destinatario_nome: targetName,
+                  mensagem: cutucadaMsg,
+                  tipo: info.tipo || "geral",
+                  group_id: matchedGroup?.group_id || null,
+                  enviada: result.ok,
+                  enviada_em: new Date().toISOString(),
+                });
+
+                content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
+                content += result.ok
+                  ? `\n\n✅ **Cutucada enviada para ${targetName}!** Mensagem: "${cutucadaMsg.slice(0, 100)}..."`
+                  : `\n\n⚠️ Falha ao enviar cutucada (${result.status}).`;
+              }
             } catch (e) {
               console.error("Error sending cutucada:", e);
               content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
               content += "\n\n⚠️ Erro ao enviar cutucada. Tente novamente.";
             }
+
           }
         } catch (parseErr) {
           console.error("Error parsing cutucada:", parseErr);
