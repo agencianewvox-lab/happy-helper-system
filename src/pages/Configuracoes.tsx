@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { SystemConfigCard, type SystemConfig } from "@/components/config/SystemConfigCard";
 import { PasswordVerificationDialog } from "@/components/config/PasswordVerificationDialog";
+import { EquipeManager } from "@/components/config/EquipeManager";
 
 interface PromptConfig {
   id: string;
@@ -45,7 +46,7 @@ const CATEGORY_ICONS: Record<string, typeof Brain> = {
   "Segurança": Lock,
 };
 
-type TabType = "prompts" | "system";
+type TabType = "prompts" | "system" | "equipe";
 
 export default function Configuracoes() {
   const { isMaster, profile, loading: profileLoading } = useProfile();
@@ -211,6 +212,15 @@ export default function Configuracoes() {
             <Settings className="w-3.5 h-3.5" />
             Regras do Sistema
           </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "equipe" ? "default" : "outline"}
+            className="gap-1.5 text-xs"
+            onClick={() => setActiveTab("equipe")}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Equipe
+          </Button>
         </div>
 
         {/* PROMPTS TAB */}
@@ -291,6 +301,9 @@ export default function Configuracoes() {
             ))}
           </Tabs>
         )}
+
+        {/* EQUIPE TAB */}
+        {activeTab === "equipe" && <EquipeManager />}
       </main>
 
       {/* Password verification dialog */}
