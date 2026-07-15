@@ -903,15 +903,16 @@ REGRAS:
       });
     }
 
-    // Webhook map for cutucadas
-    const CUTUCADA_WEBHOOK_MAP: Record<string, string> = {
-      "Murillo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-      "Murilo": "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
-      "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-      "Priscila": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-      "Netto": "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
-      "Jader": "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
+    // Map cutucada recipient → profile full_name variants (phone resolved from profiles.telefone)
+    const CUTUCADA_NAME_MAP: Record<string, string[]> = {
+      "Murillo": ["Murillo", "Murilo Araújo"],
+      "Murilo": ["Murillo", "Murilo Araújo"],
+      "Priscilla": ["Priscilla", "Priscilla Borges"],
+      "Priscila": ["Priscilla", "Priscilla Borges"],
+      "Netto": ["Netto", "Netto Monge"],
+      "Jader": ["Jader", "Jader Costa"],
     };
+
 
     // Check for cutucada intent
     const isCutucada = detectCutucadaIntent(safeMessages);
