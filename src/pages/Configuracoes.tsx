@@ -46,7 +46,7 @@ const CATEGORY_ICONS: Record<string, typeof Brain> = {
   "Segurança": Lock,
 };
 
-type TabType = "prompts" | "system";
+type TabType = "prompts" | "system" | "equipe";
 
 export default function Configuracoes() {
   const { isMaster, profile, loading: profileLoading } = useProfile();
