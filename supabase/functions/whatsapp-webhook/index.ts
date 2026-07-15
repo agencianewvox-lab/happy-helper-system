@@ -1446,8 +1446,9 @@ async function handleTeamCoachReply(
       const exactReply = await tryExactAdsReply(messageText, allGrupos || allGroups, META_TOKEN);
       if (exactReply) {
         console.log(`Deterministic ads reply for ${firstName}:`, exactReply.substring(0, 80));
-        const encodedReply = encodeURIComponent(exactReply);
-        await fetch(`${teamWebhook.url}?message=${encodedReply}`);
+        const phoneTm = await lookupTeamPhone(supabase, teamWebhook.variants);
+        if (phoneTm) await sendWhatsApp(phoneTm, exactReply);
+
         return;
       }
     }
