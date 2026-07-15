@@ -964,16 +964,17 @@ Se não especificou para quem, pergunte antes de gerar o JSON.`;
           const info = JSON.parse(cutucadaMatch[1].trim());
           const targetName = info.destinatario;
           
-          // Find webhook
-          const targetWebhookUrl = Object.entries(CUTUCADA_WEBHOOK_MAP).find(([key]) =>
+          // Find profile name variants for target
+          const targetVariants = Object.entries(CUTUCADA_NAME_MAP).find(([key]) =>
             targetName.toLowerCase().includes(key.toLowerCase()) ||
             key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
           )?.[1];
 
-          if (!targetWebhookUrl) {
+          if (!targetVariants) {
             content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
-            content += "\n\n⚠️ Não encontrei o webhook para essa pessoa.";
+            content += "\n\n⚠️ Não encontrei essa pessoa na equipe.";
           } else {
+
             // Find matched group
             let matchedGroup: any = null;
             if (info.group_name) {
