@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,37 +7,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Team members with their roles, name variations, and webhooks
+// Team members — phones now resolved from profiles.telefone via lookupTeamPhone
 const TEAM_MEMBERS = [
   {
     name: "Murilo Araújo",
     firstName: "Murillo",
     cargo: "Gestor de Tráfego / Gerente",
     nameVariations: ["murilo", "murillo", "murilo araujo", "murillo araujo", "murilo araújo", "murillo araújo"],
-    webhook: "https://bot-n8n.1lxz8u.easypanel.host/webhook/1b00c3d7-3482-4543-b0d5-50b27a74e733",
   },
   {
     name: "Netto Monge",
     firstName: "Netto",
     cargo: "Gestor de Tráfego",
     nameVariations: ["netto", "netto monge"],
-    webhook: "https://bot-n8n.1lxz8u.easypanel.host/webhook/2ee4657c-1125-4337-8c80-1977daa94bd3",
   },
   {
     name: "Jader Costa",
     firstName: "Jader",
     cargo: "Gestor de Tráfego",
     nameVariations: ["jader", "jader costa"],
-    webhook: "https://bot-n8n.1lxz8u.easypanel.host/webhook/fb54db1e-c06c-4b55-bf2f-49a80c40943e",
   },
   {
     name: "Priscilla Borges",
     firstName: "Priscilla",
     cargo: "Social Media / Sócia",
     nameVariations: ["priscilla", "priscila", "priscilla borges", "priscila borges"],
-    webhook: "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
   },
 ];
+
 
 function normalize(s: string): string {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
