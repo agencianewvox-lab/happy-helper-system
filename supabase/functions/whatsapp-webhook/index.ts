@@ -2327,7 +2327,7 @@ Deno.serve(async (req) => {
       console.log("isGroup:", isGroup, "| earlyPhone:", earlyPhone, "| isAlisson:", isAlisson, "| isAllowedGroup:", isGroup && isAllowedGroup(remoteJid));
 
       // Check if it's a team member (for coach replies in DMs)
-      const teamWebhook = !isGroup ? findTeamWebhookByName(data.pushName || "") : null;
+      const teamWebhook = !isGroup ? findTeamMemberByName(data.pushName || "") : null;
       const isTeamMember = !!teamWebhook;
 
       // Allow Alisson's messages and team member DMs through even from non-whitelisted groups/DMs
