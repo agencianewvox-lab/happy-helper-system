@@ -22,7 +22,7 @@ export default function PainelAdmin() {
   const [actionsLog, setActionsLog] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [briefings, setBriefings] = useState<any[]>([]);
-  const [coachConfig, setCoachConfig] = useState<any>(null);
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,18 +37,16 @@ export default function PainelAdmin() {
 
   const loadData = async () => {
     setLoading(true);
-    const [gruposRes, actionsRes, notifRes, briefingsRes, coachRes] = await Promise.all([
+    const [gruposRes, actionsRes, notifRes, briefingsRes] = await Promise.all([
       supabase.from("whatsapp_grupos").select("*").order("nome"),
       supabase.from("master_actions_log").select("*").order("executed_at", { ascending: false }).limit(50),
       supabase.from("master_notifications").select("*").order("created_at", { ascending: false }).limit(50),
       supabase.from("executive_briefings").select("*").order("briefing_date", { ascending: false }).limit(10),
-      supabase.from("coach_config").select("*").limit(1),
     ]);
     setGrupos(gruposRes.data || []);
     setActionsLog(actionsRes.data || []);
     setNotifications(notifRes.data || []);
     setBriefings(briefingsRes.data || []);
-    setCoachConfig(coachRes.data?.[0] || null);
     setLoading(false);
   };
 
