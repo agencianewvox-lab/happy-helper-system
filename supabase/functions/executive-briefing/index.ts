@@ -205,27 +205,31 @@ REGRAS:
       dados_base: { totalClientes, mrrTotal, avgNps, detratores: detratores.length, promotores: promotores.length, pendenciasAbertas },
     });
 
-    // Send to both masters
+    // Send to both masters via Evolution API
     const results: any[] = [];
-    for (const [name, webhook] of Object.entries(MASTER_WEBHOOKS)) {
+    for (const name of MASTER_NAMES) {
       try {
-        const encodedMsg = encodeURIComponent(briefingContent);
-        const sendResp = await fetch(`${webhook}?message=${encodedMsg}`);
+        const phone = await lookupTeamPhone(supabase, [name]);
+        if (!phone) {
+          console.warn(`[executive-briefing] No phone for ${name}`);
+          results.push({ name, sent: false, error: "no_phone" });
+          continue;
+        }
+        const sendResp = await sendWhatsApp(phone, briefingContent);
         console.log(`Briefing sent to ${name}: ${sendResp.status}`);
 
-        // Update sent flag
         const updateField = name === "Alisson" ? "enviado_alisson" : "enviado_priscilla";
         await supabase.from("executive_briefings").update({ [updateField]: true }).eq("briefing_date", todayStr);
 
-        results.push({ name, sent: true });
+        results.push({ name, sent: sendResp.ok });
       } catch (e) {
         console.error(`Failed to send briefing to ${name}:`, e);
         results.push({ name, sent: false });
       }
 
-      // Delay between sends
       await new Promise(r => setTimeout(r, 1000));
     }
+
 
     return new Response(JSON.stringify({ status: "ok", briefing_date: todayStr, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
