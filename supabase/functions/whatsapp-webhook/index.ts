@@ -2031,10 +2031,15 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
     if (!reply) return;
 
-    // Send reply via webhook (GET)
-    const encodedReply = encodeURIComponent(reply);
-    const sendResp = await fetch(`${teamWebhook.url}?message=${encodedReply}`);
-    console.log(`Coach reply to ${firstName}: ${sendResp.status}`);
+    // Send reply via Evolution API
+    const phoneTeam = await lookupTeamPhone(supabase, teamWebhook.variants);
+    if (phoneTeam) {
+      const sendRes = await sendWhatsApp(phoneTeam, reply);
+      console.log(`Coach reply to ${firstName}: ${sendRes.status}`);
+    } else {
+      console.warn(`Coach reply skipped: no phone for ${teamWebhook.name}`);
+    }
+
   } catch (err) {
     console.error("Error in team coach reply:", err);
   }
