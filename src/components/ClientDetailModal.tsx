@@ -243,7 +243,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
         supabase.from("nps_predictions").delete().eq("group_id", gid),
         supabase.from("nps_prediction_history").delete().eq("group_id", gid),
         supabase.from("onboarding_responses").delete().eq("group_id", gid),
-        supabase.from("coach_messages").delete().eq("group_id", gid),
+        
         supabase.from("calendar_events").delete().eq("group_id", gid),
         supabase.from("master_notifications").delete().eq("group_id", gid),
         supabase.from("team_feedback_log").delete().eq("group_id", gid),

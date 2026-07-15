@@ -12,8 +12,6 @@ verify_jwt = false
 [functions.meta-ads]
 verify_jwt = false
 
-[functions.cs-coach]
-verify_jwt = false
 
 [functions.calculate-nps-predictions]
 verify_jwt = false
