@@ -127,7 +127,7 @@ export default function PainelAdmin() {
               <TabsTrigger value="acoes">📋 Ações Master</TabsTrigger>
               <TabsTrigger value="notificacoes">🔔 Notificações</TabsTrigger>
               <TabsTrigger value="briefings">☀️ Briefings</TabsTrigger>
-              <TabsTrigger value="config">⚙️ Configurações</TabsTrigger>
+              
             </TabsList>
 
             <TabsContent value="financeiro">
@@ -253,45 +253,6 @@ export default function PainelAdmin() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="config">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Configurações do Sistema</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between p-4 rounded-lg border border-border/30">
-                    <div>
-                      <Label className="text-sm font-medium">CS Coach Automático</Label>
-                      <p className="text-xs text-muted-foreground">Cutucadas e alertas automáticos para a equipe</p>
-                    </div>
-                    <Switch
-                      checked={coachConfig?.ativo ?? false}
-                      onCheckedChange={toggleCoach}
-                    />
-                  </div>
-                  {coachConfig && (
-                    <div className="grid grid-cols-2 gap-4 p-4 rounded-lg border border-border/30">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Horário</Label>
-                        <p className="text-sm">{coachConfig.horario_inicio} - {coachConfig.horario_fim}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Máx mensagens/dia/pessoa</Label>
-                        <p className="text-sm">{coachConfig.max_mensagens_dia_por_pessoa}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Intervalo mínimo</Label>
-                        <p className="text-sm">{coachConfig.intervalo_minimo_minutos} min</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Tom</Label>
-                        <p className="text-sm capitalize">{coachConfig.tom}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         </main>
       </div>
