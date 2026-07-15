@@ -606,11 +606,8 @@ async function handleAlissonAIReply(
           status: "enviada",
           recebido_em: new Date().toISOString(),
         });
-        await fetch(ALISSON_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: "5564992565779", message: exactReply, groupId, type: "ai_response" }),
-        });
+        await sendWhatsApp(ALISSON_PHONE_SEND, exactReply);
+
         return;
       }
     }
