@@ -1011,28 +1011,35 @@ Se não especificou para quem, pergunte antes de gerar o JSON.`;
               cutucadaMsg = `E aí ${targetFirstName}! 👋 ${info.mensagem_contexto}. Bora resolver? (responda 👍 se já fez)`;
             }
 
-            // Send via webhook
+            // Send via Evolution API
             try {
-              const encodedMsg = encodeURIComponent(cutucadaMsg);
-              await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
-              
-              // Save to coach_messages
-              await supabase.from("coach_messages").insert({
-                destinatario_nome: targetName,
-                mensagem: cutucadaMsg,
-                tipo: info.tipo || "geral",
-                group_id: matchedGroup?.group_id || null,
-                enviada: true,
-                enviada_em: new Date().toISOString(),
-              });
+              const phone = await lookupTeamPhone(supabase, targetVariants);
+              if (!phone) {
+                content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
+                content += `\n\n⚠️ Telefone de ${targetName} não cadastrado no perfil.`;
+              } else {
+                const result = await sendWhatsApp(phone, cutucadaMsg);
 
-              content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
-              content += `\n\n✅ **Cutucada enviada para ${targetName}!** Mensagem: "${cutucadaMsg.slice(0, 100)}..."`;
+                await supabase.from("coach_messages").insert({
+                  destinatario_nome: targetName,
+                  mensagem: cutucadaMsg,
+                  tipo: info.tipo || "geral",
+                  group_id: matchedGroup?.group_id || null,
+                  enviada: result.ok,
+                  enviada_em: new Date().toISOString(),
+                });
+
+                content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
+                content += result.ok
+                  ? `\n\n✅ **Cutucada enviada para ${targetName}!** Mensagem: "${cutucadaMsg.slice(0, 100)}..."`
+                  : `\n\n⚠️ Falha ao enviar cutucada (${result.status}).`;
+              }
             } catch (e) {
               console.error("Error sending cutucada:", e);
               content = content.replace(/<SEND_CUTUCADA>[\s\S]*?<\/SEND_CUTUCADA>/, "");
               content += "\n\n⚠️ Erro ao enviar cutucada. Tente novamente.";
             }
+
           }
         } catch (parseErr) {
           console.error("Error parsing cutucada:", parseErr);
