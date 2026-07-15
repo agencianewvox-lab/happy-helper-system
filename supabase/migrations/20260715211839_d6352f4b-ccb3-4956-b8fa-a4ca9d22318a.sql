@@ -1,0 +1,1 @@
+UPDATE public.whatsapp_grupos SET group_id = '120363426996753768@g.us' WHERE nome = 'NV- Ortis Odontologia 🦷' AND group_id LIKE 'placeholder%';
