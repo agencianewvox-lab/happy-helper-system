@@ -114,40 +114,50 @@ serve(async (req) => {
     const executedActions: string[] = []
 
     if (toolCalls) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, serviceKey);
+
       console.log(`Executando ${toolCalls.length} chamadas de ferramenta...`);
       for (const toolCall of toolCalls) {
         try {
           if (toolCall.function.name === "send_whatsapp_message") {
             const args = JSON.parse(toolCall.function.arguments)
             const recipient = args.recipient_name.toLowerCase();
-            const webhookUrl = recipient === "alisson" 
-              ? ALISSON_WEBHOOK_URL 
-              : TEAM_WEBHOOK_MAP[recipient];
+            const variants = RECIPIENT_LOOKUP[recipient];
 
-            if (webhookUrl) {
-              await fetch(webhookUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: args.text }),
-              })
+            if (!variants) {
+              executedActions.push(`✗ Destinatário ${args.recipient_name} não configurado.`)
+              continue;
+            }
+
+            const phone = await lookupTeamPhone(supabase, variants);
+            if (!phone) {
+              executedActions.push(`✗ Telefone de ${args.recipient_name} não cadastrado no perfil.`)
+              continue;
+            }
+
+            const result = await sendWhatsApp(phone, args.text);
+            if (result.ok) {
               executedActions.push(`✓ Mensagem enviada para ${args.recipient_name} via WhatsApp.`)
             } else {
-              executedActions.push(`✗ Destinatário ${args.recipient_name} não configurado.`)
+              executedActions.push(`✗ Falha ao enviar para ${args.recipient_name} (${result.status}).`)
             }
           } else if (toolCall.function.name === "send_group_message") {
             const args = JSON.parse(toolCall.function.arguments)
-            await fetch(ALISSON_WEBHOOK_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ message: args.text, groupId: args.group_id }),
-            })
-            executedActions.push(`✓ Mensagem enviada para o grupo ${args.group_id}.`)
+            const result = await sendWhatsApp(args.group_id, args.text);
+            if (result.ok) {
+              executedActions.push(`✓ Mensagem enviada para o grupo ${args.group_id}.`)
+            } else {
+              executedActions.push(`✗ Falha ao enviar para o grupo ${args.group_id} (${result.status}).`)
+            }
           }
         } catch (toolError) {
           console.error(`Erro ao executar ferramenta ${toolCall.function.name}:`, toolError);
           executedActions.push(`✗ Erro ao executar ${toolCall.function.name}.`)
         }
       }
+
       
       if (!reply) {
         reply = executedActions.join("\n") || "Comando executado, Senhor."
