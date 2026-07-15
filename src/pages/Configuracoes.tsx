@@ -31,7 +31,7 @@ const CATEGORY_ICONS: Record<string, typeof Brain> = {
   "WhatsApp": MessageSquare,
   "Feedback": BarChart3,
   "Briefing": BarChart3,
-  "CS Coach": Shield,
+  
   "Geral": Settings,
   // System config categories
   "SLA": Clock,

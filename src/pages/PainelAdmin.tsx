@@ -22,7 +22,7 @@ export default function PainelAdmin() {
   const [actionsLog, setActionsLog] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [briefings, setBriefings] = useState<any[]>([]);
-  const [coachConfig, setCoachConfig] = useState<any>(null);
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,18 +37,16 @@ export default function PainelAdmin() {
 
   const loadData = async () => {
     setLoading(true);
-    const [gruposRes, actionsRes, notifRes, briefingsRes, coachRes] = await Promise.all([
+    const [gruposRes, actionsRes, notifRes, briefingsRes] = await Promise.all([
       supabase.from("whatsapp_grupos").select("*").order("nome"),
       supabase.from("master_actions_log").select("*").order("executed_at", { ascending: false }).limit(50),
       supabase.from("master_notifications").select("*").order("created_at", { ascending: false }).limit(50),
       supabase.from("executive_briefings").select("*").order("briefing_date", { ascending: false }).limit(10),
-      supabase.from("coach_config").select("*").limit(1),
     ]);
     setGrupos(gruposRes.data || []);
     setActionsLog(actionsRes.data || []);
     setNotifications(notifRes.data || []);
     setBriefings(briefingsRes.data || []);
-    setCoachConfig(coachRes.data?.[0] || null);
     setLoading(false);
   };
 
@@ -56,14 +54,6 @@ export default function PainelAdmin() {
     return grupos.reduce((sum, g) => sum + (g.investimento_ads || 0), 0);
   }, [grupos]);
 
-  const toggleCoach = async (active: boolean) => {
-    if (!coachConfig) return;
-    const { error } = await supabase.from("coach_config").update({ ativo: active }).eq("id", coachConfig.id);
-    if (!error) {
-      setCoachConfig({ ...coachConfig, ativo: active });
-      toast.success(`CS Coach ${active ? "ativado" : "pausado"}`);
-    }
-  };
 
   if (profileLoading || loading) {
     return (
@@ -137,7 +127,7 @@ export default function PainelAdmin() {
               <TabsTrigger value="acoes">📋 Ações Master</TabsTrigger>
               <TabsTrigger value="notificacoes">🔔 Notificações</TabsTrigger>
               <TabsTrigger value="briefings">☀️ Briefings</TabsTrigger>
-              <TabsTrigger value="config">⚙️ Configurações</TabsTrigger>
+              
             </TabsList>
 
             <TabsContent value="financeiro">
@@ -263,45 +253,6 @@ export default function PainelAdmin() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="config">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Configurações do Sistema</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between p-4 rounded-lg border border-border/30">
-                    <div>
-                      <Label className="text-sm font-medium">CS Coach Automático</Label>
-                      <p className="text-xs text-muted-foreground">Cutucadas e alertas automáticos para a equipe</p>
-                    </div>
-                    <Switch
-                      checked={coachConfig?.ativo ?? false}
-                      onCheckedChange={toggleCoach}
-                    />
-                  </div>
-                  {coachConfig && (
-                    <div className="grid grid-cols-2 gap-4 p-4 rounded-lg border border-border/30">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Horário</Label>
-                        <p className="text-sm">{coachConfig.horario_inicio} - {coachConfig.horario_fim}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Máx mensagens/dia/pessoa</Label>
-                        <p className="text-sm">{coachConfig.max_mensagens_dia_por_pessoa}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Intervalo mínimo</Label>
-                        <p className="text-sm">{coachConfig.intervalo_minimo_minutos} min</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Tom</Label>
-                        <p className="text-sm capitalize">{coachConfig.tom}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         </main>
       </div>
