@@ -1163,26 +1163,32 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
             cutucadaMsg = `E aí ${firstName}! 👋 ${args.mensagem_contexto}${matchedGroup ? ` (${matchedGroup.nome})` : ""}. Bora resolver isso? (responda 👍 se já fez)`;
           }
 
-          // Send via webhook
+          // Send via Evolution API
           try {
-            const encodedMsg = encodeURIComponent(cutucadaMsg);
-            const sendResp = await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
-            console.log(`Cutucada sent to ${targetName}: ${sendResp.status}`);
+            const phoneCut = await lookupTeamPhone(supabase, targetVariants);
+            if (!phoneCut) {
+              toolResults.push(`❌ Telefone de ${targetName} não cadastrado no perfil.`);
+            } else {
+              const sendRes = await sendWhatsApp(phoneCut, cutucadaMsg);
+              console.log(`Cutucada sent to ${targetName}: ${sendRes.status}`);
 
-            // Save to coach_messages
-            await supabase.from("coach_messages").insert({
-              destinatario_nome: targetName,
-              mensagem: cutucadaMsg,
-              tipo: args.tipo || "geral",
-              group_id: matchedGroup?.group_id || null,
-              enviada: true,
-              enviada_em: new Date().toISOString(),
-            });
+              await supabase.from("coach_messages").insert({
+                destinatario_nome: targetName,
+                mensagem: cutucadaMsg,
+                tipo: args.tipo || "geral",
+                group_id: matchedGroup?.group_id || null,
+                enviada: sendRes.ok,
+                enviada_em: new Date().toISOString(),
+              });
 
-            toolResults.push(`✅ Cutucada enviada para ${targetName}! Mensagem: "${cutucadaMsg.slice(0, 80)}..."`);
+              toolResults.push(sendRes.ok
+                ? `✅ Cutucada enviada para ${targetName}! Mensagem: "${cutucadaMsg.slice(0, 80)}..."`
+                : `❌ Falha ao enviar cutucada (${sendRes.status})`);
+            }
           } catch (e) {
             console.error(`Failed to send cutucada to ${targetName}:`, e);
             toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
+
           }
         }
       }
