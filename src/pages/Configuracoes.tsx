@@ -212,6 +212,15 @@ export default function Configuracoes() {
             <Settings className="w-3.5 h-3.5" />
             Regras do Sistema
           </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "equipe" ? "default" : "outline"}
+            className="gap-1.5 text-xs"
+            onClick={() => setActiveTab("equipe")}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Equipe
+          </Button>
         </div>
 
         {/* PROMPTS TAB */}
