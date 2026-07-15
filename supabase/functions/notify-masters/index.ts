@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,11 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Master webhooks
-const MASTER_WEBHOOKS: Record<string, string> = {
-  "Alisson": "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd",
-  "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-};
+const MASTER_NAMES = ["Alisson", "Priscilla"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -31,7 +28,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Throttling: check if same tipo + group_id was sent in last 4 hours
+    // Throttling: same tipo + group_id within last 4h
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     let throttleQuery = supabase
       .from("master_notifications")
@@ -39,27 +36,30 @@ Deno.serve(async (req) => {
       .eq("tipo", tipo)
       .gte("enviada_em", fourHoursAgo);
 
-    if (group_id) {
-      throttleQuery = throttleQuery.eq("group_id", group_id);
-    }
+    if (group_id) throttleQuery = throttleQuery.eq("group_id", group_id);
 
     const { data: existing } = await throttleQuery;
     if (existing && existing.length > 0) {
-      return new Response(JSON.stringify({ status: "throttled", message: "Notificação similar já enviada nas últimas 4h" }), {
+      return new Response(JSON.stringify({ status: "throttled" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const results: any[] = [];
 
-    for (const [name, webhook] of Object.entries(MASTER_WEBHOOKS)) {
+    for (const name of MASTER_NAMES) {
       try {
-        const fullMessage = `🔔 *${titulo}*\n\n${mensagem}`;
-        const encodedMsg = encodeURIComponent(fullMessage);
-        const sendResp = await fetch(`${webhook}?message=${encodedMsg}`);
-        console.log(`Notification sent to ${name}: ${sendResp.status}`);
+        const phone = await lookupTeamPhone(supabase, [name]);
+        if (!phone) {
+          console.warn(`[notify-masters] No phone for ${name} — skipping`);
+          results.push({ name, sent: false, error: "no_phone" });
+          continue;
+        }
 
-        // Log notification
+        const fullMessage = `🔔 *${titulo}*\n\n${mensagem}`;
+        const sendResp = await sendWhatsApp(phone, fullMessage);
+        console.log(`Notification to ${name}: ${sendResp.status}`);
+
         await supabase.from("master_notifications").insert({
           destinatario: name,
           tipo,
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
           dados_relacionados: dados_extras || {},
         });
 
-        results.push({ name, sent: true });
+        results.push({ name, sent: sendResp.ok });
       } catch (e) {
         console.error(`Failed to notify ${name}:`, e);
         results.push({ name, sent: false, error: e instanceof Error ? e.message : "Unknown" });
