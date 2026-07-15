@@ -301,6 +301,9 @@ export default function Configuracoes() {
             ))}
           </Tabs>
         )}
+
+        {/* EQUIPE TAB */}
+        {activeTab === "equipe" && <EquipeManager />}
       </main>
 
       {/* Password verification dialog */}
