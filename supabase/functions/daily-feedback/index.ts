@@ -329,15 +329,20 @@ Lembre: máximo 500 caracteres. Uma mensagem de WhatsApp curta e pessoal.`;
         feedbackMsg = feedbackMsg.slice(0, 697) + "...";
       }
 
-      // Send via webhook
+      // Send via Evolution API
       try {
-        const encodedMsg = encodeURIComponent(feedbackMsg);
-        const sendResp = await fetch(`${member.webhook}?message=${encodedMsg}`);
+        const phone = await lookupTeamPhone(supabase, [member.firstName, member.name]);
+        if (!phone) {
+          console.warn(`[daily-feedback] No phone for ${member.name} — skipping`);
+          continue;
+        }
+        const sendResp = await sendWhatsApp(phone, feedbackMsg);
         console.log(`Feedback sent to ${member.name}: ${sendResp.status}`);
       } catch (e) {
         console.error(`Failed to send feedback to ${member.name}:`, e);
         continue;
       }
+
 
       // Log to DB (unique constraint prevents duplicates)
       await supabase.from("daily_feedback_log").insert({
