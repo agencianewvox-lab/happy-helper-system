@@ -2,7 +2,7 @@
 // Replaces all previous n8n webhook plumbing.
 
 const EVOLUTION_BASE_URL = "https://bot-evolution-api.1lxz8u.easypanel.host";
-const EVOLUTION_INSTANCE = "financeiro nova voz"; // encoded on-the-fly
+const EVOLUTION_INSTANCE = "financeiro new vox"; // encoded on-the-fly
 
 export interface SendResult {
   ok: boolean;
