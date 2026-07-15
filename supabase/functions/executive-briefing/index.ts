@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,11 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Master webhooks
-const MASTER_WEBHOOKS: Record<string, string> = {
-  "Alisson": "https://bot-n8n.1lxz8u.easypanel.host/webhook/b833f73e-af8f-4231-85de-1ec473e52dcd",
-  "Priscilla": "https://bot-n8n.1lxz8u.easypanel.host/webhook/cb1e3596-01ff-4cd2-a3a6-32433c8b8ca5",
-};
+const MASTER_NAMES = ["Alisson", "Priscilla"];
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
