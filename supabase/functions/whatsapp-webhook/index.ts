@@ -1847,13 +1847,13 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
 
         if (fnName === "enviar_cutucada") {
           const targetName = args.destinatario;
-          const targetWebhookUrl = Object.entries(TEAM_WEBHOOK_MAP).find(([key]) =>
+          const targetVariants = Object.entries(TEAM_NAME_VARIANTS).find(([key]) =>
             targetName.toLowerCase().includes(key.toLowerCase()) ||
             key.toLowerCase().includes(targetName.toLowerCase().split(" ")[0])
           )?.[1];
 
-          if (!targetWebhookUrl) {
-            toolResults.push(`❌ Não encontrei webhook para "${targetName}".`);
+          if (!targetVariants) {
+            toolResults.push(`❌ Não encontrei "${targetName}" na equipe.`);
           } else {
             let matchedGroup: any = null;
             if (args.group_name) {
@@ -1890,22 +1890,27 @@ ${feedbackContext || "Nenhum feedback anterior registrado."}`;
             }
 
             try {
-              const encodedMsg = encodeURIComponent(cutucadaMsg);
-              await fetch(`${targetWebhookUrl}?message=${encodedMsg}`);
-              await supabase.from("coach_messages").insert({
-                destinatario_nome: targetName,
-                mensagem: cutucadaMsg,
-                tipo: args.tipo || "geral",
-                group_id: matchedGroup?.group_id || null,
-                enviada: true,
-                enviada_em: new Date().toISOString(),
-              });
-              toolResults.push(`✅ Cutucada enviada para ${targetName}!`);
+              const phoneCut2 = await lookupTeamPhone(supabase, targetVariants);
+              if (!phoneCut2) {
+                toolResults.push(`❌ Telefone de ${targetName} não cadastrado.`);
+              } else {
+                const sendRes = await sendWhatsApp(phoneCut2, cutucadaMsg);
+                await supabase.from("coach_messages").insert({
+                  destinatario_nome: targetName,
+                  mensagem: cutucadaMsg,
+                  tipo: args.tipo || "geral",
+                  group_id: matchedGroup?.group_id || null,
+                  enviada: sendRes.ok,
+                  enviada_em: new Date().toISOString(),
+                });
+                toolResults.push(sendRes.ok ? `✅ Cutucada enviada para ${targetName}!` : `❌ Falha ao enviar (${sendRes.status})`);
+              }
             } catch (e) {
               toolResults.push(`❌ Erro ao enviar cutucada para ${targetName}`);
             }
           }
         }
+
 
         // Handle salvar_nota_cliente
         if (fnName === "salvar_nota_cliente") {
