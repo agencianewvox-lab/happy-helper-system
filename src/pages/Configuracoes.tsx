@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { SystemConfigCard, type SystemConfig } from "@/components/config/SystemConfigCard";
 import { PasswordVerificationDialog } from "@/components/config/PasswordVerificationDialog";
+import { EquipeManager } from "@/components/config/EquipeManager";
 
 interface PromptConfig {
   id: string;
