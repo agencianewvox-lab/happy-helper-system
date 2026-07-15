@@ -1359,19 +1359,10 @@ NOTA: As cutucadas automáticas são enviadas pelo CS Coach em horário comercia
       recebido_em: new Date().toISOString(),
     });
 
-    // Send response via n8n webhook
-    const webhookResponse = await fetch(ALISSON_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        phone: "5564992565779",
-        message: aiReply,
-        groupId: groupId,
-        type: "ai_response",
-      }),
-    });
+    // Send response via Evolution API
+    const sendResult = await sendWhatsApp(ALISSON_PHONE_SEND, aiReply);
+    console.log("Evolution send status:", sendResult.status);
 
-    console.log("Webhook response status:", webhookResponse.status);
   } catch (err) {
     console.error("Error in Alisson AI reply:", err);
   }
