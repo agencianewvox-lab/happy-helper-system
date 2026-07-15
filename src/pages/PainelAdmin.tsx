@@ -54,14 +54,6 @@ export default function PainelAdmin() {
     return grupos.reduce((sum, g) => sum + (g.investimento_ads || 0), 0);
   }, [grupos]);
 
-  const toggleCoach = async (active: boolean) => {
-    if (!coachConfig) return;
-    const { error } = await supabase.from("coach_config").update({ ativo: active }).eq("id", coachConfig.id);
-    if (!error) {
-      setCoachConfig({ ...coachConfig, ativo: active });
-      toast.success(`CS Coach ${active ? "ativado" : "pausado"}`);
-    }
-  };
 
   if (profileLoading || loading) {
     return (
