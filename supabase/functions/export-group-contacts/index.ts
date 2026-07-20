@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const r = await fetch(u, { headers: { apikey: apiKey } });
     const body = await r.text();
     results.push({ url: u, status: r.status, body: body.slice(0, 5000) });
-    if (r.ok) break;
+    if (r.ok && u.includes('/group/participants/')) break;
   }
 
   return new Response(JSON.stringify(results, null, 2), {
