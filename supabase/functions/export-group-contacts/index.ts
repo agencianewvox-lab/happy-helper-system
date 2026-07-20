@@ -18,6 +18,8 @@ Deno.serve(async (req) => {
 
   // Try multiple known endpoints
   const attempts = [
+    `${EVOLUTION_BASE_URL}/instance/connectionState/${encodeURIComponent(EVOLUTION_INSTANCE)}`,
+    `${EVOLUTION_BASE_URL}/group/fetchAllGroups/${encodeURIComponent(EVOLUTION_INSTANCE)}?getParticipants=false`,
     `${EVOLUTION_BASE_URL}/group/participants/${encodeURIComponent(EVOLUTION_INSTANCE)}?groupJid=${encodeURIComponent(groupJid)}`,
     `${EVOLUTION_BASE_URL}/group/findGroupInfos/${encodeURIComponent(EVOLUTION_INSTANCE)}?groupJid=${encodeURIComponent(groupJid)}`,
   ];
