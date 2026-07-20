@@ -17,11 +17,13 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("EVOLUTION_API_KEY")!;
 
   // Try multiple known endpoints
+  const instance = url.searchParams.get('instance') || EVOLUTION_INSTANCE;
   const attempts = [
-    `${EVOLUTION_BASE_URL}/instance/connectionState/${encodeURIComponent(EVOLUTION_INSTANCE)}`,
-    `${EVOLUTION_BASE_URL}/group/fetchAllGroups/${encodeURIComponent(EVOLUTION_INSTANCE)}?getParticipants=false`,
-    `${EVOLUTION_BASE_URL}/group/participants/${encodeURIComponent(EVOLUTION_INSTANCE)}?groupJid=${encodeURIComponent(groupJid)}`,
-    `${EVOLUTION_BASE_URL}/group/findGroupInfos/${encodeURIComponent(EVOLUTION_INSTANCE)}?groupJid=${encodeURIComponent(groupJid)}`,
+    `${EVOLUTION_BASE_URL}/instance/fetchInstances`,
+    `${EVOLUTION_BASE_URL}/instance/connectionState/${encodeURIComponent(instance)}`,
+    `${EVOLUTION_BASE_URL}/group/fetchAllGroups/${encodeURIComponent(instance)}?getParticipants=false`,
+    `${EVOLUTION_BASE_URL}/group/participants/${encodeURIComponent(instance)}?groupJid=${encodeURIComponent(groupJid)}`,
+    `${EVOLUTION_BASE_URL}/group/findGroupInfos/${encodeURIComponent(instance)}?groupJid=${encodeURIComponent(groupJid)}`,
   ];
 
   const results: any[] = [];
