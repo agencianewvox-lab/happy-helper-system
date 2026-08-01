@@ -15,6 +15,24 @@ Deno.serve(async (req) => {
   else if (action === 'participants') target = `${BASE}/group/participants/${encodeURIComponent(instance)}?groupJid=${encodeURIComponent(groupJid)}`;
   else if (action === 'info') target = `${BASE}/group/findGroupInfos/${encodeURIComponent(instance)}?groupJid=${encodeURIComponent(groupJid)}`;
   else if (action === 'allGroups') target = `${BASE}/group/fetchAllGroups/${encodeURIComponent(instance)}?getParticipants=false`;
+  else if (action === 'webhook') target = `${BASE}/webhook/find/${encodeURIComponent(instance)}`;
+  else if (action === 'setWebhook') {
+    const r = await fetch(`${BASE}/webhook/set/${encodeURIComponent(instance)}`, {
+      method: 'POST',
+      headers: { apikey: apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        webhook: {
+          enabled: true,
+          url: url.searchParams.get('url') || '',
+          byEvents: false,
+          base64: false,
+          events: ['MESSAGES_UPSERT'],
+        },
+      }),
+    });
+    const b = await r.text();
+    return new Response(b, { status: r.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
 
   const r = await fetch(target, { headers: { apikey: apiKey } });
   const body = await r.text();
