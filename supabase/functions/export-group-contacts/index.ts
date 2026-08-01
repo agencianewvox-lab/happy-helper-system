@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
   else if (action === 'participants') target = `${BASE}/group/participants/${encodeURIComponent(instance)}?groupJid=${encodeURIComponent(groupJid)}`;
   else if (action === 'info') target = `${BASE}/group/findGroupInfos/${encodeURIComponent(instance)}?groupJid=${encodeURIComponent(groupJid)}`;
   else if (action === 'allGroups') target = `${BASE}/group/fetchAllGroups/${encodeURIComponent(instance)}?getParticipants=false`;
+  else if (action === 'webhook') target = `${BASE}/webhook/find/${encodeURIComponent(instance)}`;
 
   const r = await fetch(target, { headers: { apikey: apiKey } });
   const body = await r.text();
