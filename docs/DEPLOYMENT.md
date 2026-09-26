@@ -23,11 +23,16 @@ As demais funções em `supabase/functions` ainda executam no backend atual
 até a conclusão da migração do servidor. Um build verde NÃO confirma
 a migração completa nem a recepção de mensagens WhatsApp.
 
-Em 26/09/2026, a Evolution respondeu estado open, com webhook habilitado
-no projeto do VOXI. O banco do painel tinha última mensagem de grupo em
-06/08/2026 e nenhum registro nas últimas 24 horas. Não foi alterado o
-webhook compartilhado. Sem a configuração administrativa do banco e a
-transição do encaminhamento, a recepção contínua permanece pendente.
+Em 26/09/2026, após a reconexão informada pelo proprietário, o banco do
+painel mostrou 16 mensagens de grupo nas últimas 24 horas, de três grupos,
+com última mensagem em 26/09/2026 12:13:32 UTC. Todas as 16 tinham a instância
+`voxi_executivo_d13a86fd` no evento recebido. Isso comprova recepção recente,
+mas não disponibilidade contínua futura. A captura do Evolution da instância
+"financeiro nova voz" mostra webhook ativo para a função do banco do painel;
+ela é uma instância diferente, e os eventos selecionados não aparecem na
+captura. Nenhum webhook compartilhado foi alterado nesta revisão.
+O cartão Master agora compara a URL do webhook da instância monitorada com a
+função do banco do painel e verifica se `MESSAGES_UPSERT` está selecionado.
 OpenAI e Meta Ads foram adiados explicitamente pelo proprietário.
 
 ## Fluxo de código
@@ -59,10 +64,12 @@ Não há fallback para a função pública antiga quando um envio falha.
 ## Interface e verificações desta etapa
 
 - Login exclusivo do time; onboarding e NPS continuam públicos por link.
-- Manrope e DM Sans locais, tema claro e formulários responsivos.
+- Manrope e DM Sans locais, temas escuro e claro à escolha do time e
+  formulários responsivos. O escuro é o padrão inicial; a preferência fica
+  salva neste navegador. Onboarding e NPS públicos permanecem no tema claro.
 - Central Master em `/master/whatsapp`, com conexão, último recebimento,
   mensagens em 24h, webhook e envio manual revisável por cliente.
-- 11 testes simulados da API, sem envio real, além do teste existente.
+- Testes simulados da API, sem envio real, incluindo destino e evento do webhook.
 - Envio aceito pela Evolution não significa entrega ou leitura.
 - O usuário optou por fazer o teste de envio real depois.
 - Ainda requer validação autenticada com a conta do Master em produção.

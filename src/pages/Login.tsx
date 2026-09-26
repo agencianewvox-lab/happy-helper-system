@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Loader2, Layers3, MessageSquare, ChartNoAxesCombined } from "lucide-react";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
+import { ThemePreference } from "@/components/ThemePreference";
 
 export default function Login() {
   const { user, loading: authLoading } = useAuth();
@@ -43,7 +44,7 @@ export default function Login() {
         <footer className="login-story-footer"><span>Feito para quem faz acontecer.</span><span>NEW VOX © {new Date().getFullYear()}</span></footer>
       </section>
       <section className="login-access" aria-labelledby="login-title">
-        <div className="login-access-top"><LockKeyhole size={14} /> Ambiente exclusivo do time</div>
+        <div className="login-access-top"><LockKeyhole size={14} /> Ambiente exclusivo do time <ThemePreference compact /></div>
         <div className="login-form-wrap">
           <span className="login-section-number">01 / ACESSO AO WORKSPACE</span>
           <h2 id="login-title">Bom ter você aqui.</h2>
@@ -51,7 +52,7 @@ export default function Login() {
           <form onSubmit={handleLogin} className="space-y-5" aria-busy={loading}>
             <div className="space-y-2"><Label htmlFor="email">E-mail de acesso</Label><Input id="email" type="email" autoComplete="username" placeholder="Seu e-mail de acesso" value={email} onChange={e => setEmail(e.target.value)} required disabled={loading} className="login-input" /></div>
             <div className="space-y-2"><Label htmlFor="password">Senha</Label><div className="relative"><Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Digite sua senha" value={password} onChange={e => setPassword(e.target.value)} required disabled={loading} className="login-input pr-12" /><button type="button" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} aria-pressed={showPassword} onClick={() => setShowPassword(v => !v)} className="absolute inset-y-0 right-0 px-4 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>
-            {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+            {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
             <Button type="submit" disabled={loading || authLoading} className="login-submit">{loading || authLoading ? <><Loader2 className="animate-spin" size={18} /> {loading ? "Entrando…" : "Verificando sessão…"}</> : <>Entrar no workspace <ArrowRight size={18} /></>}</Button>
           </form>
           <div className="login-help"><LockKeyhole size={17} /><p>Seu acesso é individual e autorizado pela New Vox.<br /><span>Precisa de ajuda? Fale com o administrador do time.</span></p></div>

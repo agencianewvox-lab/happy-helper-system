@@ -14,6 +14,7 @@ import {
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { cn } from "@/lib/utils";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
+import { ThemePreference } from "@/components/ThemePreference";
 
 interface DashboardSidebarProps {
   isAdmin: boolean;
@@ -121,6 +122,10 @@ export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: Dashb
         {/* Logout at bottom */}
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
+            <div className={cn("mb-4 flex flex-col gap-2 border-t border-border/70 pt-4", collapsed ? "items-center" : "px-2")}>
+              {!collapsed && <span className="text-[10px] font-semibold uppercase tracking-[.16em] text-muted-foreground">Aparência</span>}
+              <ThemePreference toggleOnly={collapsed} />
+            </div>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton

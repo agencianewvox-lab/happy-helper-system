@@ -2,6 +2,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AccountPasswordForm } from '@/components/config/AccountPasswordForm';
+import { ThemePreference } from '@/components/ThemePreference';
 
 export default function MinhaConta() {
   const { user, loading } = useAuth();
@@ -13,6 +14,11 @@ export default function MinhaConta() {
       <p className="login-section-number">CONFIGURAÇÕES / MINHA CONTA</p>
       <h1 className="text-3xl font-semibold tracking-tight mt-3">Seu acesso, seu controle.</h1>
       <p className="text-muted-foreground mt-3 mb-8">Gerencie a segurança da sua conta sem alterar os dados dos clientes ou as configurações do time.</p>
+      <section className="rounded-2xl border bg-card p-6 sm:p-8 mb-5" aria-labelledby="appearance-heading">
+        <h2 id="appearance-heading" className="text-xl font-semibold">Aparência do painel</h2>
+        <p className="text-sm text-muted-foreground mt-1 mb-5">Escolha o visual mais confortável para trabalhar. Sua preferência fica salva neste navegador.</p>
+        <ThemePreference />
+      </section>
       <AccountPasswordForm key={user.id} userId={user.id} email={user.email} />
       <p className="flex gap-2 text-xs text-muted-foreground mt-5"><ShieldCheck size={15} className="shrink-0" />Área pessoal disponível para todos os integrantes autenticados do time.</p>
     </div>

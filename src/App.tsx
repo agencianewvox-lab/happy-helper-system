@@ -4,6 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 
 import Login from "./pages/Login";
@@ -57,34 +59,41 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   </>;
 }
 
+function AppRoutes() {
+  const { pathname } = useLocation();
+  const customerForm = /^\/(onboardingnv|pesquisa-nps)(\/|$)/.test(pathname);
+  return <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="newvox-workspace-theme" forcedTheme={customerForm ? 'light' : undefined} disableTransitionOnChange>
+    <Toaster />
+    <Sonner />
+    <Suspense fallback={<div role="status" className="min-h-screen grid place-items-center text-sm text-muted-foreground">Carregando seu workspace…</div>}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="/pendencias" element={<ProtectedRoute><Pendencias /></ProtectedRoute>} />
+        <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
+        <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
+        <Route path="/nps-real" element={<ProtectedRoute><NpsReal /></ProtectedRoute>} />
+        <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
+        <Route path="/master/whatsapp" element={<ProtectedRoute><WhatsappCentral /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
+        <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+        <Route path="/configuracoes/minha-conta" element={<ProtectedRoute><MinhaConta /></ProtectedRoute>} />
+        <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
+        <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
+        <Route path="/onboardingnv/:groupId/:surveyType?" element={<OnboardingClinica />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  </ThemeProvider>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
-        <Suspense fallback={<div role="status" className="min-h-screen grid place-items-center text-sm text-muted-foreground">Carregando seu workspace…</div>}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
-          <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-          <Route path="/pendencias" element={<ProtectedRoute><Pendencias /></ProtectedRoute>} />
-          <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
-          <Route path="/nps" element={<ProtectedRoute><NpsPreditivo /></ProtectedRoute>} />
-          <Route path="/nps-real" element={<ProtectedRoute><NpsReal /></ProtectedRoute>} />
-          <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
-          
-          <Route path="/master/whatsapp" element={<ProtectedRoute><WhatsappCentral /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
-          <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
-          <Route path="/configuracoes/minha-conta" element={<ProtectedRoute><MinhaConta /></ProtectedRoute>} />
-          <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
-          <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
-          <Route path="/onboardingnv/:groupId/:surveyType?" element={<OnboardingClinica />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        </Suspense>
+        <AppRoutes />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

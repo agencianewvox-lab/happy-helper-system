@@ -66,6 +66,18 @@
 .onboarding-fields [class*='text-cyan'] { color: #146463; }
 .onboarding-fields label { font-size: 13px; }
 .survey-shell { min-height: 100svh; background: #f3f6f6; display: flex; align-items: center; justify-content: center; padding: 32px 20px; }
+.dark .workspace-sidebar [data-sidebar='sidebar'] { background: hsl(var(--sidebar-background)); }
+.dark .workspace-sidebar [data-active='true'] { background: hsl(var(--primary) / .13); color: hsl(var(--primary)); }
+.dark .login-shell { background: hsl(var(--background)); color: hsl(var(--foreground)); }
+.dark .login-access { background: #101f22; }
+.dark .login-access-top, .dark .login-intro, .dark .login-help, .dark .login-help span, .dark .login-client-note { color: hsl(var(--muted-foreground)); }
+.dark .login-form-wrap label { color: hsl(var(--foreground)); }
+.dark .login-form-wrap .login-input { background: hsl(var(--card)); border-color: hsl(var(--border)); color: hsl(var(--foreground)); box-shadow: none; }
+.dark .login-form-wrap .login-input::placeholder { color: hsl(var(--muted-foreground)); }
+.dark .login-form-wrap .login-submit { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.dark .login-form-wrap .login-submit:hover { background: #83e6d7; }
+.dark .login-help { border-color: hsl(var(--border)); }
+.dark .login-section-number { color: hsl(var(--primary)); }
 @media (max-width: 850px) { .login-shell { grid-template-columns: 1fr; } .login-story { padding: 28px; } .login-editorial { padding: 34px 0 8px; } .login-editorial h1 { font-size: 37px; margin-top: 20px; } .login-description { font-size: 13px; } .workspace-illustration, .login-story-footer { display: none; } .login-access { padding: 28px; } .login-access-top { justify-content: flex-start; } .login-form-wrap { padding: 35px 0; max-width: 460px; } .eyebrow { font-size: 8px; } .onboarding-layout { grid-template-columns: 1fr; gap: 25px; } .onboarding-guide { position: static; } .onboarding-guide ol { display: none; } .onboarding-guide h1 { font-size: 28px; } .onboarding-shell { padding: 24px 16px; } .onboarding-brand { margin-bottom: 28px; } }
 @media (max-width: 560px) { .login-story { padding: 24px; } .login-editorial { padding: 20px 0 0; } .login-editorial h1 { font-size: 28px; margin: 0; } .login-description, .login-editorial .eyebrow { display: none; } .login-access { padding: 24px; } .login-form-wrap { padding: 24px 0; } .login-intro { margin-bottom: 24px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

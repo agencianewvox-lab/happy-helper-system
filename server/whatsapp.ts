@@ -38,11 +38,18 @@ export async function handleWhatsapp(request: Request) {
       ]);
       const webhook = webhookResult.value?.webhook ?? webhookResult.value;
       let webhookHost: string | null = null;
+      let targetMatches = false;
       try { webhookHost = new URL(webhook?.url).hostname; } catch { /* Never expose webhook credentials or query strings. */ }
+      try {
+        const configured = new URL(webhook?.url);
+        const expected = new URL('/functions/v1/whatsapp-webhook', database.url);
+        targetMatches = configured.origin === expected.origin && configured.pathname.replace(/\/$/, '') === expected.pathname;
+      } catch { /* Invalid or missing destination is reported as unmatched. */ }
+      const events = Array.isArray(webhook?.events) ? webhook.events : [];
       return reply({
         checkedAt: new Date().toISOString(), instance: INSTANCE,
         connection: stateResult.ok ? stateResult.value?.instance?.state ?? 'unknown' : 'unavailable',
-        webhook: { checked: webhookResult.ok, enabled: webhook?.enabled === true, host: webhookHost, events: Array.isArray(webhook?.events) ? webhook.events : [] },
+        webhook: { checked: webhookResult.ok, enabled: webhook?.enabled === true, host: webhookHost, targetMatches, messagesEventEnabled: events.some((event: unknown) => typeof event === 'string' && event.toUpperCase() === 'MESSAGES_UPSERT') },
         reception: { available: !latest.error && !recent.error, lastMessageAt: latest.data?.[0]?.recebido_em ?? null, messages24h: recent.error ? null : recent.count ?? 0 },
         groups: groups.data ?? [], groupsAvailable: !groups.error,
       });
