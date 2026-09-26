@@ -5,6 +5,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/onboardingnv/:path*", "destination": "/form-onboarding.html" },
+    { "source": "/pesquisa-nps/:path*", "destination": "/form-nps.html" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

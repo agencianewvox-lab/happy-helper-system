@@ -57,7 +57,7 @@ export async function handleWhatsapp(request: Request) {
     if (!profile.is_master && profile.role !== 'admin' && (!names[profile.full_name] || group.gestor_responsavel !== names[profile.full_name])) return reply({ error: 'Você não tem permissão para enviar a este grupo.' }, 403);
     const state = await evolution('/instance/connectionState');
     if (state?.instance?.state !== 'open') return reply({ error: 'O WhatsApp não está conectado. Peça ao Master para verificar a conexão.' }, 409);
-    const sent = await evolution('/message/sendText', { number: input.group_id, text: input.message.trim() });
+    const sent = await evolution('/message/sendText', { number: input.group_id, text: input.message.trim(), linkPreview: true });
     if (!sent?.key?.id) return reply({ error: 'A Evolution não confirmou o envio. Consulte o WhatsApp antes de tentar novamente.' }, 502);
     return reply({ accepted: true, messageId: sent.key.id, providerStatus: typeof sent.status === 'string' ? sent.status : 'PENDING', acceptedAt: new Date().toISOString() });
   } catch {

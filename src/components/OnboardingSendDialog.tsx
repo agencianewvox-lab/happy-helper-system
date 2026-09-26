@@ -10,26 +10,33 @@ import { whatsappRequest, publicFormUrl } from "@/lib/whatsapp";
 
 
 
-const MSG_CLINICA = `Olá, Dr(a). [Nome do Responsável]! Tudo bem?
+const MSG_CLINICA = `*NEW VOX | Boas-vindas à nossa parceria* ✨
 
-Aqui é da equipe da New Vox! Para iniciarmos os trabalhos de marketing da sua clínica com máxima eficiência, preparamos um formulário de onboarding rápido para conhecer melhor o seu negócio.
+Olá, Dr(a). [Nome do Responsável]! Tudo bem?
 
-👉 [Link do onboarding]
+Vamos conhecer melhor sua clínica, seus serviços e seus objetivos para planejar os próximos passos da nossa parceria.
 
-Leva poucos minutos e nos ajuda a criar estratégias sob medida para você!
+*Preencha seu onboarding pelo link abaixo:*
+[Link do onboarding]
 
-Um abraço,
-Equipe New Vox 🚀`;
+Você pode responder pelo celular, sem precisar de login.
+Se surgir alguma dúvida, fale com nossa equipe aqui no grupo.
 
-const MSG_GENERICO = `Olá, Time! Tudo bem?
+_Com cuidado em cada etapa, equipe New Vox._`;
 
-Para iniciarmos os trabalhos com o máximo de assertividade, preparamos um formulário de onboarding para entendermos melhor o seu negócio.
+const MSG_GENERICO = `*NEW VOX | Boas-vindas à nossa parceria* ✨
 
-👉 [Link do onboarding]
+Olá, time! Tudo bem?
 
-Leva poucos minutos e faz toda a diferença!
+Vamos conhecer melhor sua empresa, seus produtos e serviços e seus objetivos para planejar os próximos passos da nossa parceria.
 
-Equipe New Vox 🚀`;
+*Preencha seu onboarding pelo link abaixo:*
+[Link do onboarding]
+
+Você pode responder pelo celular, sem precisar de login.
+Se surgir alguma dúvida, fale com nossa equipe aqui no grupo.
+
+_Com cuidado em cada etapa, equipe New Vox._`;
 
 interface Props {
   groupId: string;
@@ -90,6 +97,7 @@ export function OnboardingSendDialog({ groupId, groupName, categoria, responsave
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">Edite a mensagem abaixo se necessário antes de enviar.</p>
           <Textarea aria-label="Mensagem que será enviada ao grupo" value={message} onChange={(e) => setMessage(e.target.value)} rows={10} className="text-sm" />
+          <p className="text-xs text-muted-foreground">Link no domínio paineldecontrole.newvox.site, com capa New Vox. A exibição da prévia depende do WhatsApp.</p>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>

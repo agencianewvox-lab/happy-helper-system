@@ -93,7 +93,31 @@ Os arquivos históricos de migrations não foram reescritos.
    por ele. Não substituir sua URL sem uma estratégia de encaminhamento validada.
 8. Só desativar o deploy/funções antigos após validar o novo fluxo completo.
 
-## Reversão
+## Compartilhamento dos formulários
+
+Os links de onboarding e NPS enviados ou copiados pelo painel usam
+https://paineldecontrole.newvox.site. Não muda a seleção clínica/genérico,
+as perguntas, o grupo de destino ou o banco que recebe as respostas.
+
+O build gera form-onboarding.html e form-nps.html a partir da entrada compilada
+do React. Rewrites específicos entregam esses arquivos no endereço original
+do formulário, antes do fallback SPA. Assim as tags Open Graph e as capas JPEG
+1200 x 630 ficam no HTML inicial, acessíveis sem JavaScript e sem autenticação.
+Não incluir nomes de clientes, identificadores de grupos ou respostas nas capas.
+
+As capas em public/share são capturas da composição HTML/CSS em
+design/share-card.html (variante ?type=nps). Ao atualizar a arte, exportar em
+1200 x 630, conferir o formato real e versionar o nome para evitar cache antigo.
+Não adicionar dependências de geração de imagem ao servidor.
+
+O envio solicita linkPreview: true à Evolution. A aparência no aplicativo,
+cache e entrega devem ser conferidos pelo proprietário, sem envio automático
+de teste. Referência do provedor sobre limitações da prévia:
+https://github.com/evolution-foundation/evolution-api/issues/2262.
+Build verifica imagens, tags e regras de rota; teste da API verifica a opção
+linkPreview sem fazer uma requisição real.
+
+## Reversão do deploy
 
 Manter o ambiente antigo durante a validação. Reverter commits pelo GitHub e
 usar a implantação anterior do projeto Painel na Vercel. Nunca reverter pelo

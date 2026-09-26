@@ -22,6 +22,13 @@ beforeEach(() => { fixture.profile = { full_name: 'Alisson', role: 'admin', is_m
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe('WhatsApp API permissions and truthful results', () => {
+  it('asks Evolution to render a link preview without changing the message or recipient', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(Response.json({ instance: { state: 'open' } })).mockResolvedValueOnce(Response.json({ key: { id: 'preview-test' } }));
+    vi.stubGlobal('fetch', fetch);
+    const message = '*New Vox*\nhttps://paineldecontrole.newvox.site/onboardingnv/123%40g.us/clinica';
+    expect((await handleWhatsapp(request('POST', { group_id: '123@g.us', message }))).status).toBe(200);
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ number: '123@g.us', text: message, linkPreview: true });
+  });
   it('rejects anonymous access', async () => { expect((await handleWhatsapp(new Request('https://example.test/api/whatsapp'))).status).toBe(401); });
   it('rejects an invalid session', async () => { fixture.user = null; expect((await handleWhatsapp(request())).status).toBe(401); });
   it('rejects removed team profiles', async () => { fixture.profile = null; expect((await handleWhatsapp(request())).status).toBe(403); });

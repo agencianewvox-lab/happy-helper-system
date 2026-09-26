@@ -10,30 +10,31 @@ import { toast } from "sonner";
 import { whatsappRequest, publicFormUrl } from "@/lib/whatsapp";
 
 
-const MSG_OPERACAO = `Olá, Time! Tudo bem?
+const MSG_OPERACAO = `*NEW VOX | Sua opinião faz a diferença* 💬
 
-Trabalhamos todos os dias para entregar os melhores resultados para o seu negócio, e a sua opinião é fundamental para continuarmos evoluindo.
+Olá, time! Tudo bem?
 
-Preparamos uma pesquisa rápida (leva menos de 2 minutos) para entender como está sendo a sua experiência conosco.
+Queremos saber como está sendo sua experiência com a New Vox. Sua avaliação nos ajuda a cuidar melhor do seu negócio.
 
-👉 [Link da pesquisa]
+*Responda à pesquisa pelo link abaixo:*
+[Link da pesquisa]
 
-Sua resposta é muito importante para nós. Contamos com você!
-Um abraço
+É simples e não precisa de login.
 
-Equipe New Vox 🚀`;
+_Obrigado por construir essa parceria com a gente. Equipe New Vox._`;
 
-const MSG_CLINICA = `Olá, Dr(a). [Nome do Responsável Master]! Tudo bem?
-Aqui é da equipe da New Vox. É muito importante para nós saber como está sendo a sua experiência com as estratégias de marketing que desenvolvemos para a sua clínica.
+const MSG_CLINICA = `*NEW VOX | Sua opinião faz a diferença* 💬
 
-Preparamos uma pesquisa rápida (menos de 2 minutos) para ouvir a sua opinião e continuar entregando resultados cada vez melhores para o seu consultório.
+Olá, Dr(a). [Nome do Responsável Master]! Tudo bem?
 
-👉 [Link da pesquisa]
+Queremos saber como está sendo sua experiência com a New Vox. Sua avaliação nos ajuda a cuidar melhor da estratégia da sua clínica.
 
-Sua avaliação nos ajuda a evoluir. Contamos com você!
-Um abraço.
+*Responda à pesquisa pelo link abaixo:*
+[Link da pesquisa]
 
-Equipe New Vox 🚀`;
+É simples e não precisa de login.
+
+_Obrigado por construir essa parceria com a gente. Equipe New Vox._`;
 
 interface Props {
   groupId: string;
@@ -100,11 +101,13 @@ export function NpsSendDialog({ groupId, groupName, categoria, responsavelMaster
             Edite a mensagem abaixo se necessário antes de enviar.
           </p>
           <Textarea
+            aria-label="Mensagem da pesquisa que será enviada ao grupo"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={12}
             className="text-sm"
           />
+          <p className="text-xs text-muted-foreground">Link no domínio paineldecontrole.newvox.site, com capa New Vox. A exibição da prévia depende do WhatsApp.</p>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
