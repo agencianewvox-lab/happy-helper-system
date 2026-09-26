@@ -14,7 +14,6 @@ export interface Profile {
 const GESTOR_NAME_MAP: Record<string, string> = {
   "Murillo": "Murilo Araújo",
   "Netto": "Netto Monge",
-  "Jader": "Jader Costa",
   "Priscilla": "Priscilla Borges",
 };
 
@@ -58,7 +57,7 @@ export function useProfile() {
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [user, authLoading]);
 
   const isAdmin = profile?.role === "admin";
   const isMaster = (profile as any)?.is_master === true;

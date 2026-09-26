@@ -7,8 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { supabase } from "@/integrations/supabase/client";
-const PUBLISHED_APP_URL = "https://paineldecontrolenv.lovable.app";
+import { whatsappRequest, publicFormUrl } from "@/lib/whatsapp";
+
 
 const MSG_OPERACAO = `Olá, Time! Tudo bem?
 
@@ -48,7 +48,7 @@ export function NpsSendDialog({ groupId, groupName, categoria, responsavelMaster
 
   const isClinica = categoria?.toLowerCase() === "clínicas";
   const surveyType = isClinica ? "clinica" : "operacao";
-  const surveyLink = `${PUBLISHED_APP_URL}/pesquisa-nps/${encodeURIComponent(groupId)}/${surveyType}`;
+  const surveyLink = publicFormUrl(`/pesquisa-nps/${encodeURIComponent(groupId)}/${surveyType}`);
 
   const buildMessage = () => {
     if (isClinica) {
@@ -69,16 +69,15 @@ export function NpsSendDialog({ groupId, groupName, categoria, responsavelMaster
   };
 
   const handleSend = async () => {
+    if (sending || !message.trim()) return;
     setSending(true);
     try {
-      const { error } = await supabase.functions.invoke("send-nps-webhook", {
-        body: { group_id: groupId, message },
-      });
-      if (error) throw error;
-      toast.success(`Pesquisa NPS enviada para ${groupName}!`);
+      const result = await whatsappRequest<{ accepted: boolean; messageId: string }>({ group_id: groupId, message });
+      if (!result.accepted || !result.messageId) throw new Error("A Evolution não confirmou o envio.");
+      toast.success("Mensagem aceita pela Evolution. Confira a entrega no WhatsApp.");
       setOpen(false);
-    } catch {
-      toast.error("Falha ao enviar o webhook. Tente novamente.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao confirmar envio. Confira o WhatsApp antes de repetir.");
     } finally {
       setSending(false);
     }
@@ -109,7 +108,7 @@ export function NpsSendDialog({ groupId, groupName, categoria, responsavelMaster
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button onClick={handleSend} disabled={sending} className="gap-1.5">
+          <Button onClick={handleSend} disabled={sending || !message.trim()} className="gap-1.5">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             Enviar
           </Button>

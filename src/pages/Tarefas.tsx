@@ -57,11 +57,9 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bg: stri
 const COLUMNS: TaskStatus[] = ["pendente", "fazendo", "feito"];
 
 const TEAM_MEMBERS = [
-  "Jader Costa",
   "Murilo Araújo",
   "Netto Monge",
   "Priscilla Borges",
-  "Joel",
   "Thais",
   "Daniella",
   "Victor Botto",

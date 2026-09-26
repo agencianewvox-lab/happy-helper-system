@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ interface Props {
   categoria?: string | null;
 }
 
-const PUBLISHED_APP_URL = "https://paineldecontrolenv.lovable.app";
+const PUBLISHED_APP_URL = "https://paineldecontrole.newvox.site";
 
 export function NpsSurveyTab({ groupId, categoria }: Props) {
   const isClinica = categoria?.toLowerCase() === "clínicas";
@@ -47,13 +47,7 @@ export function NpsSurveyTab({ groupId, categoria }: Props) {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const publicBaseUrl = useMemo(() => {
-    if (typeof window === "undefined") return PUBLISHED_APP_URL;
-    const currentOrigin = window.location.origin;
-    return currentOrigin.includes("lovable.app") && !currentOrigin.includes("id-preview--")
-      ? currentOrigin
-      : PUBLISHED_APP_URL;
-  }, []);
+  const publicBaseUrl = PUBLISHED_APP_URL;
 
   const surveyUrl = `${publicBaseUrl}/pesquisa-nps/${encodeURIComponent(groupId)}/${surveyType}`;
 

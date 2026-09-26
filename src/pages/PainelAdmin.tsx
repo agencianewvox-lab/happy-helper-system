@@ -148,7 +148,7 @@ export default function PainelAdmin() {
                         </tr>
                       </thead>
                       <tbody>
-                        {grupos.sort((a, b) => (b.investimento_ads || 0) - (a.investimento_ads || 0)).map(g => (
+                        {[...grupos].sort((a, b) => (b.investimento_ads || 0) - (a.investimento_ads || 0)).map(g => (
                           <tr key={g.group_id} className="border-b border-border/10 hover:bg-muted/20">
                             <td className="p-2 font-medium">{g.nome}</td>
                             <td className="p-2"><Badge variant="outline">{g.plano || "N/A"}</Badge></td>

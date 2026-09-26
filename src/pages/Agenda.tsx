@@ -43,8 +43,8 @@ const EVENT_TYPES = [
 ];
 
 const TEAM_MEMBERS = [
-  "Alisson", "Priscilla", "Jader Costa", "Murilo Araújo", "Netto Monge",
-  "Joel", "Thais", "Daniella", "Victor Botto", "Jiza",
+  "Alisson", "Priscilla", "Murilo Araújo", "Netto Monge",
+  "Thais", "Daniella", "Victor Botto", "Jiza",
 ];
 
 export default function Agenda() {

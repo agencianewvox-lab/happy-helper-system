@@ -51,7 +51,6 @@ Deno.serve(async (req) => {
     const GESTOR_PROFILE_MAP: Record<string, string> = {
       "Murilo Araújo": "Murillo",
       "Netto Monge": "Netto",
-      "Jader Costa": "Jader",
       "Priscilla Borges": "Priscilla",
     };
 

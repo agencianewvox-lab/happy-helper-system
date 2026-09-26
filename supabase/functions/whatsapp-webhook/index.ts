@@ -19,7 +19,6 @@ const TEAM_NAME_VARIANTS: Record<string, string[]> = {
   "Priscilla": ["Priscilla", "Priscilla Borges"],
   "Priscila": ["Priscilla", "Priscilla Borges"],
   "Netto": ["Netto", "Netto Monge"],
-  "Jader": ["Jader", "Jader Costa"],
 };
 
 // Team member phone numbers for identification
@@ -380,7 +379,7 @@ const AGENT_TOOLS = [
         properties: {
           group_name: { type: "string", description: "Nome do grupo/cliente (parcial ou completo)" },
           term: { type: "string", description: "Descrição da pendência" },
-          responsible: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge)" },
+          responsible: { type: "string", description: "Nome do responsável (ex: Murilo Araújo, Netto Monge)" },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
           priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da pendência" }
         },
@@ -424,7 +423,7 @@ const AGENT_TOOLS = [
         properties: {
           title: { type: "string", description: "Nome do cliente/grupo no sistema (ex: 'MKT NV - ORALCENTER CATALÃO'). Se não houver cliente, use um título descritivo curto." },
           description: { type: "string", description: "Descrição detalhada da tarefa a ser realizada (ex: 'Recriar campanha no Google Ads', 'Agendar reunião de alinhamento')" },
-          assigned_to: { type: "string", description: "Nome do responsável (ex: Jader Costa, Murilo Araújo, Netto Monge, Priscilla Borges, Joel, Thais, Daniella, Victor Botto, Jiza Reis)" },
+          assigned_to: { type: "string", description: "Nome do responsável (ex: Murilo Araújo, Netto Monge, Priscilla Borges, Thais, Daniella, Victor Botto, Jiza Reis)" },
           group_name: { type: "string", description: "Nome do cliente/grupo associado — SEMPRE preencha se mencionarem um cliente, mesmo parcialmente (ex: 'oral center', 'idonea', 'reabilis'). Busque o nome mais próximo da lista de grupos disponíveis.", nullable: true },
           due_date: { type: "string", description: "Data de prazo no formato YYYY-MM-DD (opcional)", nullable: true },
           priority: { type: "string", enum: ["urgente", "normal", "baixa"], description: "Prioridade da tarefa" }
@@ -482,7 +481,7 @@ const AGENT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          destinatario: { type: "string", description: "Nome do destinatário da cutucada (ex: Murilo Araújo, Netto Monge, Jader Costa, Priscilla)" },
+          destinatario: { type: "string", description: "Nome do destinatário da cutucada (ex: Murilo Araújo, Netto Monge, Priscilla)" },
           mensagem_contexto: { type: "string", description: "Contexto ou motivo da cutucada (ex: 'tarefas pendentes', 'relatório atrasado', 'cliente esperando resposta')" },
           group_name: { type: "string", description: "Nome do cliente/grupo relacionado (opcional)", nullable: true },
           tipo: { type: "string", enum: ["pendencia_esquecida", "frt_alto", "grupo_parado", "geral", "tarefa_pendente"], description: "Tipo da cutucada" }
@@ -808,12 +807,10 @@ async function handleAlissonAIReply(
     const systemPrompt = `${DB_ALISSON_PROMPT || "Você é a Vox, analista sênior de Customer Success da agência de marketing digital New Vox. Você está respondendo diretamente ao Alisson (sócio proprietário) via WhatsApp. Você é o agente pessoal dele para gestão da operação."}
 
 EQUIPE NEW VOX (conheça cada um para direcionar ações corretamente):
-- Jader Costa: Gestor de tráfego
 - Murilo Araújo (Murillo): Gestor de tráfego / Gerente
 - Netto Monge: Gestor de tráfego
 - Priscilla Borges: Social media e sócia da empresa
 - Alisson Lima: Sócio proprietário (é quem está falando com você)
-- Joel: Gerente geral
 - Thais: Auxiliar de social media
 - Daniella: Equipe operacional
 - Victor Botto: Design gráfico
@@ -1374,7 +1371,6 @@ const TEAM_GESTOR_MAP: Record<string, string | null> = {
   "Murillo": "Murilo Araújo",
   "Murilo": "Murilo Araújo",
   "Netto": "Netto Monge",
-  "Jader": "Jader Costa",
   "Priscilla": null, // sócia — acesso total
   "Priscila": null,
 };
@@ -1641,12 +1637,10 @@ CAPACIDADES DE REGISTRO (use SEMPRE que aplicável):
     const systemPrompt = `Você é a Vox, analista sênior de CS e assistente pessoal da equipe da agência New Vox. Está conversando com ${firstName} da equipe via WhatsApp. Você é uma colega de trabalho inteligente, prestativa e proativa.
 
 EQUIPE NEW VOX:
-- Jader Costa: Gestor de tráfego
 - Murilo Araújo (Murillo): Gestor de tráfego / Gerente
 - Netto Monge: Gestor de tráfego
 - Priscilla Borges: Social media e sócia da empresa
 - Alisson Lima: Sócio proprietário
-- Joel: Gerente geral
 - Thais: Auxiliar de social media
 - Victor Botto: Design gráfico
 - Jiza Reis: Financeiro
@@ -2049,7 +2043,6 @@ const TEAM_NAME_TO_PROFILE: Record<string, string> = {
   "murilo": "Murillo",
   "murillo": "Murillo",
   "netto": "Netto",
-  "jader": "Jader",
   "priscila": "Priscilla",
   "priscilla": "Priscilla",
   "alisson": "Alisson",
@@ -2118,7 +2111,6 @@ async function autoResolvePendingDemands(groupId: string, contactName: string, s
 
 
 const TEAM_MEMBERS = [
-  "jader", "jader costa",
   "alisson", "alisson lima",
   "murilo", "murillo", "murilo araújo", "murilo araujo",
   "priscila", "priscilla", "priscila borges", "priscilla borges",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ function SelectableChip({ selected, label, onClick }: { selected: boolean; label
   return (
     <button
       type="button"
+      aria-pressed={selected}
       onClick={onClick}
       className={cn(
         "px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 border",
@@ -91,10 +92,12 @@ function RadioOption({ value, label, selected }: { value: string; label: string;
 function FormInput({ label, value, onChange, type = "text", placeholder = "" }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
 }) {
+  const inputId = useId();
   return (
     <div className="space-y-1.5">
-      <Label className="text-white/70 text-sm font-medium">{label}</Label>
+      <Label htmlFor={inputId} className="text-white/70 text-sm font-medium">{label}</Label>
       <Input
+        id={inputId}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -112,6 +115,7 @@ export default function OnboardingClinica() {
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const [form, setForm] = useState<Record<string, any>>({
     specialties: [] as string[],
@@ -132,7 +136,8 @@ export default function OnboardingClinica() {
   };
 
   const handleSubmit = async () => {
-    if (!groupId) return;
+    if (!groupId || submitting) return;
+    setSubmitError("");
     setSubmitting(true);
     try {
       const { error } = await supabase.from("onboarding_responses" as any).insert({
@@ -174,7 +179,7 @@ export default function OnboardingClinica() {
 
       setSubmitted(true);
     } catch (err) {
-      console.error(err);
+      setSubmitError("Não foi possível salvar suas respostas. Seus dados continuam aqui; tente novamente.");
     } finally {
       setSubmitting(false);
     }
@@ -182,20 +187,37 @@ export default function OnboardingClinica() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
+      <div className="survey-shell">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(0,180,220,0.08),transparent_60%)]" />
-        <div className="relative bg-white/[0.04] backdrop-blur-xl rounded-3xl p-10 max-w-md w-full text-center border border-white/[0.06] shadow-2xl">
+        <div className="onboarding-surface max-w-md text-center">
           <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-5 ring-2 ring-emerald-400/20">
             <CheckCircle2 className="w-10 h-10 text-emerald-400" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Onboarding Completo!</h2>
-          <p className="text-white/50 text-sm leading-relaxed">
+          <h2 className="text-2xl font-bold text-foreground mb-2">Onboarding Completo!</h2>
+          <p className="text-muted-foreground text-sm leading-relaxed">
             Obrigado por preencher o formulário. Nossa equipe já está trabalhando para criar estratégias personalizadas para você!
           </p>
         </div>
       </div>
     );
   }
+
+  const nextStep = () => {
+    if (step === 0) {
+      const name = isClinica ? form.clinic_name : form.business_name;
+      if (!name?.trim() || !form.responsible_name?.trim()) {
+        setSubmitError("Informe o nome do negócio e o nome do responsável para continuar.");
+        return;
+      }
+      if (form.commercial_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.commercial_email)) {
+        setSubmitError("Confira o e-mail comercial informado.");
+        return;
+      }
+    }
+    setSubmitError("");
+    setStep(value => value + 1);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
 
   const renderStep = () => {
     switch (step) {
@@ -204,18 +226,18 @@ export default function OnboardingClinica() {
           <div className="space-y-4">
             {isClinica ? (
               [
-                { key: "clinic_name", label: "Nome da Clínica" },
+                { key: "clinic_name", label: "Nome da Clínica *" },
                 { key: "cnpj", label: "CNPJ" },
-                { key: "responsible_name", label: "Nome do Responsável / Dentista Principal" },
+                { key: "responsible_name", label: "Nome do Responsável / Dentista Principal *" },
                 { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
               ].map(({ key, label, placeholder }: any) => (
                 <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} placeholder={placeholder} />
               ))
             ) : (
               [
-                { key: "business_name", label: "Nome da Empresa" },
+                { key: "business_name", label: "Nome da Empresa *" },
                 { key: "cnpj", label: "CNPJ" },
-                { key: "responsible_name", label: "Nome do Responsável" },
+                { key: "responsible_name", label: "Nome do Responsável *" },
                 { key: "responsible_birthday", label: "Data / Mês de Aniversário do Responsável", placeholder: "Ex: 15/03 ou Março" },
               ].map(({ key, label, placeholder }: any) => (
                 <FormInput key={key} label={label} value={form[key] || ""} onChange={(v) => set(key, v)} placeholder={placeholder} />
@@ -439,73 +461,28 @@ export default function OnboardingClinica() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,200,255,0.07),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(0,150,255,0.05),transparent_50%)]" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[1px] bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent" />
-
-      <div className="relative bg-white/[0.03] backdrop-blur-xl rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-white/[0.06] shadow-[0_20px_80px_-20px_rgba(0,200,255,0.08)]">
-        {/* Logo + Header */}
-        <div className="text-center mb-6">
-          <img src={newvoxLogo} alt="New Vox" className="h-14 mx-auto mb-4 rounded-lg" />
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <span className="text-lg">{getSteps(isClinica)[step].icon}</span>
-            <h2 className="text-lg font-semibold text-white">{getSteps(isClinica)[step].label}</h2>
+    <div className="onboarding-shell">
+      <header className="onboarding-brand"><img src={newvoxLogo} alt="" /><strong>new vox</strong><span>EXPERIÊNCIA DO CLIENTE</span></header>
+      <div className="onboarding-layout">
+        <aside className="onboarding-guide">
+          <span className="login-section-number">O PRIMEIRO PASSO DA NOSSA PARCERIA</span>
+          <h1>Vamos conhecer<br />o seu negócio.</h1>
+          <p>Suas respostas dão direção à nossa estratégia. Preencha com tranquilidade; você pode voltar às etapas anteriores antes de enviar.</p>
+          <ol>{getSteps(isClinica).map((item, index) => <li key={item.label} aria-current={step === index ? "step" : undefined}><span>{index < step ? "✓" : String(index + 1).padStart(2, "0")}</span>{item.label}</li>)}</ol>
+        </aside>
+        <section className="onboarding-surface" aria-labelledby="onboarding-title">
+          <div className="flex items-center justify-between gap-3 mb-4"><span className="login-section-number">ETAPA {step + 1} DE {getSteps(isClinica).length}</span><span className="text-xs text-muted-foreground">{Math.round(((step + 1) / getSteps(isClinica).length) * 100)}%</span></div>
+          <div role="progressbar" aria-label="Progresso do onboarding" aria-valuenow={step + 1} aria-valuemin={0} aria-valuemax={getSteps(isClinica).length} className="h-1.5 bg-secondary rounded-full mb-7"><div className="h-full bg-primary rounded-full transition-all" style={{ width: ((step + 1) / getSteps(isClinica).length) * 100 + "%" }} /></div>
+          <h2 id="onboarding-title" tabIndex={-1}>{getSteps(isClinica)[step].label}</h2>
+          <p className="text-sm text-muted-foreground mt-2">Conte os detalhes que fazem o seu negócio único.</p>
+          <div className="onboarding-fields">{renderStep()}</div>
+          {submitError && <p role="alert" className="text-sm text-red-700 bg-red-50 p-4 rounded-xl mb-4">{submitError}</p>}
+          <div className="flex justify-between gap-3 pt-6 border-t">
+            <Button variant="outline" disabled={step === 0 || submitting} onClick={() => setStep(step - 1)}><ChevronLeft size={16} className="mr-2" />Voltar</Button>
+            {step < getSteps(isClinica).length - 1 ? <Button onClick={nextStep}>Continuar<ChevronRight size={16} className="ml-2" /></Button> : <Button onClick={handleSubmit} disabled={submitting || !form.terms_accepted}>{submitting ? <Loader2 size={16} className="animate-spin mr-2" /> : <CheckCircle2 size={16} className="mr-2" />}{submitting ? "Salvando respostas…" : "Concluir onboarding"}</Button>}
           </div>
-          <p className="text-white/40 text-xs">Etapa {step + 1} de {getSteps(isClinica).length}</p>
-
-          {/* Progress */}
-          <div className="flex gap-1.5 mt-4">
-            {getSteps(isClinica).map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "h-1 flex-1 rounded-full transition-all duration-500",
-                  i < step ? "bg-cyan-400" : i === step ? "bg-cyan-400/70 animate-pulse" : "bg-white/[0.08]"
-                )}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="max-h-[58vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
-          {renderStep()}
-        </div>
-
-        {/* Navigation */}
-        <div className="flex justify-between mt-6 pt-4 border-t border-white/[0.06]">
-          <Button
-            variant="ghost"
-            disabled={step === 0}
-            onClick={() => setStep(step - 1)}
-            className="text-white/50 hover:text-white hover:bg-white/5 rounded-xl"
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" /> Voltar
-          </Button>
-          {step < getSteps(isClinica).length - 1 ? (
-            <Button
-              onClick={() => setStep(step + 1)}
-              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,200,255,0.3)] transition-all"
-            >
-              Próximo <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={submitting || !form.terms_accepted}
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl shadow-[0_4px_20px_-4px_rgba(0,200,100,0.3)]"
-            >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
-              Enviar
-            </Button>
-          )}
-        </div>
-
-        <p className="text-[10px] text-white/20 text-center mt-4">
-          Suas respostas são confidenciais e nos ajudam a criar a melhor estratégia para você.
-        </p>
+          <p className="text-xs text-muted-foreground leading-relaxed mt-6">Suas respostas serão utilizadas pela equipe New Vox para planejar o atendimento e a estratégia do seu negócio.</p>
+        </section>
       </div>
     </div>
   );

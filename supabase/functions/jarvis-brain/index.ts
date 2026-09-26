@@ -16,7 +16,6 @@ const RECIPIENT_LOOKUP: Record<string, string[]> = {
   "priscilla": ["Priscilla", "Priscilla Borges"],
   "priscila": ["Priscilla", "Priscilla Borges"],
   "netto": ["Netto", "Netto Monge"],
-  "jader": ["Jader", "Jader Costa"],
 };
 
 
@@ -57,7 +56,7 @@ serve(async (req) => {
             type: "function",
             function: {
               name: "send_whatsapp_message",
-              description: "Envia uma mensagem via WhatsApp para um membro da equipe (Murillo, Netto, Priscilla, Jader) ou para o próprio Alisson.",
+              description: "Envia uma mensagem via WhatsApp para um membro da equipe (Murillo, Netto, Priscilla) ou para o próprio Alisson.",
               parameters: {
                 type: "object",
                 properties: {

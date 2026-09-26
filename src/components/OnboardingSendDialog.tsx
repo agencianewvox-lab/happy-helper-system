@@ -6,9 +6,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { whatsappRequest, publicFormUrl } from "@/lib/whatsapp";
 
-const PUBLISHED_APP_URL = "https://paineldecontrolenv.lovable.app";
+
 
 const MSG_CLINICA = `Olá, Dr(a). [Nome do Responsável]! Tudo bem?
 
@@ -44,7 +44,7 @@ export function OnboardingSendDialog({ groupId, groupName, categoria, responsave
 
   const isClinica = categoria?.toLowerCase().includes("clínica") || categoria?.toLowerCase().includes("odonto");
   const surveyType = isClinica ? "clinica" : "generico";
-  const onboardingLink = `${PUBLISHED_APP_URL}/onboardingnv/${encodeURIComponent(groupId)}/${surveyType}`;
+  const onboardingLink = publicFormUrl(`/onboardingnv/${encodeURIComponent(groupId)}/${surveyType}`);
 
   const buildMessage = () => {
     const template = isClinica ? MSG_CLINICA : MSG_GENERICO;
@@ -61,16 +61,15 @@ export function OnboardingSendDialog({ groupId, groupName, categoria, responsave
   };
 
   const handleSend = async () => {
+    if (sending || !message.trim()) return;
     setSending(true);
     try {
-      const { error } = await supabase.functions.invoke("send-nps-webhook", {
-        body: { group_id: groupId, message },
-      });
-      if (error) throw error;
-      toast.success(`Onboarding enviado para ${groupName}!`);
+      const result = await whatsappRequest<{ accepted: boolean; messageId: string }>({ group_id: groupId, message });
+      if (!result.accepted || !result.messageId) throw new Error("A Evolution não confirmou o envio.");
+      toast.success("Mensagem aceita pela Evolution. Confira a entrega no WhatsApp.");
       setOpen(false);
-    } catch {
-      toast.error("Falha ao enviar. Tente novamente.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao confirmar envio. Confira o WhatsApp antes de repetir.");
     } finally {
       setSending(false);
     }
@@ -90,11 +89,11 @@ export function OnboardingSendDialog({ groupId, groupName, categoria, responsave
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">Edite a mensagem abaixo se necessário antes de enviar.</p>
-          <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={10} className="text-sm" />
+          <Textarea aria-label="Mensagem que será enviada ao grupo" value={message} onChange={(e) => setMessage(e.target.value)} rows={10} className="text-sm" />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button onClick={handleSend} disabled={sending} className="gap-1.5">
+          <Button onClick={handleSend} disabled={sending || !message.trim()} className="gap-1.5">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             Enviar
           </Button>

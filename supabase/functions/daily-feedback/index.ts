@@ -22,12 +22,6 @@ const TEAM_MEMBERS = [
     nameVariations: ["netto", "netto monge"],
   },
   {
-    name: "Jader Costa",
-    firstName: "Jader",
-    cargo: "Gestor de Tráfego",
-    nameVariations: ["jader", "jader costa"],
-  },
-  {
     name: "Priscilla Borges",
     firstName: "Priscilla",
     cargo: "Social Media / Sócia",
@@ -259,7 +253,7 @@ Lembre: máximo 500 caracteres. Uma mensagem de WhatsApp curta e pessoal.`;
 
       const rulesPrompt = DB_FEEDBACK_RULES || `Regras da mensagem:
 - MÁXIMO 500 caracteres. Isso é inegociável. Se passar, cortar. É uma mensagem de WhatsApp, não um email.
-- Começar sempre com o nome da pessoa e uma saudação casual variada (nunca a mesma todo dia). Exemplos: 'Netto, bora fechar o dia!', 'E aí Jader, resumão do dia:', 'Priscila, olha como foi hoje:', 'Murillo, fechando o expediente!', 'Thais, rapidinho antes de ir:'
+- Começar sempre com o nome da pessoa e uma saudação casual variada (nunca a mesma todo dia). Exemplos: 'Netto, bora fechar o dia!', 'Priscila, olha como foi hoje:', 'Murillo, fechando o expediente!', 'Thais, rapidinho antes de ir:'
 - Ir direto ao ponto. Não precisa de introdução.
 - Mencionar 2-3 coisas no máximo. Priorizar nesta ordem:
   1. Se teve elogio de cliente → SEMPRE mencionar primeiro, é o que mais motiva

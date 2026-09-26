@@ -243,7 +243,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
         supabase.from("nps_predictions").delete().eq("group_id", gid),
         supabase.from("nps_prediction_history").delete().eq("group_id", gid),
         supabase.from("onboarding_responses").delete().eq("group_id", gid),
-        
+
         supabase.from("calendar_events").delete().eq("group_id", gid),
         supabase.from("master_notifications").delete().eq("group_id", gid),
         supabase.from("team_feedback_log").delete().eq("group_id", gid),
@@ -712,7 +712,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                       <SelectContent>
                         <SelectItem value="Netto Monge">Netto Monge</SelectItem>
                         <SelectItem value="Murilo Araújo">Murilo Araújo</SelectItem>
-                        <SelectItem value="Jader Costa">Jader Costa</SelectItem>
+
                       </SelectContent>
                     </Select>
                   </div>

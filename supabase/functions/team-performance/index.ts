@@ -11,7 +11,6 @@ const TEAM_MEMBERS: { name: string; phone: string; role: string }[] = [
   { name: "Thais", phone: "6496601341", role: "Social Media" },
   { name: "Murilo Araújo", phone: "9299894316", role: "Gestor de Tráfego / Gerente" },
   { name: "Netto Monge", phone: "14991797829", role: "Gestor de Tráfego" },
-  { name: "Jader Costa", phone: "6984470232", role: "Gestor de Tráfego" },
   { name: "Alisson Lima", phone: "6492565779", role: "Sócio proprietário" },
   { name: "Jiza Reis", phone: "4891871846", role: "Financeiro" },
   { name: "Victor Botto", phone: "6492286733", role: "Design gráfico" },

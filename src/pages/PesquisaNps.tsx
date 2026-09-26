@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Frown, Meh, Smile, ChevronRight, ChevronLeft } from "lucide-react";
@@ -174,7 +175,7 @@ export default function PesquisaNps() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+      <div className="survey-shell">
         <div className="bg-card/80 backdrop-blur border border-border/30 rounded-2xl p-8 max-w-md w-full text-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-8 h-8 text-emerald-500" />
@@ -232,10 +233,13 @@ export default function PesquisaNps() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-      <div className="bg-card/80 backdrop-blur border border-border/30 rounded-2xl p-6 sm:p-8 max-w-lg w-full space-y-5">
+    <div className="survey-shell">
+      <div className="onboarding-surface max-w-xl w-full space-y-6">
         {/* Header */}
         <div className="text-center">
+          <img src={newvoxLogo} alt="New Vox" className="w-12 h-12 rounded-xl mx-auto mb-6" />
+          <h1 className="text-3xl font-semibold mb-3">Sua experiência importa.</h1>
+          <p className="text-sm text-muted-foreground mb-5">Um momento para ouvir você e construir uma parceria ainda melhor.</p>
           <p className="text-xs font-medium text-primary uppercase tracking-wider">
             {questionLabel}
           </p>
@@ -263,6 +267,8 @@ export default function PesquisaNps() {
                 {Array.from({ length: 11 }, (_, i) => (
                   <button
                     key={i}
+                    aria-label={"Nota " + i}
+                    aria-pressed={score === i}
                     onClick={() => {
                       setScore(i);
                       setError("");

@@ -128,7 +128,7 @@ export default function Dashboard() {
   // Filter groups by clicked metric
   const metricFilteredGrupos = useMemo(() => {
     // Hide groups with 0 messages by default
-    let result = roleGrupos.filter(g => g.total_mensagens > 0);
+    let result = roleGrupos;
     if (metricFilter) {
       switch (metricFilter) {
         case "total": result = roleGrupos; break;
@@ -219,7 +219,8 @@ export default function Dashboard() {
             </div>
           </header>
 
-          <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6 w-full">
+          <main className="max-w-[1600px] mx-auto px-4 sm:px-8 py-6 space-y-6 w-full">
+            <div className="workspace-page-heading"><span className="login-section-number">VISÃO GERAL / RELACIONAMENTO</span><h2>Seu próximo passo começa aqui.</h2><p>Acompanhe clientes, organize prioridades e mantenha o time na mesma direção.</p></div>
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-11 gap-4">
           {[

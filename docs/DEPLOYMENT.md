@@ -13,9 +13,22 @@
 ## Estado da migração
 
 Esta primeira etapa prepara a hospedagem Vite e as rotas SPA na Vercel.
-As funções em `supabase/functions` ainda executam no backend atual até a
-conclusão da migração do servidor. Um build verde do site NÃO confirma
-a migração das funções nem a recepção de mensagens WhatsApp.
+O domínio de produção é https://paineldecontrole.newvox.site.
+O diagnóstico Master e o envio manual de onboarding/NPS usam a função
+`/api/whatsapp` na Vercel. A função verifica a sessão com getUser e consulta
+o perfil no banco, sem usar service_role. Somente Masters consultam o
+diagnóstico; gestores só enviam para seus próprios grupos.
+
+As demais funções em `supabase/functions` ainda executam no backend atual
+até a conclusão da migração do servidor. Um build verde NÃO confirma
+a migração completa nem a recepção de mensagens WhatsApp.
+
+Em 26/09/2026, a Evolution respondeu estado open, com webhook habilitado
+no projeto do VOXI. O banco do painel tinha última mensagem de grupo em
+06/08/2026 e nenhum registro nas últimas 24 horas. Não foi alterado o
+webhook compartilhado. Sem a configuração administrativa do banco e a
+transição do encaminhamento, a recepção contínua permanece pendente.
+OpenAI e Meta Ads foram adiados explicitamente pelo proprietário.
 
 ## Fluxo de código
 
@@ -37,6 +50,33 @@ Painel: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_KEY`,
 `OPENAI_API_KEY` e `META_ADS_ACCESS_TOKEN`, além da autenticação do webhook.
 As chaves privadas do Lovable não são fornecidas pelo repositório GitHub.
 Não copiar variáveis do projeto VOXI. Não habilitar tarefas agendadas em preview.
+
+`server/public-database.json` contém somente URL e chave pública do mesmo
+banco já usado no frontend. Nunca incluir chave de serviço nesse arquivo.
+`EVOLUTION_API_KEY` é segredo exclusivo de Production, sem prefixo VITE_.
+Não há fallback para a função pública antiga quando um envio falha.
+
+## Interface e verificações desta etapa
+
+- Login exclusivo do time; onboarding e NPS continuam públicos por link.
+- Manrope e DM Sans locais, tema claro e formulários responsivos.
+- Central Master em `/master/whatsapp`, com conexão, último recebimento,
+  mensagens em 24h, webhook e envio manual revisável por cliente.
+- 11 testes simulados da API, sem envio real, além do teste existente.
+- Envio aceito pela Evolution não significa entrega ou leitura.
+- O usuário optou por fazer o teste de envio real depois.
+- Ainda requer validação autenticada com a conta do Master em produção.
+
+## Remoção de equipe em 26/09/2026
+
+Jader: login bloqueado, sessões/refresh tokens revogados e perfil removido.
+A conta Auth bloqueada foi retida para preservar referências históricas.
+Joel: nenhum perfil/login correspondente encontrado; referências retiradas
+das configurações operacionais e do código. Alisson, Priscilla, Netto e
+Murillo preservados. T3 LED/T3 Solution ficaram sem gestor; duas tarefas
+ficaram A definir. Nenhuma conversa de cliente foi removida nesta etapa.
+Remoção de perfil não possui lixeira; uma restauração exige recriação.
+Os arquivos históricos de migrations não foram reescritos.
 
 ## Validação antes da troca definitiva
 

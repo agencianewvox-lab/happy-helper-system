@@ -1,4 +1,4 @@
-import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Home } from "lucide-react";
+import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Home, Smartphone } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { cn } from "@/lib/utils";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 
@@ -31,7 +32,8 @@ const navItems = [
   
   { title: "NPS Preditivo", url: "/nps", icon: Heart, adminOnly: true, masterOnly: false, badgeKey: null },
   { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: true, masterOnly: false, badgeKey: null },
-  { title: "Painel Admin", url: "/admin", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },
+  { title: "WhatsApp central", url: "/master/whatsapp", icon: Smartphone, adminOnly: false, masterOnly: true, badgeKey: null },
+  { title: "Acesso Master", url: "/admin", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Configurações", url: "/configuracoes", icon: Settings, adminOnly: false, masterOnly: true, badgeKey: null },
 ];
 
@@ -49,8 +51,9 @@ export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: Dashb
   });
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/40">
-      <SidebarContent className="pt-4">
+    <Sidebar collapsible="icon" className="workspace-sidebar border-r border-border/70">
+      <SidebarContent className="pt-5 px-2">
+        <div className="flex items-center gap-3 px-3 pb-5"><img src={newvoxLogo} alt="New Vox" className="h-9 w-9 rounded-xl" />{!collapsed && <div><p className="font-semibold tracking-tight">new vox</p><p className="text-[9px] tracking-[.2em] text-muted-foreground">WORKSPACE</p></div>}</div>
         {/* Master badge */}
         {isMaster && !collapsed && (
           <div className="px-4 pb-2">
@@ -63,7 +66,7 @@ export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: Dashb
 
         <SidebarGroup>
           <SidebarGroupLabel className={cn(collapsed && "sr-only")}>
-            Navegação
+            Operação & relacionamento
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -75,6 +78,7 @@ export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: Dashb
                     <SidebarMenuButton
                       onClick={() => navigate(item.url)}
                       tooltip={item.title}
+                      isActive={isActive}
                       className={cn(
                         "transition-colors cursor-pointer relative",
                         isActive && (item.title === "JARVIS" 

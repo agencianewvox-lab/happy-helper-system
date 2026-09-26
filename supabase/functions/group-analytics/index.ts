@@ -74,7 +74,7 @@ const REQUEST_KEYWORDS = [
 ];
 
 const TEAM_MEMBERS = [
-  "jader", "murillo", "murilo", "priscilla", "priscila", "alisson", "joel", "thais", "daniella", "victor botto", "netto", "netto monge", "jiza",
+  "murillo", "murilo", "priscilla", "priscila", "alisson", "thais", "daniella", "victor botto", "netto", "netto monge", "jiza",
 ];
 
 const URGENCY_KEYWORDS = [
@@ -660,11 +660,9 @@ function detectUnfulfilledTeamPromises(groupId: string, msgs: any[]): AIPendingI
 const NEW_PENDING_PROMPT = `Você é uma analista de atendimento da agência de marketing New Vox. Sua tarefa é analisar mensagens candidatas a pendência e classificá-las com PRECISÃO. Evite falsos positivos — só marque como pendência quando o cliente CLARAMENTE espera uma ação ou resposta da equipe.
 
 EQUIPE NEW VOX (mensagens dessas pessoas são da EQUIPE e NUNCA são pendências):
-- Jader: Gestor de tráfego
 - Murillo/Murilo: Gestor de tráfego
 - Priscilla/Priscila: Social media e sócia
 - Alisson: Sócio
-- Joel: Gerente geral
 - Thais: Auxiliar de social media
 - Daniella: Equipe
 - Victor Botto: Equipe

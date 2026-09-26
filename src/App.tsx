@@ -1,26 +1,30 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import Dashboard from "./pages/Dashboard";
-import Performance from "./pages/Performance";
-import Chat from "./pages/Chat";
-import Pendencias from "./pages/Pendencias";
-import Tarefas from "./pages/Tarefas";
-import NpsPreditivo from "./pages/NpsPreditivo";
-import NpsReal from "./pages/NpsReal";
-import Agenda from "./pages/Agenda";
-import PesquisaNps from "./pages/PesquisaNps";
-import OnboardingClinica from "./pages/OnboardingClinica";
-import PainelAdmin from "./pages/PainelAdmin";
-import Configuracoes from "./pages/Configuracoes";
-import Jarvis from "./pages/Jarvis";
 
 import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
+
 import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Performance = lazy(() => import("./pages/Performance"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Pendencias = lazy(() => import("./pages/Pendencias"));
+const Tarefas = lazy(() => import("./pages/Tarefas"));
+const NpsPreditivo = lazy(() => import("./pages/NpsPreditivo"));
+const NpsReal = lazy(() => import("./pages/NpsReal"));
+const Agenda = lazy(() => import("./pages/Agenda"));
+const PesquisaNps = lazy(() => import("./pages/PesquisaNps"));
+const OnboardingClinica = lazy(() => import("./pages/OnboardingClinica"));
+const PainelAdmin = lazy(() => import("./pages/PainelAdmin"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const Jarvis = lazy(() => import("./pages/Jarvis"));
+const WhatsappCentral = lazy(() => import("./pages/WhatsappCentral"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +62,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <Suspense fallback={<div role="status" className="min-h-screen grid place-items-center text-sm text-muted-foreground">Carregando seu workspace…</div>}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -69,6 +74,7 @@ const App = () => (
           <Route path="/nps-real" element={<ProtectedRoute><NpsReal /></ProtectedRoute>} />
           <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
           
+          <Route path="/master/whatsapp" element={<ProtectedRoute><WhatsappCentral /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
           <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
@@ -76,6 +82,7 @@ const App = () => (
           <Route path="/onboardingnv/:groupId/:surveyType?" element={<OnboardingClinica />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

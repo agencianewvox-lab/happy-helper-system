@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/manrope';
+@import './styles/workspace.css';
 
 #lovable-badge {
   display: none !important;
@@ -10,8 +12,8 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 220 25% 10%;
+    --background: 210 25% 97%;
+    --foreground: 215 36% 16%;
 
     --card: 0 0% 100%;
     --card-foreground: 220 25% 10%;
@@ -19,7 +21,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 10%;
 
-    --primary: 220 70% 50%;
+    --primary: 184 77% 25%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 15% 92%;
@@ -36,9 +38,9 @@
 
     --border: 220 15% 88%;
     --input: 220 15% 88%;
-    --ring: 220 70% 50%;
+    --ring: 184 77% 25%;
 
-    --radius: 0.5rem;
+    --radius: 0.85rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -97,10 +99,14 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'DM Sans Variable', sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: ui-monospace, 'Cascadia Code', monospace;
   }
+  h1, h2, h3, h4 { font-family: 'Manrope Variable', sans-serif; letter-spacing: -0.035em; }
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 4px; }
+  ::selection { background: #aee8e3; color: #123a3c; }
 }

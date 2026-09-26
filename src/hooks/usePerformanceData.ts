@@ -116,7 +116,6 @@ export function usePerformanceData(period: string, customRange?: { start: Date; 
   const PROFILE_TO_GESTOR: Record<string, string> = {
     "Murillo": "Murilo Araújo",
     "Netto": "Netto Monge",
-    "Jader": "Jader Costa",
     "Priscilla": "Priscilla Borges",
     "Alisson": "Alisson Lima",
   };
