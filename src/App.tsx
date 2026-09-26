@@ -22,6 +22,7 @@ const PesquisaNps = lazy(() => import("./pages/PesquisaNps"));
 const OnboardingClinica = lazy(() => import("./pages/OnboardingClinica"));
 const PainelAdmin = lazy(() => import("./pages/PainelAdmin"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const MinhaConta = lazy(() => import("./pages/MinhaConta"));
 const Jarvis = lazy(() => import("./pages/Jarvis"));
 const WhatsappCentral = lazy(() => import("./pages/WhatsappCentral"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -77,6 +78,7 @@ const App = () => (
           <Route path="/master/whatsapp" element={<ProtectedRoute><WhatsappCentral /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><PainelAdmin /></ProtectedRoute>} />
           <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+          <Route path="/configuracoes/minha-conta" element={<ProtectedRoute><MinhaConta /></ProtectedRoute>} />
           <Route path="/jarvis" element={<ProtectedRoute><Jarvis /></ProtectedRoute>} />
           <Route path="/pesquisa-nps/:groupId/:surveyType?" element={<PesquisaNps />} />
           <Route path="/onboardingnv/:groupId/:surveyType?" element={<OnboardingClinica />} />

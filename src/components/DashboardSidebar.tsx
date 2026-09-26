@@ -35,6 +35,7 @@ const navItems = [
   { title: "WhatsApp central", url: "/master/whatsapp", icon: Smartphone, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Acesso Master", url: "/admin", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Configurações", url: "/configuracoes", icon: Settings, adminOnly: false, masterOnly: true, badgeKey: null },
+  { title: "Minha conta", url: "/configuracoes/minha-conta", icon: Settings, adminOnly: false, masterOnly: false, badgeKey: null },
 ];
 
 export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: DashboardSidebarProps) {

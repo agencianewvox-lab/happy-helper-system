@@ -193,7 +193,8 @@ export default function Configuracoes() {
 
       <main className="max-w-[1200px] mx-auto px-6 py-6">
         {/* Top-level tabs: Prompts vs System */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-6">
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => navigate('/configuracoes/minha-conta')}><Lock className="w-3.5 h-3.5" />Minha conta e senha</Button>
           <Button
             size="sm"
             variant={activeTab === "prompts" ? "default" : "outline"}

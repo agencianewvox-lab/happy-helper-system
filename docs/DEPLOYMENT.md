@@ -117,7 +117,23 @@ https://github.com/evolution-foundation/evolution-api/issues/2262.
 Build verifica imagens, tags e regras de rota; teste da API verifica a opção
 linkPreview sem fazer uma requisição real.
 
-## Reversão do deploy
+## Minha conta — alteração de senha
+
+Área pessoal em /configuracoes/minha-conta, disponível no menu Minha conta a
+todos os usuários autenticados. Configurações Master continuam restritas;
+há um atalho Minha conta e senha nessa página, sem abrir os controles do sistema.
+
+O formulário verifica a sessão com getUser antes de updateUser. O alvo é sempre
+a conta autenticada; não aceita um ID/e-mail de terceiro e não usa service_role.
+Novas senhas têm confirmação e 12 a 128 caracteres, além das regras do Auth.
+Reautenticação por código e senha atual são respeitadas quando exigidas pelo
+serviço. Senhas e códigos não são gravados em tabelas, URLs, logs ou storage
+pelo formulário e são limpos após sucesso. Nenhuma senha real foi usada em teste.
+
+Essa área não é recuperação de acesso: quem não tem sessão válida ainda precisa
+recuperar a conta. As pendências de redirecionamento de recuperação não mudaram.
+
+## Reversão da publicação
 
 Manter o ambiente antigo durante a validação. Reverter commits pelo GitHub e
 usar a implantação anterior do projeto Painel na Vercel. Nunca reverter pelo
