@@ -1,33 +1,35 @@
-import { useState, useEffect } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
-export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+type AuthState = { user: User | null; session: Session | null; loading: boolean };
+type AuthContextValue = AuthState & { signOut: () => ReturnType<typeof supabase.auth.signOut> };
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({ user: null, session: null, loading: true });
 
   useEffect(() => {
+    const applySession = (session: Session | null, force = false) => {
+      setState((current) => !force && current.session?.access_token === session?.access_token && !current.loading
+        ? current
+        : { session, user: session?.user ?? null, loading: false });
+    };
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
+      (event, session) => applySession(session, event === "USER_UPDATED")
     );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
+  const signOut = useCallback(() => supabase.auth.signOut(), []);
 
-  return { user, session, loading, signOut };
+  return createElement(AuthContext.Provider, { value: { ...state, signOut } }, children);
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth precisa de AuthProvider");
+  return context;
 }

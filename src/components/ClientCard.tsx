@@ -11,13 +11,14 @@ import ReactMarkdown from "react-markdown";
 import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays, Siren, ArrowUpRight, ArrowDownRight, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useProfile } from "@/hooks/useProfile";
 import { NpsScoreBadge } from "@/components/NpsScoreBadge";
 import { calculateSlaStatus } from "@/lib/clientMonitoring";
 
 interface ClientCardProps {
   grupo: Grupo;
   onClick: (grupo: Grupo) => void;
+  isMaster: boolean;
+  messageStatsReady?: boolean;
   compact?: boolean;
   npsPrediction?: NpsPrediction;
 }
@@ -79,8 +80,7 @@ function TrendArrow({ trend }: { trend?: string }) {
 const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 const CARD_CATEGORIAS = ["Clientes / Operação", "Clínicas", "Internos / Gestão"];
 
-export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCardProps) {
-  const { isMaster } = useProfile();
+export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true, compact, npsPrediction }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
@@ -233,7 +233,7 @@ export function ClientCard({ grupo, onClick, compact, npsPrediction }: ClientCar
             <div className="flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
               <span className={cn(!temMensagens && "text-muted-foreground")}>
-                {grupo.total_mensagens} msg
+                {messageStatsReady ? grupo.total_mensagens : "—"} msg
               </span>
             </div>
             {grupo.ultimo_horario && (

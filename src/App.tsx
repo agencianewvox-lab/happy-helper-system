@@ -6,11 +6,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { useAuth } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
 import Login from "./pages/Login";
 
 import DailyMotivationalPopup from "./components/DailyMotivationalPopup";
+import { WorkspaceLoading } from "./components/WorkspaceLoading";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Performance = lazy(() => import("./pages/Performance"));
@@ -45,11 +46,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <WorkspaceLoading />;
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -92,9 +89,11 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

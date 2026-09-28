@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 interface Props {
   grupos: Grupo[];
   onSelectGrupo: (g: Grupo) => void;
+  isMaster: boolean;
+  messageStatsReady: boolean;
 }
 
 export function TVModeButton({ onClick }: { onClick: () => void }) {
@@ -20,7 +22,7 @@ export function TVModeButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function TVModeOverlay({ grupos, onSelectGrupo, onClose }: Props & { onClose: () => void }) {
+export function TVModeOverlay({ grupos, onSelectGrupo, onClose, isMaster, messageStatsReady }: Props & { onClose: () => void }) {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -59,7 +61,7 @@ export function TVModeOverlay({ grupos, onSelectGrupo, onClose }: Props & { onCl
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {grupos.map((g) => (
-            <ClientCard key={g.id} grupo={g} onClick={onSelectGrupo} compact />
+            <ClientCard key={g.id} grupo={g} onClick={onSelectGrupo} isMaster={isMaster} messageStatsReady={messageStatsReady} compact />
           ))}
         </div>
       </div>

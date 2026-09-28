@@ -22,10 +22,11 @@ import { AddClientDialog } from "@/components/AddClientDialog";
 import { useNpsPredictions } from "@/hooks/useNpsPredictions";
 import { BirthdayAlerts } from "@/components/BirthdayAlerts";
 import { calculateSlaStatus } from "@/lib/clientMonitoring";
+import { WorkspaceLoading } from "@/components/WorkspaceLoading";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter } = useClientData();
+  const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter, loading: clientsLoading, messagesLoading, hasMessageStats, error: clientsError } = useClientData();
   const { signOut } = useAuth();
   const { isAdmin, isMaster, gestorFilter, loading: profileLoading, profile } = useProfile();
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
@@ -180,11 +181,7 @@ export default function Dashboard() {
   };
 
   if (profileLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <WorkspaceLoading />;
   }
 
   return (
@@ -207,9 +204,9 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    AO VIVO
+                    {messagesLoading ? "Sincronizando em segundo plano" : "AO VIVO"}
                   </div>
                   <TVModeButton onClick={() => setTvMode(true)} />
                   <AddClientDialog />
@@ -256,7 +253,7 @@ export default function Dashboard() {
             >
               <Icon className={`w-7 h-7 ${color}`} />
               <div>
-                <p className="text-xl font-black">{value}</p>
+                <p className="text-xl font-black">{!hasMessageStats && key !== "total" ? "—" : value}</p>
                 <p className="text-[10px] text-muted-foreground">{label}</p>
                 <p className="text-[9px] text-muted-foreground/60">{desc}</p>
               </div>
@@ -315,11 +312,14 @@ export default function Dashboard() {
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {metricFilteredGrupos.map((g) => (
-            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} npsPrediction={predictionsMap.get(g.group_id)} />
+            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} isMaster={isMaster} messageStatsReady={hasMessageStats} npsPrediction={predictionsMap.get(g.group_id)} />
           ))}
-          {metricFilteredGrupos.length === 0 && (
+          {clientsLoading && metricFilteredGrupos.length === 0 && Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="h-48 rounded-2xl border border-border/40 bg-card/60 animate-pulse" aria-hidden="true" />
+          ))}
+          {!clientsLoading && metricFilteredGrupos.length === 0 && (
             <p className="col-span-full text-center text-muted-foreground py-12">
-              Nenhum grupo encontrado.
+              {clientsError ? "Não foi possível carregar os clientes. Reabra o painel para tentar novamente." : "Nenhum grupo encontrado."}
             </p>
           )}
         </div>
@@ -338,6 +338,8 @@ export default function Dashboard() {
             grupos={roleAllGrupos}
             onSelectGrupo={setSelectedGrupo}
             onClose={() => setTvMode(false)}
+            isMaster={isMaster}
+            messageStatsReady={hasMessageStats}
           />
         )}
 

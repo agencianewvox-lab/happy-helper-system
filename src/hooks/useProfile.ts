@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -19,48 +19,26 @@ const GESTOR_NAME_MAP: Record<string, string> = {
 
 export function useProfile() {
   const { user, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-
-    if (!user) {
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (!mounted) return;
-        if (error) {
-          console.error("Profile fetch error:", error);
-          setProfile(null);
-        } else {
-          setProfile(data as Profile | null);
-        }
-        setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [user, authLoading]);
+  const { data: profile = null, isPending, error } = useQuery({
+    queryKey: ["profile", user?.id],
+    enabled: !authLoading && !!user,
+    staleTime: 60_000,
+    refetchOnMount: true,
+    queryFn: async (): Promise<Profile> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id,user_id,full_name,role,is_master")
+        .eq("user_id", user!.id)
+        .single();
+      if (error) throw error;
+      return data as Profile;
+    },
+  });
+  if (error) console.error("Profile fetch error:", error);
+  const loading = authLoading || (!!user && isPending);
 
   const isAdmin = profile?.role === "admin";
-  const isMaster = (profile as any)?.is_master === true;
+  const isMaster = profile?.is_master === true;
   const gestorFilter = profile ? GESTOR_NAME_MAP[profile.full_name] || null : null;
 
   return { profile, loading, isAdmin, isMaster, gestorFilter };
