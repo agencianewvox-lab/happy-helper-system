@@ -137,8 +137,21 @@ Reautenticação por código e senha atual são respeitadas quando exigidas pelo
 serviço. Senhas e códigos não são gravados em tabelas, URLs, logs ou storage
 pelo formulário e são limpos após sucesso. Nenhuma senha real foi usada em teste.
 
-Essa área não é recuperação de acesso: quem não tem sessão válida ainda precisa
-recuperar a conta. As pendências de redirecionamento de recuperação não mudaram.
+## Recuperação de senha sem sessão
+
+O login oferece "Esqueceu sua senha?". O Auth envia o link ao e-mail
+cadastrado, sem revelar se a conta existe. O retorno solicitado é
+https://paineldecontrole.newvox.site/redefinir-senha. Essa rota pública valida
+a sessão criada pelo link, mostra o e-mail da conta antes de salvar e exige
+confirmação de uma senha de 12 a 128 caracteres. Após a alteração, encerra a
+sessão local e devolve o usuário ao login.
+
+No Auth do Supabase gerenciado pelo Lovable, a configuração de URLs deve
+permitir exatamente esse endereço de retorno. O template de recuperação deve
+manter o link de confirmação do Auth com o redirecionamento solicitado.
+Uma resposta HTTP 200 da solicitação não prova o endereço efetivo do e-mail
+nem a entrega; confirmar abrindo um link real de recuperação antes de
+considerar o fluxo validado de ponta a ponta. Não registrar senhas ou tokens.
 
 ## Reversão da publicação
 

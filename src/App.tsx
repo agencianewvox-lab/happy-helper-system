@@ -26,6 +26,7 @@ const OnboardingClinica = lazy(() => import("./pages/OnboardingClinica"));
 const PainelAdmin = lazy(() => import("./pages/PainelAdmin"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const MinhaConta = lazy(() => import("./pages/MinhaConta"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Jarvis = lazy(() => import("./pages/Jarvis"));
 const WhatsappCentral = lazy(() => import("./pages/WhatsappCentral"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -65,6 +66,7 @@ function AppRoutes() {
     <Suspense fallback={<div role="status" className="min-h-screen grid place-items-center text-sm text-muted-foreground">Carregando seu workspace…</div>}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/redefinir-senha" element={<ResetPassword />} />
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
         <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
