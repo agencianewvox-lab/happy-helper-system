@@ -144,7 +144,9 @@ cadastrado, sem revelar se a conta existe. O retorno solicitado é
 https://paineldecontrole.newvox.site/redefinir-senha. Essa rota pública valida
 a sessão criada pelo link, mostra o e-mail da conta antes de salvar e exige
 confirmação de uma senha de 12 a 128 caracteres. Após a alteração, encerra a
-sessão local e devolve o usuário ao login.
+sessão local e devolve o usuário ao login. Se o provedor retornar à raiz
+do site, o evento PASSWORD_RECOVERY encaminha à tela de nova senha sem abrir
+o dashboard.
 
 No Auth do Supabase gerenciado pelo Lovable, a configuração de URLs deve
 permitir exatamente esse endereço de retorno. O template de recuperação deve

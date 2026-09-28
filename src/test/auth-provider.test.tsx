@@ -12,8 +12,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 function SessionLabel() {
-  const { user, loading } = useAuth();
-  return <span>{loading ? "Carregando" : user?.id ?? "Sem sessão"}</span>;
+  const { user, loading, recoveryPending } = useAuth();
+  return <span>{loading ? "Carregando" : recoveryPending ? "Recuperação: " + user?.id : user?.id ?? "Sem sessão"}</span>;
 }
 
 describe("AuthProvider", () => {
@@ -37,5 +37,21 @@ describe("AuthProvider", () => {
 
     view.unmount();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps recovery mode until the local session ends", () => {
+    let listener: (event: string, session: unknown) => void = () => {};
+    onAuthStateChange.mockImplementation((callback) => {
+      listener = callback;
+      return { data: { subscription: { unsubscribe } } };
+    });
+
+    render(<AuthProvider><SessionLabel /></AuthProvider>);
+    act(() => listener("PASSWORD_RECOVERY", { access_token: "recovery", user: { id: "priscila-id" } }));
+    expect(screen.getByText("Recuperação: priscila-id")).toBeInTheDocument();
+    act(() => listener("SIGNED_IN", { access_token: "recovery", user: { id: "priscila-id" } }));
+    expect(screen.getByText("Recuperação: priscila-id")).toBeInTheDocument();
+    act(() => listener("SIGNED_OUT", null));
+    expect(screen.getByText("Sem sessão")).toBeInTheDocument();
   });
 });

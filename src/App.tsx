@@ -59,6 +59,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { pathname } = useLocation();
+  const { recoveryPending } = useAuth();
+  if (recoveryPending && pathname !== "/redefinir-senha") {
+    return <Navigate to="/redefinir-senha" replace />;
+  }
   const customerForm = /^\/(onboardingnv|pesquisa-nps)(\/|$)/.test(pathname);
   return <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="newvox-workspace-theme" forcedTheme={customerForm ? 'light' : undefined} disableTransitionOnChange>
     <Toaster />
