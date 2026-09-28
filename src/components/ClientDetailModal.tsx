@@ -828,7 +828,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                 responsavelMaster={(clientInfo as any).responsavel_master}
               />
             </div>
-            <OnboardingTab groupId={grupo.group_id} />
+            <OnboardingTab groupId={grupo.group_id} groupName={grupo.nome} />
           </TabsContent>
         </Tabs>
       </DialogContent>

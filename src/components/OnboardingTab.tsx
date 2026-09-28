@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CheckCircle2, FileText, Maximize2 } from "lucide-react";
+import { CheckCircle2, Download, FileText, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { downloadOnboardingPdf, type OnboardingResponse } from "@/lib/onboarding-pdf";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +15,7 @@ import {
 
 interface Props {
   groupId: string;
+  groupName: string;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -60,17 +63,17 @@ const FIELD_LABELS: Record<string, string> = {
 
 const SKIP_KEYS = ["terms_accepted"];
 
-const renderValue = (key: string, value: any): string => {
+const renderValue = (key: string, value: unknown): string => {
   if (Array.isArray(value)) {
     if (key === "ad_budget") return `R$ ${(value[0] || 0).toLocaleString("pt-BR")}`;
     return value.length > 0 ? value.join(", ") : "—";
   }
   if (typeof value === "boolean") return value ? "Sim ✅" : "Não ❌";
   if (typeof value === "object" && value !== null) return JSON.stringify(value);
-  return value?.toString() || "—";
+  return value === null || value === undefined || value === "" ? "—" : String(value);
 };
 
-function ResponseGrid({ responses }: { responses: Record<string, any> }) {
+function ResponseGrid({ responses }: { responses: Record<string, unknown> }) {
   return (
     <div className="grid gap-2 pb-4">
       {Object.entries(responses)
@@ -89,21 +92,24 @@ function ResponseGrid({ responses }: { responses: Record<string, any> }) {
   );
 }
 
-export function OnboardingTab({ groupId }: Props) {
-  const [data, setData] = useState<any>(null);
+export function OnboardingTab({ groupId, groupName }: Props) {
+  const [data, setData] = useState<OnboardingResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [fullOpen, setFullOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data: rows } = await supabase
-        .from("onboarding_responses" as any)
+      const { data: rows, error } = await supabase
+        .from("onboarding_responses")
         .select("*")
         .eq("group_id", groupId)
         .order("created_at", { ascending: false })
         .limit(1);
-      setData(rows && (rows as any[]).length > 0 ? (rows as any[])[0] : null);
+      setLoadError(Boolean(error));
+      setData(!error && rows && rows.length > 0 ? rows[0] as OnboardingResponse : null);
       setLoading(false);
     };
     fetchData();
@@ -111,6 +117,10 @@ export function OnboardingTab({ groupId }: Props) {
 
   if (loading) {
     return <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">Carregando...</div>;
+  }
+
+  if (loadError) {
+    return <div role="alert" className="py-8 text-center text-sm text-destructive">Não foi possível carregar o onboarding. Tente novamente mais tarde.</div>;
   }
 
   if (!data) {
@@ -127,20 +137,36 @@ export function OnboardingTab({ groupId }: Props) {
   const createdAt = new Date(data.created_at).toLocaleDateString("pt-BR", {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await downloadOnboardingPdf(data, groupName);
+    } catch {
+      toast.error("Não foi possível gerar o PDF. Tente novamente.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <>
       <div className="space-y-3 px-1">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             <span>Preenchido em {createdAt}</span>
             <Badge variant="secondary" className="text-[10px]">{data.survey_type === "clinica" ? "Clínica" : "Genérico"}</Badge>
           </div>
-          <Button variant="ghost" size="sm" className="text-xs gap-1.5 h-7" onClick={() => setFullOpen(true)}>
-            <Maximize2 className="w-3.5 h-3.5" />
-            Ver completo
-          </Button>
+          <div className="flex flex-wrap gap-1">
+            <Button variant="outline" size="sm" className="text-xs gap-1.5 h-8" disabled={downloading} onClick={handleDownload}>
+              <Download className="w-3.5 h-3.5" />
+              {downloading ? "Gerando PDF..." : "Baixar PDF"}
+            </Button>
+            <Button variant="ghost" size="sm" className="text-xs gap-1.5 h-8" onClick={() => setFullOpen(true)}>
+              <Maximize2 className="w-3.5 h-3.5" />
+              Ver completo
+            </Button>
+          </div>
         </div>
 
         <ScrollArea className="max-h-[45vh]">
