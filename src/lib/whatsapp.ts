@@ -1,9 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export async function whatsappRequest<T>(body?: { group_id: string; message: string }): Promise<T> {
+export async function whatsappRequest<T>(body?: { group_id: string; message: string }, action?: 'discover-groups'): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Sua sessão expirou. Entre novamente.');
-  const response = await fetch('/api/whatsapp', {
+  const response = await fetch(action ? '/api/whatsapp?action=' + action : '/api/whatsapp', {
     method: body ? 'POST' : 'GET',
     headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import database from './public-database.json' with { type: 'json' };
+import { discoverGroups, isWhatsappGroupId } from '../src/lib/group-discovery.js';
 
 const BASE = 'https://bot-evolution-api.1lxz8u.easypanel.host';
 const INSTANCE = 'voxi_executivo_d13a86fd';
@@ -17,16 +18,32 @@ export async function handleWhatsapp(request: Request) {
     if (authError || !user) return reply({ error: 'Sessão inválida. Entre novamente.' }, 401);
     const { data: profile, error: profileError } = await db.from('profiles').select('full_name,role,is_master').eq('user_id', user.id).single();
     if (profileError || !profile) return reply({ error: 'Acesso não autorizado.' }, 403);
-    if (request.method === 'GET' && !profile.is_master) return reply({ error: 'Esta área é exclusiva do Acesso Master.' }, 403);
+    const discovery = request.method === 'GET' && new URL(request.url).searchParams.get('action') === 'discover-groups';
+    if (discovery && !profile.is_master && !['admin', 'gestor'].includes(profile.role)) return reply({ error: 'Você não tem permissão para cadastrar clientes.' }, 403);
+    if (request.method === 'GET' && !discovery && !profile.is_master) return reply({ error: 'Esta área é exclusiva do Acesso Master.' }, 403);
     const apiKey = process.env.EVOLUTION_API_KEY;
     if (!apiKey) return reply({ error: 'A chave da Evolution não está disponível neste deploy. Contate o administrador.' }, 503);
-    async function evolution(path: string, body?: unknown) {
-      const response = await fetch(BASE + path + '/' + encodeURIComponent(INSTANCE), {
+    async function evolution(path: string, body?: unknown, query = '', timeout = 15000) {
+      const response = await fetch(BASE + path + '/' + encodeURIComponent(INSTANCE) + query, {
         method: body ? 'POST' : 'GET', headers: { apikey: apiKey!, 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000),
+        body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(timeout),
       });
       if (!response.ok) throw new Error('EVOLUTION_UNAVAILABLE');
       return response.json();
+    }
+    if (discovery) {
+      const [rawGroups, chats, registered] = await Promise.all([
+        evolution('/group/fetchAllGroups', undefined, '?getParticipants=false', 35000),
+        // A read-only search: no WhatsApp messages are sent or marked as read.
+        evolution('/chat/findChats', { take: 1000 }).then(value => ({ value, ok: Array.isArray(value) })).catch(() => ({ value: null, ok: false })),
+        db.from('whatsapp_grupos').select('group_id'),
+      ]);
+      if (registered.error || !registered.data) return reply({ error: 'Não foi possível conferir os clientes já cadastrados. Tente novamente.' }, 503);
+      return reply({
+        ...discoverGroups(rawGroups, chats.value, registered.data.map(group => group.group_id)),
+        checkedAt: new Date().toISOString(),
+        activityAvailable: chats.ok,
+      });
     }
     if (request.method === 'GET') {
       const [stateResult, webhookResult, latest, recent, groups] = await Promise.all([
@@ -58,7 +75,7 @@ export async function handleWhatsapp(request: Request) {
     if (raw.length > 16000) return reply({ error: 'Mensagem muito longa.' }, 413);
     let input: { group_id?: string; message?: string };
     try { input = JSON.parse(raw); } catch { return reply({ error: 'Solicitação inválida.' }, 400); }
-    if (!input || typeof input.group_id !== 'string' || !/^\d+@g\.us$/.test(input.group_id) || typeof input.message !== 'string' || !input.message.trim() || input.message.length > 8000) return reply({ error: 'Selecione um grupo válido e informe a mensagem.' }, 400);
+    if (!input || typeof input.group_id !== 'string' || !isWhatsappGroupId(input.group_id) || typeof input.message !== 'string' || !input.message.trim() || input.message.length > 8000) return reply({ error: 'Selecione um grupo válido e informe a mensagem.' }, 400);
     const { data: group, error: groupError } = await db.from('whatsapp_grupos').select('group_id,gestor_responsavel').eq('group_id', input.group_id).single();
     if (groupError || !group) return reply({ error: 'Grupo não encontrado no painel.' }, 404);
     if (!profile.is_master && profile.role !== 'admin' && (!names[profile.full_name] || group.gestor_responsavel !== names[profile.full_name])) return reply({ error: 'Você não tem permissão para enviar a este grupo.' }, 403);
@@ -68,6 +85,9 @@ export async function handleWhatsapp(request: Request) {
     if (!sent?.key?.id) return reply({ error: 'A Evolution não confirmou o envio. Consulte o WhatsApp antes de tentar novamente.' }, 502);
     return reply({ accepted: true, messageId: sent.key.id, providerStatus: typeof sent.status === 'string' ? sent.status : 'PENDING', acceptedAt: new Date().toISOString() });
   } catch {
-    return reply({ error: 'Não foi possível confirmar a operação com a Evolution. Se tentou enviar, confira o WhatsApp antes de repetir.' }, 502);
+    const discovery = request.method === 'GET' && new URL(request.url).searchParams.get('action') === 'discover-groups';
+    return reply({ error: discovery
+      ? 'Não foi possível buscar os grupos. Confira a conexão na área WhatsApp central e tente novamente, ou use o cadastro manual.'
+      : 'Não foi possível confirmar a operação com a Evolution. Se tentou enviar, confira o WhatsApp antes de repetir.' }, 502);
   }
 }
