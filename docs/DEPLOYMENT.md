@@ -33,7 +33,11 @@ ela é uma instância diferente, e os eventos selecionados não aparecem na
 captura. Nenhum webhook compartilhado foi alterado nesta revisão.
 O cartão Master agora compara a URL do webhook da instância monitorada com a
 função do banco do painel e verifica se `MESSAGES_UPSERT` está selecionado.
-OpenAI e Meta Ads foram adiados explicitamente pelo proprietário.
+Em 06/10/2026, o proprietário confirmou por captura os segredos `openai`
+e `META_ADS_ACCESS_TOKEN` no Supabase. Os arquivos atuais de Edge Functions
+leem exatamente esses nomes. Isso não valida saldo, expiração ou permissões
+das chaves. A lista de variáveis Production da Vercel ainda contém apenas
+`EVOLUTION_API_KEY`; segredos do Supabase não são transferidos automaticamente.
 
 ## Fluxo de código
 
@@ -160,3 +164,97 @@ considerar o fluxo validado de ponta a ponta. Não registrar senhas ou tokens.
 Manter o ambiente antigo durante a validação. Reverter commits pelo GitHub e
 usar a implantação anterior do projeto Painel na Vercel. Nunca reverter pelo
 projeto VOXI. Alterar o domínio do site não reverte alterações no banco.
+
+## Central de governança — processo aprovado em 06/10/2026
+
+Objetivo: manter o contexto de cada cliente acessível ao Master e aos gestores
+responsáveis, com fonte, data e responsável para cada informação. A arquitetura
+de destino continua GitHub + Vercel + banco atual; não criar dependência de um
+editor de sites, outro banco ou do projeto VOXI.
+
+Fluxo previsto:
+
+1. Cadastrar/vincular o grupo WhatsApp ao cliente e definir seu gestor.
+2. Enviar o onboarding escolhido (clínica ou genérico), mantendo revisão humana
+   antes de qualquer mensagem. Guardar a resposta original.
+3. Abrir a apresentação HTML derivada dessa resposta para a reunião inicial.
+4. Criar a reunião no Google do organizador e registrar seu identificador no
+   cliente ANTES de oferecer o envio do convite. Compartilhar apenas por ação
+   explícita; não convidar todos os clientes automaticamente.
+5. Informar os participantes sobre a transcrição e garantir que ela está ativa
+   no Meet. Transcrição é independente de gravação de vídeo.
+6. Importar a transcrição da conferência correta assim que o Google a liberar.
+7. Preservar o texto original e sua fonte; gerar separadamente um resumo com
+   decisões, pendências, responsáveis, prazos e referências à transcrição.
+8. O gestor revisa sugestões antes de transformá-las em tarefas/compromissos.
+   O Master acompanha pendências e saúde da carteira, não apenas o último chat.
+
+### Implementado neste incremento
+
+A aba Onboarding passa a oferecer **Apresentar onboarding** assim que consegue
+ler uma resposta salva. Não existe geração manual, chamada de IA nem cobrança
+adicional para montar a apresentação: o HTML deriva do formulário mais recente
+do mesmo `group_id`. O conteúdo persiste na resposta original; não há um arquivo
+PowerPoint nem um novo link público expondo respostas.
+
+Sete capítulos: ponto de partida, objetivos, público, oferta, investimento,
+operação e pauta de próximos passos. Linguagem se adapta a clínica/empresa.
+Dados ausentes aparecem como pontos de alinhamento. A pauta final é uma sugestão
+identificada como tal, não uma promessa de resultado. Apenas campos selecionados
+entram na apresentação; CNPJ, e-mail, telefone e chaves desconhecidas não entram.
+PDF e formulários existentes foram preservados. O componente é carregado apenas
+quando solicitado e possui navegação por teclado e layout móvel.
+
+### Próximo incremento: Google por usuário (ainda não conectado)
+
+O proprietário informou que usa contas Gmail pagas com transcrição já gerada no
+Drive, mas ainda não tem projeto/cliente OAuth para o Painel. A assinatura e a
+autorização de API são coisas distintas. Não ativar outro gravador/transcritor.
+
+- Criar projeto Google Cloud exclusivo do Painel sob uma conta controlada pela
+  empresa, habilitar Calendar e Meet APIs e configurar o consentimento OAuth.
+- Usar cliente OAuth **Web application**. A URL de retorno deve coincidir
+  exatamente com a rota HTTPS que for implementada na Vercel; não marcar o
+  conector como pronto antes dessa implementação e da autorização real.
+- Cada integrante conecta sua própria conta. Começar com escopos mínimos para
+  eventos próprios e espaços/conferências do Meet; não pedir acesso irrestrito
+  ao Drive. As entradas de transcrição podem ser lidas pelo Meet API.
+- Armazenar refresh tokens cifrados em área privada, apenas acessível ao backend;
+  validar state, PKCE, expiração e usuário da sessão no retorno OAuth. Nunca
+  armazenar refresh token em localStorage ou colunas expostas ao navegador.
+- O app precisa de credenciais Google e capacidade administrativa restrita no
+  banco na Vercel. Nenhum desses segredos foi criado ou copiado neste incremento.
+- Conferir exigências de verificação do Google e limitações de modo de teste.
+  Em contas pessoais não existe autorização interna de domínio Workspace.
+- Representar explicitamente estados: não conectado, autorizado, reconexão
+  necessária, reunião criada, aguardando transcrição, importada, falha recuperável.
+- Importar por identificadores estáveis (usuário, espaço, conferenceRecord,
+  transcrição); não associar por nome de arquivo. Paginar todas as entradas,
+  preservar falantes/horários e tornar reexecuções idempotentes.
+- As entradas da API Meet expiram 30 dias após a reunião. Sincronizar cedo, salvar
+  fonte/horário e guardar texto no banco, sem depender de reler o Drive para sempre.
+- Implementar sincronização agendada no backend; clicar em Atualizar não deve
+  ser a única maneira de receber uma transcrição.
+
+### Dados e segurança a implementar antes de liberar reuniões/IA
+
+Separar: atribuições por `user_id`, reuniões, transcrições originais, resumos
+versionados, decisões/tarefas revisadas e log de integração sem segredos. O
+`group_id` é o vínculo com o WhatsApp, não uma credencial de acesso.
+
+Master pode consultar toda a carteira. Gestor acessa apenas clientes atribuídos.
+Aplicar essa regra no backend e em RLS, não apenas no filtro visual. As políticas
+legadas precisam de revisão: existem leituras amplas para usuários autenticados
+e escritas antigas públicas. Fazer inventário dos formulários/webhooks antes de
+substituir políticas para não interromper a operação.
+
+Não considerar a governança concluída com a apresentação: conexão Google,
+importação automática, RLS de carteira, análise OpenAI e painel consolidado ainda
+exigem implementação e testes reais. Jarvis e correção das conversas duplicadas
+ficam fora desta etapa por orientação do proprietário.
+
+Referências técnicas consultadas:
+
+- https://developers.google.com/workspace/meet/api/guides/artifacts
+- https://developers.google.com/workspace/meet/api/guides/authenticate-authorize
+- https://developers.google.com/identity/protocols/oauth2/web-server

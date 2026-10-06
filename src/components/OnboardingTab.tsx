@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CheckCircle2, Download, FileText, Maximize2 } from "lucide-react";
+import { CheckCircle2, Download, FileText, Maximize2, Presentation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { downloadOnboardingPdf, type OnboardingResponse } from "@/lib/onboarding-pdf";
@@ -17,6 +17,8 @@ interface Props {
   groupId: string;
   groupName: string;
 }
+
+const OnboardingPresentation = lazy(() => import("./OnboardingPresentation"));
 
 const FIELD_LABELS: Record<string, string> = {
   clinic_name: "Nome da Clínica",
@@ -98,8 +100,12 @@ export function OnboardingTab({ groupId, groupName }: Props) {
   const [loadError, setLoadError] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [fullOpen, setFullOpen] = useState(false);
+  const [presentationOpen, setPresentationOpen] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    setPresentationOpen(false);
+    setFullOpen(false);
     const fetchData = async () => {
       setLoading(true);
       const { data: rows, error } = await supabase
@@ -108,11 +114,13 @@ export function OnboardingTab({ groupId, groupName }: Props) {
         .eq("group_id", groupId)
         .order("created_at", { ascending: false })
         .limit(1);
+      if (!active) return;
       setLoadError(Boolean(error));
       setData(!error && rows && rows.length > 0 ? rows[0] as OnboardingResponse : null);
       setLoading(false);
     };
     fetchData();
+    return () => { active = false; };
   }, [groupId]);
 
   if (loading) {
@@ -158,6 +166,9 @@ export function OnboardingTab({ groupId, groupName }: Props) {
             <Badge variant="secondary" className="text-[10px]">{data.survey_type === "clinica" ? "Clínica" : "Genérico"}</Badge>
           </div>
           <div className="flex flex-wrap gap-1">
+            <Button size="sm" className="text-xs gap-1.5 h-8" onClick={() => setPresentationOpen(true)}>
+              <Presentation className="w-3.5 h-3.5" /> Apresentar onboarding
+            </Button>
             <Button variant="outline" size="sm" className="text-xs gap-1.5 h-8" disabled={downloading} onClick={handleDownload}>
               <Download className="w-3.5 h-3.5" />
               {downloading ? "Gerando PDF..." : "Baixar PDF"}
@@ -168,6 +179,8 @@ export function OnboardingTab({ groupId, groupName }: Props) {
             </Button>
           </div>
         </div>
+
+        <p className="text-xs text-muted-foreground">Apresentação HTML pronta com as respostas deste formulário. Campos não preenchidos ficam como pontos de alinhamento.</p>
 
         <ScrollArea className="max-h-[45vh]">
           <ResponseGrid responses={responses} />
@@ -193,6 +206,11 @@ export function OnboardingTab({ groupId, groupName }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+      {presentationOpen && (
+        <Suspense fallback={<div role="status" className="fixed inset-0 z-[60] grid place-items-center bg-background text-sm">Preparando apresentação…</div>}>
+          <OnboardingPresentation response={data} groupName={groupName} onClose={() => setPresentationOpen(false)} />
+        </Suspense>
+      )}
     </>
   );
 }
