@@ -13,6 +13,8 @@ describe("independent WhatsApp receiver", () => {
   expect(result.row.direcao).toBe("entrada");
   expect(JSON.stringify(result.row)).not.toContain("must-not-persist");
   expect(result.row.dados_extras.data.key.id).toBe("provider-1");
+  expect(result.row.dados_extras._retention.received_by).toBe("independent_panel");
+  expect(result.row.dados_extras._retention).not.toHaveProperty("legacy_bridge_delivered");
  });
  it("does not ingest private chats", () => {
   const value=event({conversation:"privado"}); value.data.key.remoteJid="551100000000@s.whatsapp.net";

@@ -7,15 +7,47 @@
 - Banco, autenticação e processamento: destino aprovado no Supabase independente.
 - ID Vercel: `prj_3nuCjeXwCgNzDXoDIu6X3vNktJnk`.
 - Destino aprovado dos dados: Supabase independente `gorqyovidpdvuockzndm`.
-- Dados, autenticação e Realtime ainda em produção: projeto antigo
-  `fmipenijdipscnqhtwvy`, gerenciado pelo Lovable. A migração não foi concluída.
-  Nenhum dado é transferido para o VOXI.
+- Dados, autenticação, Realtime e funções em produção:
+  `gorqyovidpdvuockzndm`. O banco antigo foi preservado como arquivo,
+  sem as rotinas agendadas e sem escrita dos clientes anon/authenticated.
 - VOXI é outro projeto/repositório/banco. Não compartilhar seus IDs de deploy,
   variáveis de banco ou domínios com este painel.
 
 ## Estado da migração
 
-### Checkpoint de 07/10/2026
+### Corte oficial — 07/10/2026, 20:09 UTC
+
+- Domínio oficial publicado na Vercel; bundle confirmado com o Supabase novo
+  e sem o identificador antigo. Código publicado na branch main.
+- Usuários/identidades migrados; senhas conferidas por hash, sem exposição.
+  As sessões antigas não são transferidas: entrar novamente.
+- Recorte de três meses importado; conferência final de metadados sem diferenças.
+  Nenhuma mensagem da janela final do receptor antigo faltou no novo.
+- WhatsApp: Evolution → encaminhamento compartilhado existente → whatsapp-ingest
+  do Painel independente. A ponte temporária do novo receptor ao banco antigo
+  foi removida. Nenhuma outra alteração no Voxi.
+- Idempotência por grupo/identificador do provedor; UUID determinístico evita
+  duplicação quando a Evolution repete a entrega. Grupos não cadastrados são ignorados.
+- Retenção: texto e metadados; binários apenas de áudio. Imagens/vídeos são rótulos.
+  A origem não continha binários embutidos de 49 áudios históricos: não declarar
+  esses arquivos recuperados. Os 96 arquivos disponíveis foram preservados.
+- Filas duráveis para transcrição e novos onboardings, com confirmação ao grupo
+  e ao gestor quando atribuído/com telefone. Não reenviar formulários históricos.
+  Envio de resultado incerto fica para revisão, sem repetição automática.
+- Rotinas de NPS, feedback, briefing e fila ativas apenas no Supabase novo.
+  Segredos de Meta, OpenAI e Evolution permanecem no Supabase.
+- Meta: 24 contas acessíveis em teste autenticado. OpenAI: transcrição real
+  concluída no novo banco. Nenhuma mensagem de teste enviada a clientes.
+- Login validado e cadastro público bloqueado. Recuperação por e-mail permanece
+  PENDENTE de SMTP, conforme informado pelo proprietário. Não prometer entrega
+  de e-mails apenas porque a página e o redirecionamento estão configurados.
+- Google/Meet permanece fora desta rodada; Jarvis/chat não foram ativados.
+
+Auditoria agregada: `migration-final-cutover-2026-10-07.json`.
+Não executar deploy em lote das funções legadas não revisadas.
+Os checkpoints abaixo documentam estados históricos, não o estado atual.
+
+### Checkpoint anterior de 07/10/2026 (superado pelo corte acima)
 
 O Supabase novo tem as tabelas, usuários com senhas preservadas e permissões
 validadas por gestor. Meta Ads respondeu com 24 contas acessíveis ao Master.

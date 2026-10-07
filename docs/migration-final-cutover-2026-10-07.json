@@ -1,0 +1,78 @@
+{
+  "status": "production_cutover_completed",
+  "verifiedAt": "2026-10-07T20:21:00Z",
+  "architecture": {
+    "site": "https://paineldecontrole.newvox.site",
+    "github": "agencianewvox-lab/happy-helper-system",
+    "supabase": "gorqyovidpdvuockzndm",
+    "frontendDeployment": "dpl_GVA2SfLjoQGvL6KdghdnMEUVkr5g",
+    "frontendCommit": "40bd8951b6dedad119bd920a039d9df39721fda6",
+    "legacyRuntimeRequired": false
+  },
+  "data": {
+    "sourcePreserved": true,
+    "sourceClientWritesFrozenAt": "2026-10-07T20:06:56.700201Z",
+    "scopeStart": "2026-07-06T03:00:00Z",
+    "sourceFinalMetadataRows": 218,
+    "sourceFinalMetadataChanges": 0,
+    "finalRelayWindowSourceRows": 30,
+    "finalRelayWindowMissingMessages": 0,
+    "duplicatesMatchedByProviderId": true,
+    "targetGroups": 26,
+    "targetAuthUsers": 5,
+    "targetProfiles": 4,
+    "onboardingResponses": 7,
+    "passwordHashesMatch": true,
+    "sessionsMigrated": false,
+    "audioFilesCopied": 96,
+    "decodedAudioBytes": 6699946,
+    "sourceAudiosWithoutEmbeddedBinary": 49,
+    "completedNewTranscriptions": 14,
+    "imagesAndVideoBinariesStored": false
+  },
+  "whatsapp": {
+    "sameSharedConnectionPreserved": true,
+    "voxiChange": "only previously approved Panel forwarding URL",
+    "receiverVersion": 3,
+    "legacyBridgeRemoved": true,
+    "realMessageReceivedAfterBridgeRemoval": "2026-10-07T20:14:20Z",
+    "noClientTestMessagesSent": true
+  },
+  "processing": {
+    "oldSchedulesInactive": true,
+    "newSchedules": [
+      "calculate-nps-predictions-6h",
+      "daily-feedback-18h-brt",
+      "executive-briefing-7am",
+      "panel-audio-onboarding"
+    ],
+    "newSchedulesActive": true,
+    "cronOwner": "postgres",
+    "onboardingNotificationScope": "new submissions only; registered group and assigned manager with phone",
+    "uncertainDelivery": "manual review; no automatic resend",
+    "oldOnboardingNotificationsReplayed": false
+  },
+  "verification": {
+    "metaAccessibleAccounts": 24,
+    "loginVerified": true,
+    "publicRegistrationBlocked": true,
+    "authUsersTemporaryRemoved": true,
+    "sourcePasswordHashesComparedWithoutDisclosure": true,
+    "anonymousPrivilegedCallsRejected": true,
+    "openaiTranscriptionVerified": true,
+    "workerCronHTTP": 200,
+    "domainHTTP": 200,
+    "legacyProjectInProductionBundle": false,
+    "receiverDeploymentContainsLegacyURL": false,
+    "typecheck": "passed",
+    "tests": "130 passed in 22 files; full rerun with two workers passed after an initial PDF timeout under machine load",
+    "freshVisualBrowserCheck": "not performed; browser automation unavailable"
+  },
+  "pendingOwnerConfiguration": [
+    "SMTP for production password-recovery email delivery"
+  ],
+  "deferred": [
+    "Google/Meet integration",
+    "Jarvis/chat activation"
+  ]
+}

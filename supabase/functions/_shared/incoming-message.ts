@@ -23,7 +23,7 @@ export function incomingMessage(body: any) {
   const stamp = Number(data.messageTimestamp);
   const time = Number.isFinite(stamp) && stamp > 0 ? new Date(stamp < 1e12 ? stamp * 1000 : stamp) : new Date();
   const metadata: any = retainedWhatsAppEvent(body);
-  metadata._retention = { ...metadata._retention, legacy_bridge_delivered: false,
+  metadata._retention = { ...metadata._retention, received_by: "independent_panel",
     transcription_pending: Boolean(msg.audioMessage || data.messageType === "audioMessage") };
   return { providerId: key.id, row: {
     group_id: groupId, telefone: typeof key.participant === "string" ? key.participant.split("@")[0] : null,
