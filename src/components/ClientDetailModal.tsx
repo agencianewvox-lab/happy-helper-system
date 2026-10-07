@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { Grupo, NpsPrediction } from "@/types/client";
+import { Grupo } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -26,11 +26,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { MetaAdsTab } from "@/components/MetaAdsTab";
-import { NpsDetailPanel } from "@/components/NpsDetailPanel";
 import { NpsSurveyTab } from "@/components/NpsSurveyTab";
 import { ClientNotesTab } from "@/components/ClientNotesTab";
 import { OnboardingTab } from "@/components/OnboardingTab";
 import { OnboardingSendDialog } from "@/components/OnboardingSendDialog";
+import { ClientHealthPanel } from "./ClientHealth";
+import { deduplicateMessages } from "@/lib/message-deduplication";
 
 interface Conversa {
   id: string;
@@ -45,7 +46,6 @@ interface Props {
   grupo: Grupo | null;
   open: boolean;
   onClose: () => void;
-  npsPrediction?: NpsPrediction;
 }
 
 function formatFrt(minutes: number | null | undefined): string {
@@ -82,7 +82,7 @@ function trendLabel(trend?: string) {
   return { icon: Minus, color: "text-muted-foreground", text: "Estável" };
 }
 
-export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props) {
+export function ClientDetailModal({ grupo, open, onClose }: Props) {
   const { user } = useAuth();
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -98,6 +98,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
   const conversasEndRef = useRef<HTMLDivElement>(null);
+  const conversationRequest = useRef(0);
+  const [conversationError, setConversationError] = useState(false);
 
   const groupId = grupo?.group_id || "";
   const a = grupo?.analytics;
@@ -106,7 +108,9 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
 
   const fetchConversas = useCallback(async () => {
     if (!groupId) return;
+    const request = ++conversationRequest.current;
     setLoadingConversas(true);
+    setConversationError(false);
     try {
       let all: Conversa[] = [];
       let offset = 0;
@@ -114,19 +118,21 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
       while (true) {
         const { data, error } = await supabase
           .from("whatsapp_conversas")
-          .select("id, mensagem, nome_contato, direcao, recebido_em, created_at")
+          .select<string, Conversa & { provider_id: string | null; provider_fallback_id: string | null }>("id, mensagem, nome_contato, direcao, recebido_em, created_at, provider_id:dados_extras->data->key->>id, provider_fallback_id:dados_extras->key->>id")
           .eq("group_id", groupId)
           .order("recebido_em", { ascending: true })
+          .order("id", { ascending: true })
           .range(offset, offset + pageSize - 1);
         if (error) throw error;
+        if (request !== conversationRequest.current) return;
         if (!data || data.length === 0) break;
         all = all.concat(data);
         if (data.length < pageSize) break;
         offset += pageSize;
       }
-      setConversas(all);
-    } catch (err) { console.error("Error fetching conversas:", err); }
-    finally { setLoadingConversas(false); }
+      if (request === conversationRequest.current) setConversas(deduplicateMessages(all));
+    } catch { if (request === conversationRequest.current) setConversationError(true); }
+    finally { if (request === conversationRequest.current) setLoadingConversas(false); }
   }, [groupId]);
 
   const fetchResolutions = useCallback(async () => {
@@ -194,6 +200,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
 
   useEffect(() => {
     if (open) { fetchResolutions(); fetchConversas(); fetchClientInfo(); }
+    return () => { conversationRequest.current++; };
   }, [open, fetchResolutions, fetchConversas, fetchClientInfo]);
 
   const conversasByDate = useMemo(() => {
@@ -278,7 +285,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-card border-border/50 max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[96vw] max-w-5xl bg-card border-border/50 max-h-[90dvh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -307,7 +314,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
         <Tabs defaultValue="indicadores" className="mt-2" onValueChange={(val) => {
           if (val === "conversas") setTimeout(() => conversasEndRef.current?.scrollIntoView({ behavior: "auto" }), 100);
         }}>
-          <TabsList className="w-full">
+          <div className="max-w-full overflow-x-auto pb-1"><TabsList className="w-full min-w-max">
             <TabsTrigger value="indicadores" className="flex-1">Indicadores</TabsTrigger>
             <TabsTrigger value="conversas" className="flex-1">Conversas ({conversas.length})</TabsTrigger>
             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
@@ -315,13 +322,13 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
             <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
             <TabsTrigger value="notas" className="flex-1 gap-1"><StickyNote className="w-3 h-3" /> Notas</TabsTrigger>
             <TabsTrigger value="onboarding" className="flex-1 gap-1">📋 Onboarding</TabsTrigger>
-          </TabsList>
+          </TabsList></div>
 
           <TabsContent value="indicadores" className="space-y-4 mt-4">
+            <ClientHealthPanel group={grupo} />
             {a ? (
               <>
                 {/* NPS Preditivo */}
-                <NpsDetailPanel prediction={npsPrediction} />
                 <div className="grid grid-cols-2 gap-3">
                   {/* FRT */}
                   <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
@@ -364,10 +371,10 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                   <div className="p-3 rounded-lg bg-muted/30 border border-border/30 col-span-2">
                     <div className="flex items-center gap-2 mb-1">
                       <ShieldAlert className={cn("w-4 h-4", churnColor(a.churn_risk))} />
-                      <span className="text-xs text-muted-foreground font-medium">Risco de Churn</span>
+                      <span className="text-xs text-muted-foreground font-medium">Índice de risco estimado · não é probabilidade</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <p className={cn("text-lg font-bold", churnColor(a.churn_risk))}>{a.churn_risk}%</p>
+                      <p className={cn("text-lg font-bold", churnColor(a.churn_risk))}>{a.churn_risk}/100</p>
                       <Badge variant="outline" className={cn("text-[10px]", churnColor(a.churn_risk))}>
                         {a.churn_risk_label || (a.churn_risk >= 80 ? "Crítico" : a.churn_risk >= 60 ? "Alto" : a.churn_risk >= 30 ? "Moderado" : "Baixo")}
                       </Badge>
@@ -398,7 +405,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                         ))}
                         <div className="flex items-center justify-between text-xs border-t border-border/30 pt-1.5 mt-1">
                           <span className="font-semibold">Total</span>
-                          <span className={cn("font-bold", churnColor(a.churn_risk))}>{a.churn_risk}%</span>
+                          <span className={cn("font-bold", churnColor(a.churn_risk))}>{a.churn_risk}/100</span>
                         </div>
                       </div>
                     )}
@@ -536,6 +543,8 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
           <TabsContent value="conversas" className="mt-4">
             {loadingConversas ? (
               <p className="text-sm text-muted-foreground text-center py-8">Carregando conversas...</p>
+            ) : conversationError ? (
+              <div role="alert" className="py-8 text-center text-sm text-destructive">Não foi possível carregar as conversas. <Button variant="outline" size="sm" onClick={fetchConversas}>Tentar novamente</Button></div>
             ) : conversas.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">Nenhuma conversa registrada.</p>
             ) : (
@@ -828,7 +837,7 @@ export function ClientDetailModal({ grupo, open, onClose, npsPrediction }: Props
                 responsavelMaster={(clientInfo as any).responsavel_master}
               />
             </div>
-            <OnboardingTab groupId={grupo.group_id} groupName={grupo.nome} />
+            <OnboardingTab groupId={grupo.group_id} groupName={grupo.nome} ownerId={user?.id} />
           </TabsContent>
         </Tabs>
       </DialogContent>

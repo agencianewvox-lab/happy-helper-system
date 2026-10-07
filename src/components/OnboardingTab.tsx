@@ -16,6 +16,7 @@ import {
 interface Props {
   groupId: string;
   groupName: string;
+  ownerId?: string;
 }
 
 const OnboardingPresentation = lazy(() => import("./OnboardingPresentation"));
@@ -94,7 +95,7 @@ function ResponseGrid({ responses }: { responses: Record<string, unknown> }) {
   );
 }
 
-export function OnboardingTab({ groupId, groupName }: Props) {
+export function OnboardingTab({ groupId, groupName, ownerId }: Props) {
   const [data, setData] = useState<OnboardingResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -208,7 +209,7 @@ export function OnboardingTab({ groupId, groupName }: Props) {
       </Dialog>
       {presentationOpen && (
         <Suspense fallback={<div role="status" className="fixed inset-0 z-[60] grid place-items-center bg-background text-sm">Preparando apresentação…</div>}>
-          <OnboardingPresentation response={data} groupName={groupName} onClose={() => setPresentationOpen(false)} />
+          <OnboardingPresentation key={`${groupId}:${data.created_at}:${ownerId}`} response={data} groupName={groupName} ownerId={ownerId} onClose={() => setPresentationOpen(false)} />
         </Suspense>
       )}
     </>

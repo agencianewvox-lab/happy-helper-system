@@ -1,0 +1,161 @@
+{
+  "capturedAt": "2026-10-07T00:38:00Z",
+  "sourceProject": "fmipenijdipscnqhtwvy",
+  "targetProject": "gorqyovidpdvuockzndm",
+  "state": "preparation_only_no_cutover",
+  "tables": [
+    {
+      "approx_bytes": 388,
+      "row_count": 2,
+      "table_name": "ai_chat_messages"
+    },
+    {
+      "approx_bytes": 2184,
+      "row_count": 8,
+      "table_name": "ai_conversations"
+    },
+    {
+      "approx_bytes": 14698,
+      "row_count": 10,
+      "table_name": "ai_prompts_config"
+    },
+    {
+      "approx_bytes": 1876,
+      "row_count": 4,
+      "table_name": "calendar_events"
+    },
+    {
+      "approx_bytes": 904,
+      "row_count": 3,
+      "table_name": "client_notes"
+    },
+    {
+      "approx_bytes": 500,
+      "row_count": 1,
+      "table_name": "coach_config"
+    },
+    {
+      "approx_bytes": 239454,
+      "row_count": 313,
+      "table_name": "coach_messages"
+    },
+    {
+      "approx_bytes": 179753,
+      "row_count": 262,
+      "table_name": "daily_feedback_log"
+    },
+    {
+      "approx_bytes": 97554,
+      "row_count": 79,
+      "table_name": "executive_briefings"
+    },
+    {
+      "approx_bytes": 0,
+      "row_count": 0,
+      "table_name": "master_actions_log"
+    },
+    {
+      "approx_bytes": 0,
+      "row_count": 0,
+      "table_name": "master_notifications"
+    },
+    {
+      "approx_bytes": 1374151,
+      "row_count": 6947,
+      "table_name": "nps_prediction_history"
+    },
+    {
+      "approx_bytes": 44421,
+      "row_count": 26,
+      "table_name": "nps_predictions"
+    },
+    {
+      "approx_bytes": 731,
+      "row_count": 1,
+      "table_name": "nps_surveys"
+    },
+    {
+      "approx_bytes": 272,
+      "row_count": 1,
+      "table_name": "office_direct_messages"
+    },
+    {
+      "approx_bytes": 104395,
+      "row_count": 328,
+      "table_name": "office_messages"
+    },
+    {
+      "approx_bytes": 1038,
+      "row_count": 2,
+      "table_name": "office_presence"
+    },
+    {
+      "approx_bytes": 2136,
+      "row_count": 6,
+      "table_name": "office_rooms"
+    },
+    {
+      "approx_bytes": 0,
+      "row_count": 0,
+      "table_name": "office_voice_sessions"
+    },
+    {
+      "approx_bytes": 25607,
+      "row_count": 8,
+      "table_name": "onboarding_responses"
+    },
+    {
+      "approx_bytes": 18404,
+      "row_count": 52,
+      "table_name": "pending_demand_resolutions"
+    },
+    {
+      "approx_bytes": 945,
+      "row_count": 4,
+      "table_name": "profiles"
+    },
+    {
+      "approx_bytes": 23714,
+      "row_count": 58,
+      "table_name": "system_configs"
+    },
+    {
+      "approx_bytes": 12770,
+      "row_count": 24,
+      "table_name": "tasks"
+    },
+    {
+      "approx_bytes": 1683,
+      "row_count": 5,
+      "table_name": "team_feedback_log"
+    },
+    {
+      "approx_bytes": 127327,
+      "row_count": 121,
+      "table_name": "webrtc_signals"
+    },
+    {
+      "approx_bytes": 1114736353,
+      "row_count": 8646,
+      "table_name": "whatsapp_conversas"
+    },
+    {
+      "approx_bytes": 17052,
+      "row_count": 25,
+      "table_name": "whatsapp_grupos"
+    }
+  ],
+  "copied": {
+    "privateSchema": "migration_stage",
+    "tables": [
+      "ai_chat_messages"
+    ],
+    "records": 2
+  },
+  "blocked": [
+    "Source connector database action quota; bulk export not executed.",
+    "WhatsApp raw records approximately 1.115 GB; full payload copy not verified.",
+    "Authentication, runtime functions, storage and schedules not migrated."
+  ],
+  "safety": "Source unchanged. New integration secrets not read, copied, or printed. Target staging not accessible to anon/authenticated."
+}

@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { metaAdsErrorMessage } from "@/lib/meta-ads-errors";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ import {
 interface MetaAdsTabProps {
   grupoId: string;
   grupoDbId: string;
+  onAccountChanged?: () => void;
 }
 
 interface AdsSummary {
@@ -70,7 +73,14 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
   3: { label: "Não segura", color: "text-red-500" },
 };
 
-export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
+export function MetaAdsTab(props: MetaAdsTabProps) {
+  return <MetaAdsContent key={props.grupoDbId} {...props} />;
+}
+
+function MetaAdsContent({ grupoDbId, onAccountChanged }: MetaAdsTabProps) {
+  const adsRequest = useRef(0);
+  const [accountReadError, setAccountReadError] = useState(false);
+  const [readingAccount, setReadingAccount] = useState(true);
   const [savedAccountId, setSavedAccountId] = useState("");
   const [savedAccountName, setSavedAccountName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -93,16 +103,20 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
 
   // Fetch saved ad_account_id
   useEffect(() => {
+    let active = true;
+    const requestCounter = adsRequest;
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("whatsapp_grupos")
         .select("ad_account_id")
         .eq("id", grupoDbId)
         .single();
-      if (data && (data as any).ad_account_id) {
-        setSavedAccountId((data as any).ad_account_id);
-      }
+      if (!active) return;
+      setAccountReadError(Boolean(error));
+      setSavedAccountId(data?.ad_account_id || "");
+      setReadingAccount(false);
     })();
+    return () => { active = false; requestCounter.current++; };
   }, [grupoDbId]);
 
   const loadAccounts = useCallback(async () => {
@@ -116,8 +130,8 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
       if (data?.error) throw new Error(data.error);
       setAccounts(data.accounts || []);
       setAccountsLoaded(true);
-    } catch (err: any) {
-      setAccountsError(err.message || "Erro ao listar contas");
+    } catch (err: unknown) {
+      setAccountsError(await metaAdsErrorMessage(err));
     } finally {
       setAccountsLoading(false);
     }
@@ -137,35 +151,39 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
   const selectAccount = useCallback(async (account: AdAccount) => {
     setSaving(true);
     const id = account.account_id;
-    await supabase
-      .from("whatsapp_grupos")
-      .update({ ad_account_id: id } as any)
-      .eq("id", grupoDbId);
-    setSavedAccountId(id);
-    setSavedAccountName(account.name || id);
-    setSaving(false);
-  }, [grupoDbId]);
+    try {
+      const { data, error } = await supabase.from("whatsapp_grupos").update({ ad_account_id: id }).eq("id", grupoDbId).select("id").single();
+      if (error || !data) throw error || new Error("Missing persisted row");
+      setSavedAccountId(id);
+      setSavedAccountName(account.name || id);
+      toast.success("Conta de anúncios vinculada ao cliente.");
+      onAccountChanged?.();
+    } catch { toast.error("A conta não foi vinculada. Verifique sua permissão e tente novamente."); }
+    finally { setSaving(false); }
+  }, [grupoDbId, onAccountChanged]);
 
   const disconnectAccount = useCallback(async () => {
     setSaving(true);
-    await supabase
-      .from("whatsapp_grupos")
-      .update({ ad_account_id: null } as any)
-      .eq("id", grupoDbId);
-    setSavedAccountId("");
-    setSavedAccountName("");
-    setSummary(null);
-    setCampaigns([]);
-    setDaily([]);
-    setSaving(false);
-  }, [grupoDbId]);
+    try {
+      const { data, error } = await supabase.from("whatsapp_grupos").update({ ad_account_id: null }).eq("id", grupoDbId).select("id").single();
+      if (error || !data) throw error || new Error("Missing persisted row");
+      adsRequest.current++;
+      setSavedAccountId(""); setSavedAccountName("");
+      setSummary(null); setCampaigns([]); setDaily([]); setLoading(false);
+      toast.success("Vínculo removido. A conta na Meta não foi alterada.");
+      onAccountChanged?.();
+    } catch { toast.error("O vínculo não foi removido. Verifique sua permissão e tente novamente."); }
+    finally { setSaving(false); }
+  }, [grupoDbId, onAccountChanged]);
 
   const fetchAds = useCallback(async () => {
     if (!savedAccountId) return;
+    const request = ++adsRequest.current;
     setLoading(true);
     setError(null);
+    setSummary(null); setCampaigns([]); setDaily([]);
     try {
-      const body: any = { ad_account_id: savedAccountId };
+      const body: Record<string, string> = { ad_account_id: savedAccountId };
       if (useCustomRange && dateRange?.from && dateRange?.to) {
         body.since = format(dateRange.from, "yyyy-MM-dd");
         body.until = format(dateRange.to, "yyyy-MM-dd");
@@ -175,13 +193,15 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
       const { data, error: fnError } = await supabase.functions.invoke("meta-ads", { body });
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
+      if (request !== adsRequest.current) return;
       setSummary(data.summary);
       setCampaigns(data.campaigns || []);
       setDaily(data.daily || []);
-    } catch (err: any) {
-      setError(err.message || "Erro ao buscar dados do Meta Ads");
+    } catch (err: unknown) {
+      const message = await metaAdsErrorMessage(err);
+      if (request === adsRequest.current) setError(message);
     } finally {
-      setLoading(false);
+      if (request === adsRequest.current) setLoading(false);
     }
   }, [savedAccountId, datePreset, useCustomRange, dateRange]);
 
@@ -200,7 +220,11 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
   }, [accounts, searchQuery]);
 
   const fmt = (n: number) => n.toLocaleString("pt-BR");
-  const fmtMoney = (n: number) => `R$ ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const accountCurrency = accounts.find(a => a.account_id.replace(/^act_/, "") === savedAccountId.replace(/^act_/, ""))?.currency;
+  const fmtMoney = (n: number) => accountCurrency && /^[A-Z]{3}$/.test(accountCurrency) ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: accountCurrency }).format(n) : `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (moeda da conta)`;
+
+  if (readingAccount) return <p role="status" className="py-6 text-sm text-muted-foreground">Conferindo vínculo da conta…</p>;
+  if (accountReadError) return <p role="alert" className="py-6 text-sm text-destructive">Não foi possível ler o vínculo deste cliente. Feche e abra o card para tentar novamente. Nenhuma conta foi alterada.</p>;
 
   return (
     <div className="space-y-4">
@@ -372,7 +396,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
                   { label: "CPC", value: fmtMoney(summary.cpc), icon: MousePointerClick, color: "text-orange-500", bg: "bg-orange-500/10" },
                   { label: "CPM", value: fmtMoney(summary.cpm), icon: BarChart3, color: "text-violet-500", bg: "bg-violet-500/10" },
                   { label: "Alcance", value: fmt(summary.reach), icon: Target, color: "text-cyan-500", bg: "bg-cyan-500/10" },
-                  { label: "CPA", value: summary.cpa ? fmtMoney(summary.cpa) : "—", icon: DollarSign, color: "text-red-500", bg: "bg-red-500/10" },
+                  { label: "CPA", value: summary.cpa != null ? fmtMoney(summary.cpa) : "—", icon: DollarSign, color: "text-red-500", bg: "bg-red-500/10" },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
                   <div key={label} className={cn("p-2.5 rounded-lg border border-border/30", bg)}>
                     <div className="flex items-center gap-1.5 mb-1">
@@ -392,7 +416,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
                     <ComposedChart data={daily}>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
                       <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(d) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} />
-                      <YAxis yAxisId="left" tick={{ fontSize: 9 }} tickFormatter={(v) => `R$${v}`} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 9 }} tickFormatter={(v) => fmt(v)} />
                       <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9 }} />
                       <Tooltip
                         contentStyle={{ fontSize: 11, background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
@@ -412,7 +436,7 @@ export function MetaAdsTab({ grupoId, grupoDbId }: MetaAdsTabProps) {
                   <p className="text-xs text-muted-foreground font-semibold mb-2">🎯 Campanhas</p>
                   <div className="space-y-1.5">
                     {campaigns.map((c, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs p-2 rounded bg-background/50 border border-border/20">
+                      <div key={i} className="flex flex-wrap gap-2 items-center justify-between text-xs p-2 rounded bg-background/50 border border-border/20">
                         <span className="truncate flex-1 font-medium">{c.name}</span>
                         <div className="flex gap-3 text-muted-foreground shrink-0 ml-2">
                           <span>{fmtMoney(c.spend)}</span>

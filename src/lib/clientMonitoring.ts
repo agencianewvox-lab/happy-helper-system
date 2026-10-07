@@ -121,27 +121,28 @@ export function businessMinutesBetween(
 ) {
   const start = new Date(startIso);
   const end = new Date(endIso);
-  if (end <= start) return 0;
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) return 0;
 
+  // Shift once to Brasília's current UTC-3 offset; UTC accessors avoid applying the host timezone twice.
   const toBrt = (date: Date) => new Date(date.getTime() - 3 * 60 * 60 * 1000);
   const startBrt = toBrt(start);
   const endBrt = toBrt(end);
 
   const clamp = (date: Date) => {
     const cloned = new Date(date);
-    while (cloned.getDay() === 0 || cloned.getDay() === 6) {
-      cloned.setDate(cloned.getDate() + 1);
-      cloned.setHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
+    while (cloned.getUTCDay() === 0 || cloned.getUTCDay() === 6) {
+      cloned.setUTCDate(cloned.getUTCDate() + 1);
+      cloned.setUTCHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
     }
 
-    const hour = cloned.getHours() + cloned.getMinutes() / 60;
+    const hour = cloned.getUTCHours() + cloned.getUTCMinutes() / 60;
     if (hour < businessStartHour) {
-      cloned.setHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
+      cloned.setUTCHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
     } else if (hour >= businessEndHour) {
-      cloned.setDate(cloned.getDate() + 1);
-      cloned.setHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
-      while (cloned.getDay() === 0 || cloned.getDay() === 6) {
-        cloned.setDate(cloned.getDate() + 1);
+      cloned.setUTCDate(cloned.getUTCDate() + 1);
+      cloned.setUTCHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
+      while (cloned.getUTCDay() === 0 || cloned.getUTCDay() === 6) {
+        cloned.setUTCDate(cloned.getUTCDate() + 1);
       }
     }
 
@@ -153,19 +154,19 @@ export function businessMinutesBetween(
 
   let total = 0;
   while (current < endBrt) {
-    if (current.getDay() !== 0 && current.getDay() !== 6) {
+    if (current.getUTCDay() !== 0 && current.getUTCDay() !== 6) {
       const endOfBusiness = new Date(current);
-      endOfBusiness.setHours(Math.floor(businessEndHour), businessEndHour % 1 ? 30 : 0, 0, 0);
+      endOfBusiness.setUTCHours(Math.floor(businessEndHour), businessEndHour % 1 ? 30 : 0, 0, 0);
       const sliceEnd = endBrt < endOfBusiness ? endBrt : endOfBusiness;
       if (sliceEnd > current) {
         total += (sliceEnd.getTime() - current.getTime()) / 60000;
       }
     }
 
-    current.setDate(current.getDate() + 1);
-    current.setHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
-    while (current.getDay() === 0 || current.getDay() === 6) {
-      current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
+    current.setUTCHours(Math.floor(businessStartHour), businessStartHour % 1 ? 30 : 0, 0, 0);
+    while (current.getUTCDay() === 0 || current.getUTCDay() === 6) {
+      current.setUTCDate(current.getUTCDate() + 1);
     }
   }
 

@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NpsSendDialog } from "@/components/NpsSendDialog";
 import { useProfile } from "@/hooks/useProfile";
+import { realNps } from "@/lib/client-health";
 
 interface NpsSurveyRow {
   id: string;
@@ -168,21 +169,32 @@ export default function NpsReal() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const { isMaster } = useProfile();
+  const { isMaster, gestorFilter, loading: profileLoading } = useProfile();
+  const [loadError, setLoadError] = useState(false);
+  const [period, setPeriod] = useState("90");
 
   useEffect(() => {
+    if (profileLoading) return;
+    let active = true;
     async function fetchData() {
       setLoading(true);
-      const [surveyRes, gruposRes] = await Promise.all([
-        supabase.from("nps_surveys").select("*").order("created_at", { ascending: false }),
-        supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, categoria, responsavel_master"),
-      ]);
-      if (surveyRes.data) setSurveys(surveyRes.data as NpsSurveyRow[]);
-      if (gruposRes.data) setGrupos(gruposRes.data as GrupoInfo[]);
-      setLoading(false);
+      setLoadError(false);
+      try {
+        if (!isMaster && !gestorFilter) { if (active) { setSurveys([]); setGrupos([]); } return; }
+        let query = supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, categoria, responsavel_master");
+        if (!isMaster) query = query.eq("gestor_responsavel", gestorFilter!);
+        const groupResult = await query;
+        if (groupResult.error) throw groupResult.error;
+        const visible = groupResult.data || [];
+        const surveyResult = visible.length ? await supabase.from("nps_surveys").select("*").in("group_id", visible.map(g => g.group_id)).order("created_at", { ascending: false }) : { data: [], error: null };
+        if (surveyResult.error) throw surveyResult.error;
+        if (active) { setGrupos(visible); setSurveys(surveyResult.data as NpsSurveyRow[]); }
+      } catch { if (active) setLoadError(true); }
+      finally { if (active) setLoading(false); }
     }
     fetchData();
-  }, []);
+    return () => { active = false; };
+  }, [isMaster, gestorFilter, profileLoading]);
 
   const gruposMap = useMemo(() => {
     const map: Record<string, GrupoInfo> = {};
@@ -218,20 +230,14 @@ export default function NpsReal() {
         gestor.toLowerCase().includes(search.toLowerCase()) ||
         (s.comment || "").toLowerCase().includes(search.toLowerCase());
       const matchType = filterType === "all" || s.survey_type === filterType;
-      return matchSearch && matchType;
+      const matchPeriod = period === "all" || Date.parse(s.created_at) >= Date.now() - Number(period) * 86400000;
+      return matchSearch && matchType && matchPeriod;
     });
-  }, [surveys, search, filterType, gruposMap]);
+  }, [surveys, search, filterType, gruposMap, period]);
 
   const stats = useMemo(() => {
-    if (surveys.length === 0) return { avg: 0, promoters: 0, detractors: 0, passive: 0, nps: 0, total: 0 };
-    const total = surveys.length;
-    const avg = surveys.reduce((s, sv) => s + sv.score, 0) / total;
-    const promoters = surveys.filter((s) => s.score >= 9).length;
-    const detractors = surveys.filter((s) => s.score <= 6).length;
-    const passive = total - promoters - detractors;
-    const nps = Math.round(((promoters - detractors) / total) * 100);
-    return { avg: Number(avg.toFixed(1)), promoters, detractors, passive, nps, total };
-  }, [surveys]);
+    return realNps(filteredSurveys);
+  }, [filteredSurveys]);
 
   function getScoreColor(score: number) {
     if (score >= 9) return "text-green-400";
@@ -249,7 +255,7 @@ export default function NpsReal() {
     ? gruposMap[selectedGroupId]?.nome?.replace(/\s*\(.*?\)/, "").substring(0, 30) || "Cliente"
     : "";
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -257,11 +263,15 @@ export default function NpsReal() {
     );
   }
 
+  if (loadError) return <p role="alert" className="p-8 text-destructive">Não foi possível carregar as pesquisas. Nenhum indicador foi calculado. Atualize a página para tentar novamente.</p>;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">NPS Real</h1>
-        <p className="text-muted-foreground text-sm">Envie pesquisas e acompanhe as respostas de satisfação</p>
+        <p className="text-muted-foreground text-sm">Satisfação declarada pelo cliente, sem inferência de IA.</p>
+        <p className="text-muted-foreground text-xs mt-2">Última resposta válida de cada cliente dentro do período e filtros. NPS = % de promotores (9–10) menos % de detratores (0–6); notas 7–8 são neutras. O histórico completo permanece preservado.</p>
+        <label className="flex items-center gap-3 text-sm mt-4">Período de análise<select aria-label="Período do NPS" className="rounded-lg border bg-background p-2" value={period} onChange={e => setPeriod(e.target.value)}><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="all">Todo o histórico</option></select></label>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -273,7 +283,7 @@ export default function NpsReal() {
         </Card>
         <Card className="bg-card border-border/40">
           <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Respostas</p>
+            <p className="text-xs text-muted-foreground mb-1">Clientes na amostra</p>
             <p className="text-2xl font-bold text-foreground">{stats.total}</p>
           </CardContent>
         </Card>

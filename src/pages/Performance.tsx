@@ -59,7 +59,7 @@ const rankIcons = [Trophy, Medal, Award];
 const rankColors = ["text-amber-400", "text-zinc-400", "text-orange-600"];
 
 const SCORE_LABELS: Record<string, string> = {
-  nps: "NPS Preditivo",
+  nps: "Índice estimado (legado)",
   frt: "Tempo de Resposta",
   tasks: "Tarefas Executadas",
   resolutions: "Pendências Resolvidas",
@@ -76,14 +76,16 @@ const SCORE_ICONS: Record<string, any> = {
   inactivity: AlertTriangle,
 };
 
-function getScoreColor(score: number): string {
+function getScoreColor(score: number | null): string {
+  if (score == null) return "text-muted-foreground";
   if (score >= 8) return "text-emerald-500";
   if (score >= 6) return "text-amber-500";
   if (score >= 4) return "text-orange-500";
   return "text-red-500";
 }
 
-function getScoreBg(score: number): string {
+function getScoreBg(score: number | null): string {
+  if (score == null) return "bg-muted/20 border-border";
   if (score >= 8) return "bg-emerald-500/10 border-emerald-500/20";
   if (score >= 6) return "bg-amber-500/10 border-amber-500/20";
   if (score >= 4) return "bg-orange-500/10 border-orange-500/20";
@@ -191,13 +193,13 @@ export default function Performance() {
   // FRT for selected gestor
   const gestorFrt = useMemo(() => {
     const collab = filteredCollaborators.find(c => c.name === gestorName);
-    return collab?.avg_frt_minutes ?? teamData?.global.avg_frt_minutes ?? null;
+    return gestorName ? collab?.avg_frt_minutes ?? null : teamData?.global.avg_frt_minutes ?? null;
   }, [filteredCollaborators, gestorName, teamData]);
 
   // Update FRT score in metrics
   const enhancedMetrics = useMemo((): GestorMetrics => {
     const frt = gestorFrt;
-    let frtScore = 5;
+    let frtScore: number | null = null;
     if (frt != null) {
       if (frt <= 15) frtScore = 10;
       else if (frt <= 30) frtScore = 8;
@@ -207,8 +209,7 @@ export default function Performance() {
       else frtScore = 1;
     }
     const scores = { ...metrics.scores, frt: frtScore };
-    const overall = Number(((scores.nps + scores.npsReal + scores.frt + scores.tasks + scores.resolutions + scores.sentiment + scores.inactivity) / 7).toFixed(1));
-    return { ...metrics, frtAvg: frt ?? 0, scores: { ...scores, overall } };
+    return { ...metrics, frtAvg: frt, scores };
   }, [metrics, gestorFrt]);
 
   const sentimentData = useMemo(() => {
@@ -330,18 +331,19 @@ export default function Performance() {
               Scorecard — {enhancedMetrics.name}
             </h2>
             <Badge variant="outline" className={cn("text-xs font-bold", getScoreColor(enhancedMetrics.scores.overall))}>
-              Nota Geral: {enhancedMetrics.scores.overall}
+              Índice observado: {enhancedMetrics.scores.overall ?? "Sem base"}
             </Badge>
           </div>
+          <p className="text-xs text-muted-foreground mb-4">Índice de execução: média das dimensões com dados (tarefas, pendências e nota dada pelo cliente). Sem notas presumidas nem bônus por complexidade. O índice legado não compõe essa média; isto não é NPS nem um ranking conclusivo de desempenho.</p>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {(Object.keys(SCORE_LABELS) as Array<keyof typeof SCORE_LABELS>).map((key) => {
-              const score = enhancedMetrics.scores[key as keyof typeof enhancedMetrics.scores] as number;
+              const score = enhancedMetrics.scores[key as keyof typeof enhancedMetrics.scores];
               const Icon = SCORE_ICONS[key];
               return (
                 <Card key={key} className={cn("border transition-colors", getScoreBg(score))}>
                   <CardContent className="p-4 flex flex-col items-center text-center">
                     <Icon className={cn("w-5 h-5 mb-1", getScoreColor(score))} />
-                    <p className={cn("text-3xl font-black", getScoreColor(score))}>{score}</p>
+                    <p className={cn("text-3xl font-black", getScoreColor(score))}>{score ?? "—"}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">{SCORE_LABELS[key]}</p>
                   </CardContent>
                 </Card>
@@ -353,12 +355,12 @@ export default function Performance() {
         {/* ═══════════ KPIs RÁPIDOS ═══════════ */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           {[
-            { label: "NPS Médio", value: enhancedMetrics.npsAvg.toFixed(1), icon: Heart, color: "text-primary" },
-            { label: "FRT Médio", value: formatFrt(enhancedMetrics.frtAvg || null), icon: Timer, color: "text-amber-500" },
+            { label: "Índice legado · 0–10", value: enhancedMetrics.scores.nps != null ? enhancedMetrics.npsAvg.toFixed(1) : "—", icon: Heart, color: "text-primary" },
+            { label: "FRT Médio", value: formatFrt(enhancedMetrics.frtAvg), icon: Timer, color: "text-amber-500" },
             { label: "Tarefas Concluídas", value: `${enhancedMetrics.tasksCompleted}/${enhancedMetrics.tasksTotal}`, icon: ListChecks, color: "text-blue-500" },
             { label: "Pendências Resolvidas", value: `${enhancedMetrics.pendingResolved}/${enhancedMetrics.pendingTotal}`, icon: CheckCircle, color: "text-emerald-500" },
             { label: "Clientes", value: enhancedMetrics.clients.length, icon: Users, color: "text-violet-500" },
-            { label: "Grupos Ativos", value: `${enhancedMetrics.totalGroups - enhancedMetrics.inactiveGroups}/${enhancedMetrics.totalGroups}`, icon: Activity, color: "text-cyan-500" },
+            { label: "Nota do cliente · amostra", value: enhancedMetrics.npsRealCount ? `${enhancedMetrics.npsRealAvg.toFixed(1)} · ${enhancedMetrics.npsRealCount} cliente(s)` : "Sem respostas", icon: Heart, color: "text-cyan-500" },
           ].map(({ label, value, icon: Icon, color }) => (
             <Card key={label} className="bg-card/60 border-border/30">
               <CardContent className="p-4 flex items-center gap-3">
@@ -377,7 +379,7 @@ export default function Performance() {
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Heart className="w-4 h-4 text-primary" /> Evolução NPS Preditivo (Geral)
+                <Heart className="w-4 h-4 text-primary" /> Índice estimado histórico · não é NPS real
               </CardTitle>
             </CardHeader>
             <CardContent className="h-[300px]">
@@ -388,11 +390,11 @@ export default function Performance() {
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                     <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip contentStyle={tooltipStyle} />
-                    <Line type="monotone" dataKey="score" name="NPS Médio" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="score" name="Índice legado (0–10)" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de evolução NPS no período.</p>
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados do índice estimado no período.</p>
               )}
             </CardContent>
           </Card>
@@ -400,7 +402,7 @@ export default function Performance() {
           {/* NPS por Cliente */}
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">NPS Preditivo por Cliente</CardTitle>
+              <CardTitle className="text-sm font-semibold">Índice estimado por cliente · legado, 0–10</CardTitle>
             </CardHeader>
             <CardContent className="h-[300px]">
               {clientNpsData.length > 0 ? (
@@ -409,8 +411,8 @@ export default function Performance() {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} angle={-45} textAnchor="end" interval={0} height={60} />
                     <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "NPS"]} />
-                    <Bar dataKey="score" name="NPS" radius={[4, 4, 0, 0]}>
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Índice estimado"]} />
+                    <Bar dataKey="score" name="Índice estimado" radius={[4, 4, 0, 0]}>
                       {clientNpsData.map((entry: any, idx: number) => (
                         <Cell key={idx} fill={getNpsBarColor(entry.score)} />
                       ))}
@@ -418,7 +420,7 @@ export default function Performance() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-12">Sem dados de NPS.</p>
+                <p className="text-sm text-muted-foreground text-center py-12">Sem dados do índice estimado.</p>
               )}
             </CardContent>
           </Card>
@@ -712,7 +714,7 @@ export default function Performance() {
           <Card className="bg-card/60 border-border/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-amber-400" /> Ranking Geral por Responsável
+                <Trophy className="w-4 h-4 text-amber-400" /> Comparativo por responsável · base disponível
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -722,8 +724,8 @@ export default function Performance() {
                     <tr className="border-b border-border/30">
                       <th className="text-left py-2 px-2 text-muted-foreground font-medium">#</th>
                       <th className="text-left py-2 px-2 text-muted-foreground font-medium">Responsável</th>
-                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS Pred.</th>
-                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">NPS Real</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">Índice legado</th>
+                      <th className="text-center py-2 px-2 text-muted-foreground font-medium">Nota cliente · média 0–10</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">FRT</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">Tarefas</th>
                       <th className="text-center py-2 px-2 text-muted-foreground font-medium">Pendências</th>
@@ -745,16 +747,16 @@ export default function Performance() {
                             <p className="font-semibold">{g.name}</p>
                             <p className="text-[10px] text-muted-foreground">{g.clients.length} clientes</p>
                           </td>
-                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.nps))}>{g.scores.nps}</td>
-                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.npsReal))}>{g.scores.npsReal}</td>
-                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.frt))}>{g.scores.frt}</td>
-                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.tasks))}>{g.scores.tasks}</td>
-                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.resolutions))}>{g.scores.resolutions}</td>
-                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.sentiment))}>{g.scores.sentiment}</td>
-                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.inactivity))}>{g.scores.inactivity}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.nps))}>{g.scores.nps ?? "—"}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.npsRealAvg))}>{g.npsRealCount > 0 ? g.npsRealAvg.toFixed(1) : "—"}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.frt))}>{g.scores.frt ?? "—"}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.tasks))}>{g.scores.tasks ?? "—"}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.resolutions))}>{g.scores.resolutions ?? "—"}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.sentiment))}>{g.scores.sentiment ?? "—"}</td>
+                          <td className={cn("py-3 px-2 text-center font-bold", getScoreColor(g.scores.inactivity))}>{g.scores.inactivity ?? "—"}</td>
                           <td className="py-3 px-2 text-center">
                             <Badge className={cn("text-xs font-bold", getScoreBg(g.scores.overall), getScoreColor(g.scores.overall))}>
-                              {g.scores.overall}
+                              {g.scores.overall ?? "Sem base"}
                             </Badge>
                           </td>
                         </tr>

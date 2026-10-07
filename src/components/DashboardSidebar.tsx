@@ -1,4 +1,4 @@
-import { BarChart3, Brain, ListTodo, CalendarDays, Heart, Bot, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Home, Smartphone } from "lucide-react";
+import { BarChart3, Megaphone, ListTodo, CalendarDays, Heart, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Home, Smartphone } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -25,14 +25,13 @@ interface DashboardSidebarProps {
 const navItems = [
   { title: "Início", url: "/", icon: Home, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Performance", url: "/performance", icon: BarChart3, adminOnly: false, masterOnly: false, badgeKey: null },
-  { title: "Chat IA", url: "/chat", icon: Brain, adminOnly: false, masterOnly: false, badgeKey: null },
-  { title: "JARVIS", url: "/jarvis", icon: Bot, adminOnly: false, masterOnly: true, badgeKey: null },
+  { title: "Anúncios", url: "/anuncios", icon: Megaphone, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
   { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false, masterOnly: false, badgeKey: "agenda" as const },
   { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false, masterOnly: false, badgeKey: "pendencias" as const },
   
-  { title: "NPS Preditivo", url: "/nps", icon: Heart, adminOnly: true, masterOnly: false, badgeKey: null },
-  { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: true, masterOnly: false, badgeKey: null },
+  { title: "Saúde da carteira", url: "/nps", icon: Heart, adminOnly: false, masterOnly: false, badgeKey: null },
+  { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "WhatsApp central", url: "/master/whatsapp", icon: Smartphone, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Acesso Master", url: "/admin", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Configurações", url: "/configuracoes", icon: Settings, adminOnly: false, masterOnly: true, badgeKey: null },

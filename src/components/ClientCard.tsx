@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Grupo, NpsPrediction } from "@/types/client";
+import { Grupo } from "@/types/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays, Siren, ArrowUpRight, ArrowDownRight, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { NpsScoreBadge } from "@/components/NpsScoreBadge";
+import { ClientHealthBadge } from "@/components/ClientHealth";
 import { calculateSlaStatus } from "@/lib/clientMonitoring";
 
 interface ClientCardProps {
@@ -20,7 +20,6 @@ interface ClientCardProps {
   isMaster: boolean;
   messageStatsReady?: boolean;
   compact?: boolean;
-  npsPrediction?: NpsPrediction;
 }
 
 const categoriaConfig: Record<string, { color: string; icon: string }> = {
@@ -80,7 +79,7 @@ function TrendArrow({ trend }: { trend?: string }) {
 const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
 const CARD_CATEGORIAS = ["Clientes / Operação", "Clínicas", "Internos / Gestão"];
 
-export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true, compact, npsPrediction }: ClientCardProps) {
+export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true, compact }: ClientCardProps) {
   const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
@@ -277,7 +276,7 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
               </span>
               {/* Churn */}
               <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", churnBg(a.churn_risk), churnColor(a.churn_risk))}>
-                🔥 {a.churn_risk}% {a.churn_risk_label}
+                🔥 {a.churn_risk}/100 {a.churn_risk_label}
               </span>
               {/* Pending */}
               {a.has_pending_demands && (() => {
@@ -321,7 +320,7 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
                 </span>
               )}
               {/* NPS Score */}
-              <NpsScoreBadge prediction={npsPrediction} />
+              <ClientHealthBadge group={grupo} />
             </div>
           )}
 

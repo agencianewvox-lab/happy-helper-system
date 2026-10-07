@@ -13,6 +13,7 @@ dist-ssr
 *.local
 .vercel
 .env.*.local
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*

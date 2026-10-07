@@ -21,7 +21,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 10%;
 
-    --primary: 184 77% 25%;
+    --primary: 211 83% 41%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 15% 92%;
@@ -38,7 +38,7 @@
 
     --border: 220 15% 88%;
     --input: 220 15% 88%;
-    --ring: 184 77% 25%;
+    --ring: 211 83% 41%;
 
     --radius: 0.85rem;
 
@@ -53,42 +53,42 @@
   }
 
   .dark {
-    --background: 186 29% 7%;
-    --foreground: 172 22% 95%;
+    --background: 220 43% 7%;
+    --foreground: 213 42% 95%;
 
-    --card: 185 24% 11%;
-    --card-foreground: 172 22% 95%;
+    --card: 218 36% 11%;
+    --card-foreground: 213 42% 95%;
 
-    --popover: 185 24% 11%;
-    --popover-foreground: 172 22% 95%;
+    --popover: 218 36% 11%;
+    --popover-foreground: 213 42% 95%;
 
-    --primary: 172 68% 54%;
-    --primary-foreground: 184 30% 8%;
+    --primary: 198 90% 61%;
+    --primary-foreground: 218 46% 9%;
 
-    --secondary: 185 17% 17%;
-    --secondary-foreground: 172 22% 95%;
+    --secondary: 216 29% 17%;
+    --secondary-foreground: 213 42% 95%;
 
-    --muted: 185 17% 17%;
-    --muted-foreground: 180 12% 70%;
+    --muted: 216 29% 17%;
+    --muted-foreground: 215 23% 70%;
 
-    --accent: 184 22% 19%;
-    --accent-foreground: 172 22% 95%;
+    --accent: 216 36% 19%;
+    --accent-foreground: 213 42% 95%;
 
     --destructive: 0 68% 49%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 184 17% 22%;
-    --input: 184 17% 22%;
-    --ring: 172 68% 54%;
+    --border: 216 28% 23%;
+    --input: 216 28% 23%;
+    --ring: 198 90% 61%;
 
-    --sidebar-background: 185 30% 9%;
-    --sidebar-foreground: 172 22% 95%;
-    --sidebar-primary: 172 68% 54%;
-    --sidebar-primary-foreground: 184 30% 8%;
-    --sidebar-accent: 184 22% 18%;
-    --sidebar-accent-foreground: 172 22% 95%;
-    --sidebar-border: 184 17% 22%;
-    --sidebar-ring: 172 68% 54%;
+    --sidebar-background: 221 43% 9%;
+    --sidebar-foreground: 213 42% 95%;
+    --sidebar-primary: 198 90% 61%;
+    --sidebar-primary-foreground: 218 46% 9%;
+    --sidebar-accent: 216 36% 18%;
+    --sidebar-accent-foreground: 213 42% 95%;
+    --sidebar-border: 216 28% 23%;
+    --sidebar-ring: 198 90% 61%;
   }
 }
 
@@ -108,5 +108,5 @@
   }
   h1, h2, h3, h4 { font-family: 'Manrope Variable', sans-serif; letter-spacing: -0.035em; }
   :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 4px; }
-  ::selection { background: #aee8e3; color: #123a3c; }
+  ::selection { background: #a9ddff; color: #123458; }
 }

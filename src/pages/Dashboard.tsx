@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from "react";
 import { usePendingAlert, useHighRiskAlert } from "@/hooks/usePendingAlert";
 import { cn } from "@/lib/utils";
 import { useClientData } from "@/hooks/useClientData";
-import { AIChatPanel } from "@/components/AIChatPanel";
 import { ClientCard } from "@/components/ClientCard";
 import { ClientDetailModal } from "@/components/ClientDetailModal";
 import { DashboardFilters } from "@/components/DashboardFilters";
@@ -19,7 +18,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 
 import { AddClientDialog } from "@/components/AddClientDialog";
-import { useNpsPredictions } from "@/hooks/useNpsPredictions";
 import { BirthdayAlerts } from "@/components/BirthdayAlerts";
 import { calculateSlaStatus } from "@/lib/clientMonitoring";
 import { WorkspaceLoading } from "@/components/WorkspaceLoading";
@@ -34,7 +32,6 @@ export default function Dashboard() {
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
   const [gestorFilterOverride, setGestorFilterOverride] = useState<string | null>(null);
   const [slaTick, setSlaTick] = useState(0);
-  const { predictionsMap, npsGlobal } = useNpsPredictions();
 
   useEffect(() => {
     const interval = setInterval(() => setSlaTick((value) => value + 1), 60000);
@@ -175,7 +172,7 @@ export default function Dashboard() {
     frt: "Com FRT",
     positive: "Sentimento Positivo",
     inativos: "Grupos Inativos",
-    dengue: "Grupos da Dengue",
+    dengue: "Sem interação há 48h",
     sla: "SLA Violado",
     priority: "Prioridade Máxima",
   };
@@ -229,7 +226,7 @@ export default function Dashboard() {
             { key: "frt", label: "FRT Médio", desc: "Tempo médio de 1ª resposta", value: stats.avgFrt != null ? `${stats.avgFrt}min` : "—", icon: Timer, color: "text-blue-500" },
             { key: "positive", label: "Sentimento +", desc: "Grupos com sentimento positivo", value: stats.positiveSent, icon: TrendingUp, color: "text-emerald-500" },
             { key: "inativos", label: "Grupos Inativos", desc: "Sem atividade há mais de 24h", value: stats.inativos, icon: Moon, color: "text-zinc-400" },
-            { key: "dengue", label: "Grupos da Dengue", desc: "Sem atividade há mais de 48h", value: stats.dengue, icon: Flame, color: "text-red-600" },
+            { key: "dengue", label: "Sem interação há 48h", desc: "Conferir rotina e contexto do cliente", value: stats.dengue, icon: Flame, color: "text-red-600" },
             { key: "sla", label: "SLA Violado", desc: "Equipe sem responder há +30min", value: stats.slaViolations, icon: AlertCircle, color: "text-red-500" },
             { key: "priority", label: "Prioridade Máxima", desc: "Clientes em estado crítico combinado", value: stats.priorityCount, icon: ShieldAlert, color: "text-red-600" },
           ].map(({ key, label, desc, value, icon: Icon, color }) => (
@@ -312,7 +309,7 @@ export default function Dashboard() {
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {metricFilteredGrupos.map((g) => (
-            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} isMaster={isMaster} messageStatsReady={hasMessageStats} npsPrediction={predictionsMap.get(g.group_id)} />
+            <ClientCard key={g.id} grupo={g} onClick={setSelectedGrupo} isMaster={isMaster} messageStatsReady={hasMessageStats} />
           ))}
           {clientsLoading && metricFilteredGrupos.length === 0 && Array.from({ length: 4 }, (_, index) => (
             <div key={index} className="h-48 rounded-2xl border border-border/40 bg-card/60 animate-pulse" aria-hidden="true" />
@@ -330,7 +327,6 @@ export default function Dashboard() {
           grupo={selectedGrupo}
           open={!!selectedGrupo}
           onClose={() => setSelectedGrupo(null)}
-          npsPrediction={selectedGrupo ? predictionsMap.get(selectedGrupo.group_id) : undefined}
         />
 
         {tvMode && (
@@ -343,7 +339,6 @@ export default function Dashboard() {
           />
         )}
 
-        <AIChatPanel />
         </div>
       </div>
     </SidebarProvider>

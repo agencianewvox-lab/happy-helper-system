@@ -5,8 +5,10 @@
 - Código: `agencianewvox-lab/happy-helper-system`, branch `main`.
 - Site e processamento: projeto Vercel `painel-de-controle`, equipe `new-vox`.
 - ID Vercel: `prj_3nuCjeXwCgNzDXoDIu6X3vNktJnk`.
-- Dados, autenticação e Realtime atuais: Supabase gerenciado pelo Lovable,
-  projeto `fmipenijdipscnqhtwvy`. Nenhum dado é transferido para o VOXI.
+- Destino aprovado dos dados: Supabase independente `gorqyovidpdvuockzndm`.
+- Dados, autenticação e Realtime ainda em produção: projeto antigo
+  `fmipenijdipscnqhtwvy`, gerenciado pelo Lovable. A migração não foi concluída.
+  Nenhum dado é transferido para o VOXI.
 - VOXI é outro projeto/repositório/banco. Não compartilhar seus IDs de deploy,
   variáveis de banco ou domínios com este painel.
 
@@ -258,3 +260,111 @@ Referências técnicas consultadas:
 - https://developers.google.com/workspace/meet/api/guides/artifacts
 - https://developers.google.com/workspace/meet/api/guides/authenticate-authorize
 - https://developers.google.com/identity/protocols/oauth2/web-server
+
+## Revisão v2 — 06/10/2026, antes da migração completa
+
+### Destino corrigido e situação comprovada
+
+O proprietário informou e autorizou preparar/validar o novo Supabase
+`gorqyovidpdvuockzndm` (Painel de Controle NV). Ele é o destino, não o VOXI.
+O bundle público e `server/public-database.json` ainda apontam para
+`fmipenijdipscnqhtwvy`. Não alterar só a URL: o destino foi encontrado sem
+tabelas públicas, usuários Auth ou Edge Functions. As chaves mostradas pelo
+proprietário no novo projeto não validam uma migração nem estão disponíveis
+automaticamente na Vercel.
+
+Inventário agregado em `migration-inventory-2026-10-07.json`: 25 grupos,
+8 formulários, 4 perfis, 8.646 conversas. As conversas incluem aproximadamente
+1,115 GB em registros JSON brutos; mídias/base64 exigem uma exportação completa.
+
+Foi criada SOMENTE uma área privada `migration_stage` no destino, com RLS e
+sem grants para anon/authenticated. Dois registros de `ai_chat_messages`
+foram copiados e conferidos por SHA-256, como primeiro lote. A cópia seguinte
+foi bloqueada pela franquia de consultas do conector de origem. A consulta
+agregada liberou depois, mas a exportação em lote foi novamente bloqueada.
+Nenhuma tabela de aplicação, senha, usuário Auth, arquivo ou função foi migrada.
+Nenhum dado da origem foi apagado e nenhuma conexão de produção foi trocada.
+O aviso INFO do advisor “RLS enabled no policy” nas três tabelas privadas é
+intencional: acesso de usuários finais é negado, não falta uma política pública.
+
+Para completar: exportação integral pela ferramenta oficial/backup autorizado
+do banco de origem; esquema, dados e arquivos verificados; Auth e recuperação de
+senha; funções com autenticação/escopo de carteira; segredos no runtime correto;
+rotas públicas de formulários; webhook compartilhado e agendamentos; conciliação
+do delta de mensagens antes de qualquer troca. Não criar endpoint público de
+exportação nem remover proteção para contornar a franquia.
+
+Exportação oficial da origem (documentação Lovable conferida em 07/10/2026):
+More → Cloud → Overview → Advanced settings → Export project data → Database
+→ Export → Start export. O arquivo fica disponível no Storage após o aviso.
+É um backup PostgreSQL custom-format `.backup` (possivelmente em ZIP), não SQL
+para colar no editor. Inspecionar o índice com `pg_restore --list` e restaurar
+seletivamente em destino isolado, com ferramenta compatível com zstd. Não usar
+`--clean` sobre o Supabase inicializado sem revisão. Esse formato inclui Auth
+e hashes de senha; quando restaurados corretamente, as senhas podem ser
+preservadas, mas novas sessões serão necessárias. Arquivos Storage, segredos,
+funções e agendamentos exigem etapas próprias. A exportação ainda NÃO foi
+solicitada: navegador autenticado indisponível; pedido encaminhado ao proprietário.
+
+### Melhorias implementadas nesta revisão
+
+- Onboarding HTML padrão para TODOS os clientes, sem hardcode de Titanium:
+  dez capítulos, logo original, azul/ciano Newvox, plano de trabalho, checklist
+  de acessos, responsabilidades, rotina, decisões e próximos passos.
+- Respostas clínicas/empresas e download PDF preservados. Dados não preenchidos
+  continuam “a confirmar”; não há promessa automática de metas ou datas.
+- Editor de reunião: rascunho LOCAL por operador + grupo + formulário, com
+  esquema versionado e limites de tamanho. Não sincroniza entre gestores.
+- Download HTML offline, sem APIs/scripts externos, somente campos selecionados
+  e texto revisado da reunião. Valores escapados e CSP restritiva. Arquivo
+  compartilhado não expira nem é revogável. Link público personalizado com
+  validade/revogação AINDA NÃO foi implementado; não confundir com o link
+  existente do formulário ou com a exportação HTML.
+- Área “Anúncios” para navegar pela carteira. Não altera campanhas na Meta.
+  Vínculo só mostra sucesso após confirmação de uma linha gravada no banco.
+  Erros não-2xx têm explicação segura; respostas antigas de consultas não
+  sobrescrevem uma nova seleção/período. Moeda da conta quando conhecida.
+- O token do backend ANTIGO foi rejeitado pela Meta. Isso NÃO prova que o token
+  informado no novo projeto seja inválido. A ligação à nova integração depende
+  da migração do runtime e sua validação autenticada.
+- Saúde operacional v2 (0–100) é diferente de NPS real. Regras transparentes:
+  silêncio maior que 630/1260 minutos úteis reduz 10/25 pontos; retorno pendente
+  por mais de 30/120/630 minutos úteis reduz 25/45/60 pontos. Sem mensagens
+  verificáveis, não atribuir índice saudável. Expediente seg–sex, 8h–18h30 BRT,
+  sem calendário de feriados. Corrigida aplicação dupla do fuso do navegador.
+- NPS real: última resposta válida por cliente no período/filtros, 9–10
+  promotores, 7–8 neutros e 0–6 detratores. Histórico original mantido.
+  Gráficos antigos na Performance são explicitamente “índice legado”, não NPS.
+- Performance deixa de inventar notas 5/10 ou atividade 100% quando faltam
+  observações. Nota declarada pelo cliente não recebe bônus por complexidade;
+  considera a última resposta válida por cliente no período. O índice de
+  execução agrega somente dimensões observadas de tarefas, pendências e nota
+  do cliente; não é NPS nem avaliação conclusiva de desempenho do gestor.
+- Conversas: deduplicação VISUAL por identificador do evento, sem excluir registros
+  nem juntar textos iguais de eventos diferentes. Ordenação estável por data/id,
+  proteção contra resposta de consulta de outro card, e erro com nova tentativa.
+  Idempotência definitiva do webhook e saneamento dos registros ainda pendentes.
+- Card ampliado, abas com rolagem própria; paleta navy/azul/ciano preservando
+  temas claro/escuro. Jarvis/chat retirados da navegação, rotas/dados preservados.
+- Dashboard deixa de consultar previsões de NPS que não são mais usadas nos cards.
+
+### Limites da verificação
+
+Testes automatizados de recuperação/alteração de senha, formulários/PDF,
+carregamento, descoberta de grupos e novos fluxos. Visual com clínica fictícia
+isolada, desktop 1440×1000 e celular 390×844, sem envio a clientes.
+Esses testes não provam login real, Meta válido ou recepção Evolution no novo
+projeto. Políticas legadas do banco atual continuam exigindo revisão: filtros
+de carteira na interface NÃO substituem RLS/validação do servidor.
+Google fica explicitamente para a segunda rodada.
+
+O navegador de teste renderizou/aplicou a personalização sem erros. A gravação
+de downloads foi cancelada pelo ambiente de automação tanto para o HTML quanto
+para um TXT de controle; portanto o salvamento no disco não foi comprovado nesse
+navegador. Geração, escape/CSP, carregamento da marca e criação do download são
+cobertos por testes automatizados. Não confundir essa limitação com validação
+do envio de arquivos por WhatsApp (não houve envio nesta rodada).
+
+Referências operacionais:
+- https://docs.lovable.dev/tips-tricks/external-deployment-hosting
+- https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore
