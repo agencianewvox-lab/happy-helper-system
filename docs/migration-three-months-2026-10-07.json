@@ -1,41 +1,44 @@
 {
-  "sourceProject": "fmipenijdipscnqhtwvy",
-  "targetProject": "gorqyovidpdvuockzndm",
-  "scope": {
-    "start": "2026-07-06T03:00:00Z",
-    "end": "2026-10-07T01:07:39Z",
-    "current": [
-      "whatsapp_grupos",
-      "profiles",
-      "system_configs",
-      "coach_config",
-      "ai_prompts_config",
-      "office_rooms"
-    ],
-    "dateColumns": {
-      "calendar_events": "created_at",
-      "client_notes": "created_at",
-      "onboarding_responses": "created_at",
-      "nps_surveys": "created_at",
-      "tasks": "greatest(created_at,updated_at)",
-      "pending_demand_resolutions": "greatest(created_at,requested_at,resolved_at)",
-      "team_feedback_log": "created_at",
-      "master_notifications": "created_at",
-      "master_actions_log": "executed_at",
-      "ai_conversations": "greatest(created_at,updated_at)",
-      "ai_chat_messages": "created_at",
-      "office_direct_messages": "created_at",
-      "office_presence": "last_seen",
-      "office_voice_sessions": "started_at",
-      "webrtc_signals": "created_at",
-      "nps_predictions": "calculated_at"
-    }
+  "start": "2026-07-06T03:00:00Z",
+  "end": "2026-10-07T01:07:39Z",
+  "current": [
+    "whatsapp_grupos",
+    "profiles",
+    "system_configs",
+    "coach_config",
+    "ai_prompts_config",
+    "office_rooms"
+  ],
+  "dateColumns": {
+    "calendar_events": "created_at",
+    "client_notes": "created_at",
+    "onboarding_responses": "created_at",
+    "nps_surveys": "created_at",
+    "tasks": "greatest(created_at,updated_at)",
+    "pending_demand_resolutions": "greatest(created_at,requested_at,resolved_at)",
+    "team_feedback_log": "created_at",
+    "master_notifications": "created_at",
+    "master_actions_log": "executed_at",
+    "ai_conversations": "greatest(created_at,updated_at)",
+    "ai_chat_messages": "created_at",
+    "office_direct_messages": "created_at",
+    "office_presence": "last_seen",
+    "office_voice_sessions": "started_at",
+    "webrtc_signals": "created_at",
+    "nps_predictions": "calculated_at"
   },
-  "state": "partial_private_staging_no_cutover",
-  "expectedConversations": 3250,
-  "copiedConversations": 3000,
-  "conversationCursor": "ebdc0e49-41c7-46fa-ac17-97e7fbd3ef1b",
-  "copiedCore": {
+  "policy": "audio_text_metadata_v2",
+  "status": "scoped_snapshot_copied_private_staging_no_cutover",
+  "conversationCursor": "ffb44a07-7ba6-4c7b-bce6-0fd81970804d",
+  "conversations": 3250,
+  "audioFiles": 96,
+  "audioBase64Characters": 8933404,
+  "audioDecodedBytes": 6699946,
+  "audioProviderHashMatches": 96,
+  "audioWithoutEmbeddedSource": 49,
+  "audioTranscripts": 82,
+  "totalRecords": 7170,
+  "counts": {
     "whatsapp_grupos": 25,
     "profiles": 4,
     "system_configs": 58,
@@ -57,30 +60,44 @@
     "office_presence": 0,
     "office_voice_sessions": 0,
     "webrtc_signals": 0,
-    "nps_predictions": 26
+    "nps_predictions": 26,
+    "office_messages": 0,
+    "coach_messages": 90,
+    "daily_feedback_log": 90,
+    "executive_briefings": 38,
+    "nps_prediction_history": 3548,
+    "whatsapp_conversas": 3250
   },
-  "audio": {
-    "sourceMessages": 145,
-    "embeddedFilesAvailable": 96,
-    "embeddedFilesCopied": 0,
-    "base64Characters": 8933404,
-    "sourceMessagesWithTranscript": 82,
-    "withoutEmbeddedFile": 49
-  },
-  "pendingHistoricalTables": [
-    "nps_prediction_history",
-    "coach_messages",
-    "daily_feedback_log",
-    "executive_briefings",
-    "office_messages"
+  "pending": [
+    "auth_users_and_identities",
+    "application_schema_and_policies",
+    "server_functions",
+    "runtime_secrets_validation",
+    "storage_audio_delivery",
+    "cron_and_webhook_forwarding",
+    "source_delta_before_cutover"
   ],
-  "checks": {
-    "normalizedMessages": 3000,
-    "wrongMediaLabels": 0,
-    "unexpectedRawMediaOrApiKeys": 0,
-    "invalidRowHashes": 0,
-    "tests": 87
-  },
+  "originModified": false,
   "productionChanged": false,
-  "originDeleted": false
+  "verifiedAt": "2026-10-07T02:28:00Z",
+  "verification": {
+    "tablesTracked": 28,
+    "countMismatches": 0,
+    "invalidRowHashes": 0,
+    "disallowedMedia": 0,
+    "testsPassed": 105,
+    "types": "passed",
+    "targetedLint": "passed",
+    "build": "passed"
+  },
+  "onboardingSync": {
+    "prepared": true,
+    "enabled": false,
+    "reason": "Legacy group-assignment write permissions must be secured and verified before activation"
+  },
+  "usageAtCheckpoint": {
+    "usedPercent": 80,
+    "remainingPercent": 20,
+    "stopAtUsedPercent": 90
+  }
 }

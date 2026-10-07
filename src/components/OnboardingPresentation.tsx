@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { createOnboardingPresentation } from "@/lib/onboarding-presentation";
 import type { OnboardingResponse } from "@/lib/onboarding-pdf";
 import { emptyMeetingPlan, meetingPlanSchema, type MeetingPlan } from "@/lib/onboarding-plan";
+import { MeetingPlanStoreError } from "@/lib/onboarding-plan-store";
 import { OnboardingMeetingEditor } from "./OnboardingMeetingEditor";
 import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { toast } from "sonner";
@@ -16,8 +17,19 @@ interface Props {
   ownerId?: string;
 }
 
-export default function OnboardingPresentation({ response, groupName, onClose, ownerId }: Props) {
+export default function OnboardingPresentation(props: Props) {
+  return <OnboardingPresentationContent key={`${props.ownerId}:${props.response.group_id}:${props.response.id || props.response.created_at}`} {...props} />;
+}
+
+function OnboardingPresentationContent({ response, groupName, onClose, ownerId }: Props) {
   const [index, setIndex] = useState(0);
+  // Enable only after the SQL permission preflight and real role-isolation tests pass.
+  const shared = import.meta.env.VITE_ONBOARDING_SYNC_ENABLED === "true" && Boolean(response.id && ownerId);
+  const [version, setVersion] = useState(0);
+  const [cloudLoading, setCloudLoading] = useState(shared);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const [saving, setSaving] = useState(false);
   const storageKey = ownerId ? `newvox:meeting:v1:${ownerId}:${response.group_id}:${response.created_at}` : null;
   const [plan, setPlan] = useState<MeetingPlan>(() => {
     try { return storageKey ? meetingPlanSchema.parse(JSON.parse(localStorage.getItem(storageKey) || "{}")) : emptyMeetingPlan(); }
@@ -34,9 +46,40 @@ export default function OnboardingPresentation({ response, groupName, onClose, o
 
   useEffect(() => { viewport.current?.scrollTo?.({ top: 0 }); }, [index, editing]);
 
-  const save = () => {
+  useEffect(() => {
+    if (!shared || !response.id) return;
+    let active = true;
+    setCloudLoading(true); setCloudError(null);
+    void import("@/lib/onboarding-plan-supabase").then(({ sharedMeetingPlanStore }) => sharedMeetingPlanStore.load(response.id!, response.group_id)).then(saved => {
+      if (!active) return;
+      setVersion(saved?.version || 0);
+      if (saved) { setPlan(saved.plan); setDraft(saved.plan); }
+      else if (reload > 0) { const empty = emptyMeetingPlan(); setPlan(empty); setDraft(empty); }
+    }).catch(() => {
+      if (active) setCloudError("Não foi possível carregar o plano da equipe. Nenhuma alteração foi sincronizada.");
+    }).finally(() => { if (active) setCloudLoading(false); });
+    return () => { active = false; };
+  }, [shared, response.id, response.group_id, reload]);
+
+  const save = async () => {
     const result = meetingPlanSchema.safeParse(draft);
     if (!result.success) { toast.error("Revise os limites dos campos."); return; }
+    if (shared && response.id) {
+      if (saving || cloudLoading || cloudError) return;
+      setSaving(true);
+      try {
+        const { sharedMeetingPlanStore } = await import("@/lib/onboarding-plan-supabase");
+        const saved = await sharedMeetingPlanStore.save(response.id, response.group_id, result.data, version);
+        setPlan(saved.plan); setDraft(saved.plan); setVersion(saved.version); setEditing(false);
+        toast.success("Plano salvo no painel e disponível à equipe autorizada.");
+      } catch (error) {
+        const message = error instanceof MeetingPlanStoreError && error.kind === "conflict"
+          ? "Outro usuário alterou o plano. Suas edições continuam na tela e não sobrescreveram a versão salva."
+          : "Não foi possível salvar no painel. Suas edições continuam na tela; nada foi sincronizado.";
+        setCloudError(message); toast.error(message);
+      } finally { setSaving(false); }
+      return;
+    }
     if (storageKey) {
       try { localStorage.setItem(storageKey, JSON.stringify(result.data)); }
       catch { toast.error("Não foi possível salvar neste navegador. Suas alterações continuam na tela; baixe o HTML para guardá-las."); setPlan(result.data); setEditing(false); return; }
@@ -66,7 +109,7 @@ export default function OnboardingPresentation({ response, groupName, onClose, o
         <DialogDescription className="sr-only">Apresentação baseada nas respostas salvas. Use as setas para navegar pelos capítulos e Escape para fechar.</DialogDescription>
         <header className="nv-presentation-top">
           <div className="nv-presentation-brand"><img src={newvoxLogo} alt="Newvox" /><div>NEWVOX<small>CLIENT EXPERIENCE</small></div></div>
-          <div className="nv-presentation-toolbar"><span className="nv-presentation-context">ONBOARDING / PLANO DE INÍCIO</span><button type="button" onClick={() => { if (!editing) setDraft(plan); setEditing(!editing); }}>{editing ? "Voltar à apresentação" : "Personalizar reunião"}</button><button type="button" onClick={exportHtml} disabled={exporting || editing}>{exporting ? "Preparando…" : "Baixar HTML"}</button></div>
+          <div className="nv-presentation-toolbar"><span className="nv-presentation-context">ONBOARDING / PLANO DE INÍCIO</span><button type="button" disabled={saving || cloudLoading || Boolean(cloudError)} onClick={() => { if (!editing) setDraft(plan); setEditing(!editing); }}>{editing ? "Voltar à apresentação" : "Personalizar reunião"}</button><button type="button" onClick={exportHtml} disabled={exporting || editing || cloudLoading}>{exporting ? "Preparando…" : "Baixar HTML"}</button></div>
         </header>
         <div className="nv-presentation-layout">
           <aside className="nv-presentation-sidebar" hidden={editing}>
@@ -82,7 +125,10 @@ export default function OnboardingPresentation({ response, groupName, onClose, o
             <div className="nv-presentation-source"><Layers3 size={18} aria-hidden="true" /><p>Briefing recebido<br /><strong>{submittedAt}</strong></p><small>Seu contexto + o método Newvox. Um plano construído em conjunto.</small></div>
           </aside>
           <main ref={viewport} className="nv-presentation-viewport">
-            {editing ? <OnboardingMeetingEditor plan={draft} onChange={setDraft} onSave={save} onCancel={() => setEditing(false)} canPersist={Boolean(storageKey)} /> : <section key={chapter.id} className={"nv-presentation-chapter nv-presentation-" + chapter.kind} aria-labelledby="presentation-chapter-title">
+            {cloudLoading && <p role="status">Carregando plano da equipe…</p>}
+            {shared && !cloudLoading && !cloudError && <p className="nv-editor-notice">{version ? `Plano da equipe · versão ${version}` : "Novo plano · ainda não salvo no painel"}</p>}
+            {cloudError && <div role="alert" className="nv-editor-notice"><p>{cloudError}</p><button type="button" disabled={saving} onClick={() => { setEditing(false); setReload(value => value + 1); }}>{editing ? "Descartar minhas edições e recarregar" : "Recarregar plano da equipe"}</button></div>}
+            {editing ? <OnboardingMeetingEditor plan={draft} onChange={setDraft} onSave={save} onCancel={() => setEditing(false)} canPersist={Boolean(storageKey)} shared={shared} busy={saving || cloudLoading} saveDisabled={Boolean(cloudError)} /> : <section key={chapter.id} className={"nv-presentation-chapter nv-presentation-" + chapter.kind} aria-labelledby="presentation-chapter-title">
               <div className="nv-presentation-kicker"><span>{String(index + 1).padStart(2, "0")} / {String(chapters.length).padStart(2, "0")}</span><span>{chapter.label}</span></div>
               <div className="nv-presentation-heading">
                 <h2 id="presentation-chapter-title" aria-live="polite">{chapter.title}</h2>

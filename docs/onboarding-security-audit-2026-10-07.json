@@ -1,0 +1,137 @@
+{
+  "checkedAt": "2026-10-07T02:26:00Z",
+  "sourceProject": "fmipenijdipscnqhtwvy",
+  "policies": [
+    {
+      "cmd": "SELECT",
+      "policyname": "Anon read own onboarding",
+      "qual": "true",
+      "roles": [
+        "anon"
+      ],
+      "tablename": "onboarding_responses",
+      "with_check": null
+    },
+    {
+      "cmd": "SELECT",
+      "policyname": "Authenticated read onboarding_responses",
+      "qual": "true",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "onboarding_responses",
+      "with_check": null
+    },
+    {
+      "cmd": "DELETE",
+      "policyname": "Masters can delete onboarding_responses",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.user_id = auth.uid()) AND (profiles.is_master = true))))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "onboarding_responses",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "policyname": "Public insert onboarding_responses",
+      "qual": null,
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "tablename": "onboarding_responses",
+      "with_check": "true"
+    },
+    {
+      "cmd": "SELECT",
+      "policyname": "Admins can read all profiles",
+      "qual": "is_admin(auth.uid())",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "profiles",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "policyname": "Admins can update profiles",
+      "qual": "is_admin(auth.uid())",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "profiles",
+      "with_check": "is_admin(auth.uid())"
+    },
+    {
+      "cmd": "SELECT",
+      "policyname": "Users can read own profile",
+      "qual": "(auth.uid() = user_id)",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "profiles",
+      "with_check": null
+    },
+    {
+      "cmd": "SELECT",
+      "policyname": "Authenticated read whatsapp_grupos",
+      "qual": "true",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "whatsapp_grupos",
+      "with_check": null
+    },
+    {
+      "cmd": "DELETE",
+      "policyname": "Masters can delete grupos",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.user_id = auth.uid()) AND (profiles.is_master = true))))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "whatsapp_grupos",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "policyname": "Service role insert grupos",
+      "qual": null,
+      "roles": [
+        "public"
+      ],
+      "tablename": "whatsapp_grupos",
+      "with_check": "true"
+    },
+    {
+      "cmd": "UPDATE",
+      "policyname": "Service role update grupos",
+      "qual": "true",
+      "roles": [
+        "public"
+      ],
+      "tablename": "whatsapp_grupos",
+      "with_check": "true"
+    }
+  ],
+  "roleCounts": [
+    {
+      "count": 2,
+      "is_master": true,
+      "role": "admin"
+    },
+    {
+      "count": 2,
+      "is_master": false,
+      "role": "gestor"
+    }
+  ],
+  "privileges": {
+    "anonymous_group_insert": true,
+    "anonymous_onboarding_select": true,
+    "authenticated_can_update_assignment": true,
+    "authenticated_group_update": true,
+    "group_rls_enabled": true
+  },
+  "decision": "Do not activate shared onboarding on legacy ownership permissions. Prepare guarded SQL and disabled-by-default code; no source permission changes applied."
+}

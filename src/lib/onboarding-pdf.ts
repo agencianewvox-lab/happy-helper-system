@@ -1,6 +1,7 @@
 import type { Content, TDocumentDefinitions } from "pdfmake/interfaces";
 
 export interface OnboardingResponse {
+  id?: string;
   created_at: string;
   group_id: string;
   respondent_name: string | null;

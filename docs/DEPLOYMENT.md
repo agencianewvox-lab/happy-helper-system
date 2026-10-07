@@ -304,20 +304,25 @@ descrita acima; não autoriza apagar a origem. O checkpoint atual está em
   base64), 82 mensagens com transcrição. Essas contagens podem se sobrepor.
   Os outros 49 não têm arquivo embutido; uma URL antiga não comprova recuperação.
 - Não levar apikey, payload completo, mídia citada ou outros binários no evento.
-- Cópia parcial privada: 3.000/3.250 conversas normalizadas e 154 registros de
-  cadastros/configurações/históricos menores. SHA-256 conferido por registro;
-  nenhuma imagem/vídeo/base64 não autorizado nos lotes normalizados.
-- Nenhum arquivo de áudio foi copiado ainda. `audio_copy_pending` impede
-  confundir metadados já copiados com preservação do arquivo.
+- Snapshot copiado na área privada: 3.250 conversas, 154 registros de
+  cadastros/configurações/históricos menores e 3.766 registros históricos restantes.
+  São 7.170 registros e 28 tabelas verificadas, sem divergência de contagem ou hash.
+  Não há arquivos de imagem/vídeo nem apikey nos eventos normalizados.
+- Os 96 arquivos de áudio disponíveis foram copiados: 6.699.946 bytes decodificados,
+  com SHA-256 igual ao arquivo informado pelo provedor em todos os 96 casos.
+  As 82 transcrições existentes também foram preservadas. Os 49 registros sem
+  arquivo embutido têm `source_audio_status=not_embedded_in_source`, sem alegar
+  recuperação do binário. Não há `audio_copy_pending` restante nesse snapshot.
 - Dois registros de teste de chat IA, anteriores ao recorte, foram retirados
   apenas da área privada do destino. A origem continua disponível para recuperação.
 
-O conector da origem limitou temporariamente a próxima leitura. Retomar pelo
-UUID do checkpoint usando `scripts/migration/export-messages.sql`; não reiniciar
+O conector limitou temporariamente algumas leituras; a cópia do recorte foi
+retomada e concluída. Para novos lotes, usar o checkpoint e
+`scripts/migration/export-messages.sql`; não reiniciar
 com OFFSET nem sobrescrever arquivos de áudio já conciliados com um lote somente
 de metadados. `export-audio.sql` é somente leitura e nunca deve ter seus resultados
-impressos em logs ou versionados. Ainda faltam 250 conversas, arquivos de áudio e
-cinco tabelas históricas indicadas no checkpoint. Recontar e conciliar alterações
+impressos em logs ou versionados. Os scripts não restauram o esquema da aplicação,
+Auth ou funções. Recontar e conciliar alterações
 posteriores ao snapshot antes da troca; o recorte não é expurgo automático futuro.
 
 `message-retention.ts` prepara a mesma política no código do receptor de eventos,
@@ -326,6 +331,40 @@ com testes de remoção de imagens/vídeos, segredos e anexos citados, preservan
 Ela não foi ativada na origem nem no destino nesta etapa. Auth, esquema público,
 permissões, funções e virada de produção continuam pendentes. Não considerar o
 painel independente do Lovable antes dessas validações.
+
+### Sincronização do plano de onboarding — preparada, não ativada
+
+Código preparado para salvar o plano em `onboarding_meeting_plans`, separado
+das respostas originais, com versão otimista, auditoria preenchida no servidor,
+vínculo imutável ao formulário/cliente e leitura apenas da equipe autorizada.
+Conflitos preservam a edição local na tela; não existe retry que sobrescreva a
+versão de outro operador. Trocar de cliente descarta respostas assíncronas antigas.
+
+`VITE_ONBOARDING_SYNC_ENABLED` permanece ausente/desativada. Sem essa flag, o
+comportamento publicado continua local. O SQL preparado NÃO foi aplicado à origem
+ou ao destino; não basta ligar a flag. É necessário primeiro:
+
+1. Revisar as regras reais de identidade/carteira. Auditoria em
+   `onboarding-security-audit-2026-10-07.json`: gestores têm privilégio de atualização
+   de `gestor_responsavel` e a policy de UPDATE dos grupos aceita `public` com
+   condição irrestrita. O `SELECT authenticated` também é irrestrito. Portanto
+   vincular o acesso do plano a esse campo hoje não seria uma proteção confiável.
+2. Impedir alterações diretas dos campos de identidade `full_name`, `role` e
+   `is_master`, e de vínculo `gestor_responsavel`; usar operações privilegiadas
+   auditadas para a administração necessária. O preflight é conservador e verifica
+   privilégios efetivos, não procura somente a string `true` nas policies.
+3. Auditar RPCs/Edge Functions capazes de criar usuários ou alterar esses campos.
+   Ausência de grant direto não prova ausência de um caminho privilegiado vulnerável.
+4. Testar anon, gestor dono, outro gestor e Master com o esquema real, incluindo
+   tentativas de trocar identidade/carteira, UUID de outra resposta e versão antiga.
+5. Aplicar o SQL somente após revisão, verificar RLS/auditoria e habilitar a flag
+   no ambiente correto. Não copiar anotações para `onboarding_responses`, cuja
+   leitura anon irrestrita foi confirmada na origem e também requer correção.
+
+Os testes locais de fluxo/store e guardas estáticas não substituem esse teste real
+de autorização. Esta etapa não publicou link personalizado: snapshot revisado,
+validade e revogação ainda precisam ser implementados. O HTML offline já existente
+continua disponível, mas não é revogável. Nenhum dado foi enviado a clientes.
 
 Para completar: exportação do recorte aprovado (ou backup oficial como origem
 para restauração seletiva); esquema, dados e áudios verificados; Auth e recuperação de
