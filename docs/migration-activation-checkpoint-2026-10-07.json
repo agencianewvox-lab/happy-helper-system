@@ -1,0 +1,71 @@
+{
+  "checkpoint_at": "2026-10-07T18:33:00Z",
+  "status": "prepared_not_cut_over",
+  "architecture_approved": {
+    "code": "GitHub",
+    "site": "Vercel",
+    "database_auth_functions": "Supabase gorqyovidpdvuockzndm"
+  },
+  "source_preserved": true,
+  "production_changed": false,
+  "voxi_modified": false,
+  "database": {
+    "application_tables": 28,
+    "snapshot_rows": 7170,
+    "auth_users": 5,
+    "profiles": 4,
+    "password_hashes_preserved": true,
+    "blocked_user_preserved": true,
+    "delta_pending": true
+  },
+  "security": {
+    "rls_policies": 73,
+    "master_clients": 25,
+    "murillo_clients": 10,
+    "netto_clients": 7,
+    "anonymous_client_read": false,
+    "anonymous_response_read": false,
+    "anonymous_form_insert_test": "passed_rollback",
+    "manager_privilege_escalation_test": "rejected",
+    "temporary_validation_account": "removed_sessions_revoked",
+    "advisory": "Leaked-password protection disabled; migration_stage is intentionally inaccessible"
+  },
+  "functions": {
+    "deployed": [
+      "group-analytics",
+      "team-performance",
+      "meta-ads",
+      "ai-analyze",
+      "whatsapp"
+    ],
+    "anonymous_requests": "401",
+    "meta_ads": {
+      "status": 200,
+      "accessible_accounts": 24
+    },
+    "team_performance": {
+      "status": 200
+    },
+    "whatsapp": {
+      "status": "requires_confirmed_EVOLUTION_INSTANCE",
+      "reason": "User forbids changes involving Voxi; no shared-instance fallback in new Edge function"
+    }
+  },
+  "discovery": {
+    "legacy_panel_code_instance": "voxi_executivo_d13a86fd",
+    "observed_webhook_host": "kjwtfnabcqrxzfilqlom.supabase.co",
+    "read_only_confirmation": "webhook-executive-agent forwards group events to the legacy Panel endpoint",
+    "user_decision": "Do not change anything in Voxi. Confirm Panel's separate Evolution instance before cutover."
+  },
+  "tests": {
+    "vitest": 116,
+    "typecheck": "passed"
+  },
+  "remaining": [
+    "Confirm independent Evolution instance (screenshot suggests financeiro nova voz / Financeiro New Vox) without changing Voxi",
+    "Secure and deploy incoming webhook and remaining functions",
+    "Migrate final changes since snapshot including new onboarding response",
+    "Validate Auth redirects/recovery and live function flows",
+    "Switch Vercel frontend to new Supabase only after readiness checks"
+  ]
+}

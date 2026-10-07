@@ -1,0 +1,50 @@
+{
+  "recorded_at": "2026-10-07T19:09:00Z",
+  "authorization": "User explicitly approved retaining the existing Evolution connection and changing only the Panel forwarding destination in Voxi.",
+  "old_url": "https://fmipenijdipscnqhtwvy.supabase.co/functions/v1/whatsapp-webhook",
+  "new_url": "https://gorqyovidpdvuockzndm.supabase.co/functions/v1/whatsapp-ingest",
+  "voxi": {
+    "project": "kjwtfnabcqrxzfilqlom",
+    "function": "webhook-executive-agent",
+    "old_version": 33,
+    "new_version": 34,
+    "verified_change": "Exactly one URL replacement; all other deployed source bytes preserved",
+    "github_note": "Default-branch source differs from deployed function and has no legacy forwarding block; it was NOT overwritten with unrelated live changes. Exact forwarding patch is recorded alongside this checkpoint."
+  },
+  "panel": {
+    "project": "gorqyovidpdvuockzndm",
+    "receiver": "whatsapp-ingest",
+    "version": 2,
+    "auth": "Verified Evolution instance credential (SHA-256 verifier stored in Master-only system_configs); no plaintext credential persisted",
+    "real_messages_verified": 4,
+    "matching_legacy_distinct_messages": 4,
+    "legacy_rows_for_those_messages": 8,
+    "no_whatsapp_test_messages_sent": true,
+    "synthetic_voxi_test": "Blocked by safety review; not retried. Temporary test group removed. Real incoming events used for verification instead."
+  },
+  "data": {
+    "delta_messages_copied": 189,
+    "cutoff": "2026-10-07T18:55:26Z",
+    "target_message_count_at_check": 3443,
+    "current_clients": 26,
+    "current_onboarding_responses_within_window": 7,
+    "current_tasks": 24,
+    "current_pending_demand_rows": 53,
+    "audio_binary_delta_rows": 0,
+    "pending_audio_copy": 0,
+    "pending_bridge": 0
+  },
+  "status": "Forwarding destination changed and real reception verified; full migration is NOT complete.",
+  "legacy_bridge": "New receiver temporarily forwards each event to the old Panel webhook to preserve the currently deployed UI and legacy processing. Remove after Vercel/Auth/function cutover, not before.",
+  "remaining": [
+    "Secure/deploy remaining functions and public-form follow-up capabilities",
+    "Validate recovery redirects and Auth setup",
+    "Switch Vercel frontend and server public configuration to new Supabase",
+    "Finish final delta and audio transcription reconciliation",
+    "Remove temporary legacy bridge; verify no old backend requests"
+  ],
+  "tests": {
+    "unit_tests": 126,
+    "typecheck": "passed"
+  }
+}

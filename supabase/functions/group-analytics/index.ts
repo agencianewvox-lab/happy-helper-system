@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff, authFailure } from "../_shared/staff-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -967,13 +967,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    let staff;
+    try { staff = await requireStaff(req); } catch (error) { return authFailure(error); }
+    const supabase = staff.db;
     const OPENAI_API_KEY = Deno.env.get("openai");
-    if (!OPENAI_API_KEY) throw new Error("OpenAI API key not configured");
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     // Fetch all conversations (paginated)
     let allConversas: any[] = [];

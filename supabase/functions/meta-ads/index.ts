@@ -1,3 +1,4 @@
+import { requireStaff, authFailure } from "../_shared/staff-auth.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -12,6 +13,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    let staff;
+    try { staff = await requireStaff(req); } catch (error) { return authFailure(error); }
+    const { data: allowedGroups, error: scopeError } = await staff.db.from("whatsapp_grupos").select("ad_account_id");
+    if (scopeError) return Response.json({ error: "Não foi possível conferir suas contas." }, { status: 503, headers: corsHeaders });
+    const allowedAccounts = new Set((allowedGroups || []).map(g => String(g.ad_account_id || "").replace(/^act_/, "")));
     const token = Deno.env.get("META_ADS_ACCESS_TOKEN");
     if (!token) {
       return new Response(JSON.stringify({ error: "META_ADS_ACCESS_TOKEN not configured" }), {
@@ -39,7 +45,7 @@ Deno.serve(async (req) => {
         allAccounts = allAccounts.concat(data.data || []);
         url = data.paging?.next || null;
       }
-      return new Response(JSON.stringify({ accounts: allAccounts }), {
+      return new Response(JSON.stringify({ accounts: staff.isMaster ? allAccounts : allAccounts.filter(a => allowedAccounts.has(String(a.account_id))) }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -51,6 +57,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (typeof ad_account_id !== "string" || !/^(act_)?[0-9]+$/.test(ad_account_id)) return Response.json({ error: "Conta inválida." }, { status: 400, headers: corsHeaders });
+    if (!staff.isMaster && !allowedAccounts.has(ad_account_id.replace(/^act_/, ""))) return Response.json({ error: "Conta fora dos seus clientes." }, { status: 403, headers: corsHeaders });
+    if ((since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) || (until && !/^\d{4}-\d{2}-\d{2}$/.test(until))) return Response.json({ error: "Período inválido." }, { status: 400, headers: corsHeaders });
     const accountId = ad_account_id.startsWith("act_") ? ad_account_id : `act_${ad_account_id}`;
 
     // Build date filter: custom range takes priority over preset

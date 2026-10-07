@@ -3,7 +3,8 @@
 ## Destino aprovado
 
 - Código: `agencianewvox-lab/happy-helper-system`, branch `main`.
-- Site e processamento: projeto Vercel `painel-de-controle`, equipe `new-vox`.
+- Site: projeto Vercel `painel-de-controle`, equipe `new-vox`.
+- Banco, autenticação e processamento: destino aprovado no Supabase independente.
 - ID Vercel: `prj_3nuCjeXwCgNzDXoDIu6X3vNktJnk`.
 - Destino aprovado dos dados: Supabase independente `gorqyovidpdvuockzndm`.
 - Dados, autenticação e Realtime ainda em produção: projeto antigo
@@ -13,6 +14,24 @@
   variáveis de banco ou domínios com este painel.
 
 ## Estado da migração
+
+### Checkpoint de 07/10/2026
+
+O Supabase novo tem as tabelas, usuários com senhas preservadas e permissões
+validadas por gestor. Meta Ads respondeu com 24 contas acessíveis ao Master.
+As funções revisadas `group-analytics`, `team-performance`, `meta-ads`,
+`ai-analyze`, `whatsapp` e `whatsapp-ingest` já estão no destino.
+Não executar deploy em lote das funções antigas ainda não revisadas.
+
+Por autorização expressa, a única mudança no Voxi foi a URL que encaminha
+grupos ao Painel. A versão 34 de `webhook-executive-agent` preserva todo
+o restante da versão 33. O receptor novo já recebeu mensagens reais e
+mantém uma ponte temporária ao receptor antigo, pois o site ainda consulta
+o banco antigo. Isso NÃO representa a conclusão da migração.
+Ver `forwarding-cutover-2026-10-07.json` e o patch exato adjacente.
+Não remover a ponte antes da troca e validação de site, Auth e funções.
+
+### Histórico das etapas anteriores
 
 Esta primeira etapa prepara a hospedagem Vite e as rotas SPA na Vercel.
 O domínio de produção é https://paineldecontrole.newvox.site.
@@ -56,9 +75,11 @@ projeto atual. São configurações públicas; a proteção de dados depende de 
 Nunca colocar chave administrativa, Evolution, OpenAI ou Meta em variáveis
 com prefixo `VITE_`, no GitHub ou no bundle do navegador.
 
-Para migrar as funções, configurar somente no ambiente Production do projeto
-Painel: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_KEY`,
-`OPENAI_API_KEY` e `META_ADS_ACCESS_TOKEN`, além da autenticação do webhook.
+Conforme a arquitetura confirmada em 07/10, as funções ficam no Supabase.
+Usar os segredos já cadastrados ali: `EVOLUTION_API_KEY`, `openai` e
+`META_ADS_ACCESS_TOKEN`. `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`
+são fornecidos ao ambiente das Edge Functions. Não é necessário duplicar
+as chaves OpenAI/Meta na Vercel.
 As chaves privadas do Lovable não são fornecidas pelo repositório GitHub.
 Não copiar variáveis do projeto VOXI. Não habilitar tarefas agendadas em preview.
 

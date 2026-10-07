@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireStaff, authFailure } from "../_shared/staff-auth.ts";
 import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
 
 
@@ -385,17 +385,19 @@ Deno.serve(async (req) => {
   }
 
   try {
+    let staff;
+    try { staff = await requireStaff(req); } catch (error) { return authFailure(error); }
     const OPENAI_API_KEY = Deno.env.get("openai");
     if (!OPENAI_API_KEY) throw new Error("OpenAI API key not configured");
 
     const META_TOKEN = Deno.env.get("META_ADS_ACCESS_TOKEN");
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    const { messages, type, gestorFilter, groupId, isMaster, userName } = await req.json();
+    const supabase = staff.db;
+    const { messages, type, gestorFilter, groupId } = await req.json();
+    const isMaster = staff.isMaster;
+    const userName = staff.profile.full_name;
+    // The user explicitly deferred Jarvis/chat; retain only read-only analysis modes.
+    if (!["summary", "analyze"].includes(type)) return Response.json({ error: "O chat está desativado. Use o resumo ou a análise dos clientes." }, { status: 403, headers: corsHeaders });
     const safeMessages = Array.isArray(messages) ? messages : [];
 
     // Load configurable prompts from DB

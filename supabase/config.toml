@@ -1,4 +1,13 @@
-project_id = "fmipenijdipscnqhtwvy"
+project_id = "gorqyovidpdvuockzndm"
+
+# Deploy only reviewed functions explicitly while migration is staged.
+# The receiver verifies the Evolution instance credential inside its handler.
+[functions.whatsapp-ingest]
+verify_jwt = false
+
+# Staff identity is validated with Auth.getUser and restricted through database RLS.
+[functions.whatsapp]
+verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false

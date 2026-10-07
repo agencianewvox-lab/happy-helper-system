@@ -1,0 +1,5 @@
+--- deployed/webhook-executive-agent/index.ts (version 33)
++++ deployed/webhook-executive-agent/index.ts (version 34)
+@@
+-    const forwarded=await fetch("https://fmipenijdipscnqhtwvy.supabase.co/functions/v1/whatsapp-webhook",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
++    const forwarded=await fetch("https://gorqyovidpdvuockzndm.supabase.co/functions/v1/whatsapp-ingest",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
