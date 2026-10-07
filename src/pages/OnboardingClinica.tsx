@@ -1,4 +1,4 @@
-import { useState, useId } from "react";
+import { useState, useId, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,7 @@ export default function OnboardingClinica() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const responseId = useRef<string | null>(null);
 
   const [form, setForm] = useState<Record<string, any>>({
     specialties: [] as string[],
@@ -140,42 +141,23 @@ export default function OnboardingClinica() {
     setSubmitError("");
     setSubmitting(true);
     try {
+      responseId.current ??= crypto.randomUUID();
       const { error } = await supabase.from("onboarding_responses" as any).insert({
+        id: responseId.current,
         group_id: groupId,
         survey_type: isClinica ? "clinica" : "generico",
         respondent_name: isClinica ? (form.clinic_name || null) : (form.business_name || null),
         respondent_email: form.commercial_email || null,
         responses: form,
       } as any);
-      if (error) throw error;
+      // A lost HTTP acknowledgement must not duplicate a form or its notifications.
+      if (error && error.code !== "23505") throw error;
 
-      // If role is Proprietário or Sócio, auto-fill client card
-      const role = form.responsible_role || "";
-      const isOwnerOrPartner = role === "Proprietário(a)" || role === "Sócio(a)";
-      
-      // Always try to update card data and lookup CNPJ via edge function
-      try {
-        await supabase.functions.invoke("cnpj-lookup", {
-          body: { 
-            cnpj: form.cnpj || null, 
-            group_id: groupId,
-            is_owner_or_partner: isOwnerOrPartner,
-            responsible_name: form.responsible_name || null,
-            responsible_birthday: form.responsible_birthday || null,
-          },
-        });
-      } catch (cnpjErr) {
-        console.error("Auto-fill failed:", cnpjErr);
-      }
-
-      // Notify gestor via WhatsApp and create onboarding call task
-      try {
-        await supabase.functions.invoke("notify-gestor-onboarding", {
-          body: { group_id: groupId, client_name: form.clinic_name || null },
-        });
-      } catch (notifyErr) {
-        console.error("Gestor notification failed:", notifyErr);
-      }
+      // The database queues follow-ups atomically; closing this page cannot lose them.
+      // No client-supplied recipient or group is trusted by the completion endpoint.
+      void supabase.functions.invoke("notify-gestor-onboarding", {
+        body: { response_id: responseId.current },
+      }).catch(() => undefined);
 
       setSubmitted(true);
     } catch (err) {

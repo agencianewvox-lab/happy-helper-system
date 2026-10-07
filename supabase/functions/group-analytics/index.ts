@@ -1,4 +1,4 @@
-import { requireStaff, authFailure } from "../_shared/staff-auth.ts";
+import { requireAnalyticsCaller, authFailure } from "../_shared/staff-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -968,7 +968,7 @@ Deno.serve(async (req) => {
 
   try {
     let staff;
-    try { staff = await requireStaff(req); } catch (error) { return authFailure(error); }
+    try { staff = await requireAnalyticsCaller(req); } catch (error) { return authFailure(error); }
     const supabase = staff.db;
     const OPENAI_API_KEY = Deno.env.get("openai");
 
@@ -1134,8 +1134,8 @@ Deno.serve(async (req) => {
     let aiPendingItems: AIPendingItem[] = [];
     let intentMap = new Map<string, IntentCategory>();
     const [pendingResult, intentResult] = await Promise.allSettled([
-      detectPendingWithAI(allCandidates, OPENAI_API_KEY),
-      detectIntentWithAI(groupedConvs, OPENAI_API_KEY),
+      OPENAI_API_KEY ? detectPendingWithAI(allCandidates, OPENAI_API_KEY) : Promise.resolve([] as AIPendingItem[]),
+      OPENAI_API_KEY ? detectIntentWithAI(groupedConvs, OPENAI_API_KEY) : Promise.resolve(new Map<string, IntentCategory>()),
     ]);
     if (pendingResult.status === "fulfilled") aiPendingItems = pendingResult.value;
     else console.error("AI pending failed:", pendingResult.reason);

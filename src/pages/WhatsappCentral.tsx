@@ -12,7 +12,7 @@ import { whatsappRequest } from '@/lib/whatsapp';
 
 interface Status {
   checkedAt: string; instance: string; connection: string;
-  webhook: { checked: boolean; enabled: boolean; host: string | null; targetMatches: boolean; messagesEventEnabled: boolean };
+  webhook: { checked: boolean; enabled: boolean; host: string | null; targetMatches: boolean; route?: 'approved_relay' | 'direct'; messagesEventEnabled: boolean };
   reception: { available: boolean; lastMessageAt: string | null; messages24h: number | null };
   groupsAvailable: boolean;
   groups: { group_id: string; nome: string; categoria: string | null; responsavel_master: string | null }[];
@@ -47,7 +47,7 @@ export default function WhatsappCentral() {
           <div className="p-6 border-b flex gap-3"><MessageSquare className="text-primary" size={21} /><div><h2 className="font-semibold text-lg">Onboarding dos clientes</h2><p className="text-sm text-muted-foreground mt-1">Escolha o cliente, revise a mensagem e envie. Nenhum envio é feito automaticamente.</p></div></div>
           {!data.groupsAvailable ? <p role="alert" className="p-6 text-destructive">Não foi possível consultar os clientes.</p> : data.groups.length === 0 ? <p className="p-6 text-muted-foreground">Nenhum cliente cadastrado.</p> : <div className="divide-y">{data.groups.map(group => <div key={group.group_id} className="px-6 py-4 flex flex-wrap justify-between items-center gap-3"><div><p className="font-medium text-sm">{group.nome}</p><p className="text-xs text-muted-foreground mt-1">{group.categoria || 'Cliente New Vox'} · Link público, sem login</p></div><OnboardingSendDialog groupId={group.group_id} groupName={group.nome} categoria={group.categoria} responsavelMaster={group.responsavel_master} /></div>)}</div>}
         </section>
-        <div className="mt-5 text-xs text-muted-foreground space-y-2 leading-relaxed"><p>Última consulta: {date(data.checkedAt)} (horário de Brasília). Atualização automática a cada minuto.</p><p>A instância atual também atende o VOXI. Esta área não desconecta o telefone nem altera o webhook compartilhado.</p><p>Um envio aceito pela Evolution não significa entrega ou leitura no WhatsApp. Confira a conversa para confirmar.</p></div>
+        <div className="mt-5 text-xs text-muted-foreground space-y-2 leading-relaxed"><p>Última consulta: {date(data.checkedAt)} (horário de Brasília). Atualização automática a cada minuto.</p><p>{data.webhook.route === 'approved_relay' ? 'Conexão preservada: Evolution → encaminhamento compartilhado → Supabase do Painel.' : 'Conexão direta com o Supabase do Painel.'} Esta área não desconecta o telefone nem altera o webhook compartilhado. O recebimento é confirmado pelos registros do banco, não apenas pela configuração.</p><p>Um envio aceito pela Evolution não significa entrega ou leitura no WhatsApp. Confira a conversa para confirmar.</p></div>
       </>}
     </main>
   </div></SidebarProvider>;

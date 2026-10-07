@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { requireMasterOrService, authFailure } from "../_shared/staff-auth.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,6 +47,8 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const denied = await requireMasterOrService(req).then(() => null, authFailure);
+  if (denied) return denied;
   try {
     // Fetch all groups
     const { data: grupos, error: gErr } = await supabase.from("whatsapp_grupos").select("*");

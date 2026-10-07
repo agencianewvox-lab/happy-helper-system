@@ -4,8 +4,8 @@ const database = { url: Deno.env.get('SUPABASE_URL')!, publishableKey: Deno.env.
 import { discoverGroups, isWhatsappGroupId } from '../_shared/group-discovery.ts';
 
 const BASE = 'https://bot-evolution-api.1lxz8u.easypanel.host';
-// No shared-instance fallback: only the explicitly confirmed Panel instance may be used.
-const INSTANCE = Deno.env.get('EVOLUTION_INSTANCE') || '';
+// Shared connection explicitly approved by the owner; never modify its webhook here.
+const INSTANCE = Deno.env.get('EVOLUTION_INSTANCE') || 'voxi_executivo_d13a86fd';
 const names: Record<string, string> = { Murillo: 'Murilo Araújo', Murilo: 'Murilo Araújo', Netto: 'Netto Monge', Neto: 'Netto Monge' };
 export function reply(body: unknown, status = 200) {
   return Response.json(body, { status, headers: { ...authCors, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -63,14 +63,15 @@ export async function handleWhatsapp(request: Request) {
       try { webhookHost = new URL(webhook?.url).hostname; } catch { /* Never expose webhook credentials or query strings. */ }
       try {
         const configured = new URL(webhook?.url);
-        const expected = new URL('/functions/v1/whatsapp-webhook', database.url);
-        targetMatches = configured.origin === expected.origin && configured.pathname.replace(/\/$/, '') === expected.pathname;
+        const direct = new URL('/functions/v1/whatsapp-ingest', database.url);
+        const approvedRelay = new URL('https://kjwtfnabcqrxzfilqlom.supabase.co/functions/v1/webhook-executive-agent');
+        targetMatches = [direct, approvedRelay].some(expected => configured.origin === expected.origin && configured.pathname.replace(/\/$/, '') === expected.pathname);
       } catch { /* Invalid or missing destination is reported as unmatched. */ }
       const events = Array.isArray(webhook?.events) ? webhook.events : [];
       return reply({
         checkedAt: new Date().toISOString(), instance: INSTANCE,
         connection: stateResult.ok ? stateResult.value?.instance?.state ?? 'unknown' : 'unavailable',
-        webhook: { checked: webhookResult.ok, enabled: webhook?.enabled === true, host: webhookHost, targetMatches, messagesEventEnabled: events.some((event: unknown) => typeof event === 'string' && event.toUpperCase() === 'MESSAGES_UPSERT') },
+        webhook: { checked: webhookResult.ok, enabled: webhook?.enabled === true, host: webhookHost, targetMatches, route: webhookHost === 'kjwtfnabcqrxzfilqlom.supabase.co' ? 'approved_relay' : 'direct', messagesEventEnabled: events.some((event: unknown) => typeof event === 'string' && event.toUpperCase() === 'MESSAGES_UPSERT') },
         reception: { available: !latest.error && !recent.error, lastMessageAt: latest.data?.[0]?.recebido_em ?? null, messages24h: recent.error ? null : recent.count ?? 0 },
         groups: groups.data ?? [], groupsAvailable: !groups.error,
       });

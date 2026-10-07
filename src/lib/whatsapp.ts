@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 export async function whatsappRequest<T>(body?: { group_id: string; message: string }, action?: 'discover-groups'): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Sua sessão expirou. Entre novamente.');
-  const response = await fetch(action ? '/api/whatsapp?action=' + action : '/api/whatsapp', {
+  const endpoint = import.meta.env.VITE_SUPABASE_URL + '/functions/v1/whatsapp';
+  const response = await fetch(action ? endpoint + '?action=' + action : endpoint, {
     method: body ? 'POST' : 'GET',
-    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(45000),
   });

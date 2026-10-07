@@ -59,8 +59,9 @@ export async function handleWhatsapp(request: Request) {
       try { webhookHost = new URL(webhook?.url).hostname; } catch { /* Never expose webhook credentials or query strings. */ }
       try {
         const configured = new URL(webhook?.url);
-        const expected = new URL('/functions/v1/whatsapp-webhook', database.url);
-        targetMatches = configured.origin === expected.origin && configured.pathname.replace(/\/$/, '') === expected.pathname;
+        const expected = new URL('/functions/v1/whatsapp-ingest', database.url);
+        const relay = new URL('https://kjwtfnabcqrxzfilqlom.supabase.co/functions/v1/webhook-executive-agent');
+        targetMatches = [expected, relay].some(target => configured.origin === target.origin && configured.pathname.replace(/\/$/, '') === target.pathname);
       } catch { /* Invalid or missing destination is reported as unmatched. */ }
       const events = Array.isArray(webhook?.events) ? webhook.events : [];
       return reply({

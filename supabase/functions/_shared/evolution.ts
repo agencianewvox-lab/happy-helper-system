@@ -38,15 +38,16 @@ export async function sendWhatsApp(number: string, text: string): Promise<SendRe
         number,
         text,
       }),
+      signal: AbortSignal.timeout(20000),
     });
     const body = await res.text();
     if (!res.ok) {
-      console.error(`[evolution] Send failed ${res.status} to ${number}:`, body);
+      console.error(`[evolution] Send failed with status ${res.status}`);
     }
     return { ok: res.ok, status: res.status, body };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[evolution] Fetch threw for ${number}:`, msg);
+    console.error('[evolution] Delivery could not be confirmed');
     return { ok: false, status: 0, body: msg };
   }
 }

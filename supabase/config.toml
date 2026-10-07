@@ -1,5 +1,25 @@
 project_id = "gorqyovidpdvuockzndm"
 
+[auth]
+enabled = true
+site_url = "https://paineldecontrole.newvox.site"
+additional_redirect_urls = ["https://paineldecontrole.newvox.site/redefinir-senha"]
+enable_signup = false
+minimum_password_length = 12
+
+[auth.email]
+# This enables EMAIL LOGIN (ExternalEmailEnabled in the official CLI mapping).
+# Public registration remains blocked by [auth].enable_signup = false above.
+enable_signup = true
+enable_confirmations = true
+secure_password_change = true
+max_frequency = "1m"
+otp_length = 8
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 # Deploy only reviewed functions explicitly while migration is staged.
 # The receiver verifies the Evolution instance credential inside its handler.
 [functions.whatsapp-ingest]
@@ -41,4 +61,11 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.jarvis-brain]
+verify_jwt = false
+
+# Custom authorization validates staff sessions or the service-only database probe.
+[functions.process-panel-jobs]
+verify_jwt = false
+
+[functions.team-performance]
 verify_jwt = false
