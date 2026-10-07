@@ -4,7 +4,7 @@ import { Grupo } from "@/types/client";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -20,7 +20,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle,
   Timer, ThumbsUp, ThumbsDown, Users, ShieldAlert,
   CheckCircle2, XCircle, ArrowDown, ArrowUp, ArrowUpRight, ArrowDownRight,
-  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone, UserCheck, AlertCircle, Siren, StickyNote, Trash2,
+  Briefcase, DollarSign, CalendarDays, Cake, KeyRound, Save, Loader2, Megaphone, UserCheck, AlertCircle, Siren, StickyNote,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -32,6 +32,7 @@ import { OnboardingTab } from "@/components/OnboardingTab";
 import { OnboardingSendDialog } from "@/components/OnboardingSendDialog";
 import { ClientHealthPanel } from "./ClientHealth";
 import { deduplicateMessages } from "@/lib/message-deduplication";
+import { DeleteClientDialog } from "@/components/DeleteClientDialog";
 
 interface Conversa {
   id: string;
@@ -233,16 +234,12 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   if (!grupo) return null;
 
   const handleDelete = async () => {
-    if (!grupo?.id || !grupo?.group_id) return;
-    const confirmed = window.confirm(
-      `Tem certeza que deseja excluir "${grupo.nome}"?\n\nTodas as conversas, notas, pendências, pesquisas NPS, previsões, onboarding e dados relacionados serão apagados permanentemente.`
-    );
-    if (!confirmed) return;
+    if (!grupo?.id || !grupo?.group_id || deleting) throw new Error("Cliente indisponível para exclusão");
     setDeleting(true);
     try {
       const gid = grupo.group_id;
       // Delete all related data in parallel
-      await Promise.all([
+      const relatedResults = await Promise.all([
         supabase.from("whatsapp_conversas").delete().eq("group_id", gid),
         supabase.from("client_notes").delete().eq("group_id", gid),
         supabase.from("pending_demand_resolutions").delete().eq("group_id", gid),
@@ -256,13 +253,14 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         supabase.from("team_feedback_log").delete().eq("group_id", gid),
         supabase.from("tasks").delete().eq("group_id", gid),
       ]);
+      const relatedError = relatedResults.find((result) => result.error)?.error;
+      if (relatedError) throw relatedError;
       // Finally delete the group itself
-      const { error } = await supabase.from("whatsapp_grupos").delete().eq("id", grupo.id);
+      const { data, error } = await supabase.from("whatsapp_grupos").delete().eq("id", grupo.id).select("id");
       if (error) throw error;
+      if (data?.length !== 1) throw new Error("A exclusão do cliente não foi confirmada pelo banco");
       toast.success("Cliente e todos os dados relacionados foram excluídos!");
       onClose();
-    } catch (err: any) {
-      toast.error("Erro ao excluir: " + err.message);
     } finally {
       setDeleting(false);
     }
@@ -284,9 +282,12 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   ];
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next && !deleting) onClose(); }}>
       <DialogContent className="w-[96vw] max-w-5xl bg-card border-border/50 max-h-[90dvh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
+          <DialogDescription className="sr-only">
+            Conversas, informações, onboarding e indicadores do cliente selecionado.
+          </DialogDescription>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {isPriorityMax && <Siren className="w-5 h-5 text-red-500 animate-bounce" />}
@@ -302,9 +303,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                 </Badge>
               )}
             </div>
-            <Button variant="ghost" size="icon" onClick={handleDelete} disabled={deleting} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="Excluir cliente">
-              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            </Button>
+            <DeleteClientDialog key={`${grupo.id}:${open}`} clientName={grupo.nome} onConfirm={handleDelete} />
           </div>
           {isPriorityMax && a?.priority_reason && (
             <p className="text-xs text-red-500 font-semibold mt-1">🚨 {a.priority_reason}</p>
