@@ -1,0 +1,39 @@
+{
+  "client": "NV - Titanium Odonto",
+  "requested_action": "Restore accidentally deleted client and require explicit confirmation before client deletion",
+  "recovery": {
+    "source": "Private migration staging copy",
+    "snapshot_cutoff_utc": "2026-10-07T01:07:39Z",
+    "restored_to": "Existing production database; no database cutover",
+    "mode": "Single atomic INSERT statement, original identifiers, ON CONFLICT DO NOTHING",
+    "restored_and_verified_equal_to_snapshot": {
+      "whatsapp_grupos": 1,
+      "onboarding_responses": 1,
+      "whatsapp_conversas": 58,
+      "tasks": 1,
+      "nps_predictions": 1,
+      "nps_prediction_history": 5
+    },
+    "total": 67,
+    "unrelated_clients_modified": false,
+    "messages_sent": false,
+    "limitation": "Records created or changed after the snapshot cutoff are not covered by this recovery."
+  },
+  "deletion_guard": {
+    "in_app_alert_dialog": true,
+    "displays_client_name": true,
+    "exact_confirmation_text": "EXCLUIR",
+    "separate_destructive_button": true,
+    "initial_focus": "Cancel",
+    "repeated_requests_blocked": true,
+    "confirmation_cleared_on_cancel_or_client_change": true,
+    "database_errors_not_reported_as_success": true,
+    "limitation": "Existing multi-table deletion is still non-transactional. A partial failure is reported and stops removal of the parent card."
+  },
+  "release_scope": "Hotfix based on production main; excludes unfinished migration and shared onboarding changes.",
+  "verification": {
+    "automated_tests": 89,
+    "real_client_deletion_tested": false,
+    "browser_check": "Unavailable: desktop browser automation failed to initialize. No production deletion attempted."
+  }
+}
