@@ -50,6 +50,53 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("report configuration UI", () => {
+  it("lets a customer without CRM configure a Meta-only report", async () => {
+    vi.mocked(reportsApi).mockResolvedValue({
+      pipelines: [],
+      stages: [],
+      campaigns: [],
+    });
+    view({ source: undefined, client: { ...client, ad_account_id: "123" } });
+    expect(screen.getByLabelText("Fontes do relatório")).toHaveValue("meta");
+    expect(
+      screen.getByRole("button", { name: "Salvar configuração" }),
+    ).toBeEnabled();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "5. Prévia" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(
+      await screen.findByRole("button", {
+        name: "Gerar prévia com dados reais",
+      }),
+    ).toBeEnabled();
+    expect(
+      vi.mocked(reportsApi).mock.calls.some((c) => c[0].action === "send"),
+    ).toBe(false);
+  });
+  it("inserts message variables and flags unknown tokens", async () => {
+    vi.mocked(reportsApi).mockResolvedValue({
+      pipelines: [],
+      stages: [],
+      campaigns: [],
+    });
+    view();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "3. Mensagem" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    const input = await screen.findByLabelText("Mensagem personalizada");
+    fireEvent.change(input, { target: { value: "Investimento: " } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Investimento · Meta" }),
+    );
+    expect(input).toHaveValue("Investimento: {{investimento}}");
+    fireEvent.change(input, { target: { value: "{{unknown}}" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("unknown");
+    expect(
+      screen.getByRole("button", { name: "Salvar configuração" }),
+    ).toBeDisabled();
+  });
   it("starts paused and only queries the selected client catalog", async () => {
     vi.mocked(reportsApi).mockResolvedValue({ pipelines: [], stages: [] });
     view();

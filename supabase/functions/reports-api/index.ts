@@ -2,7 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { requireStaff, authCors, authFailure } from "../_shared/staff-auth.ts";
 import { VoxiReader, deriveScope, inIds } from "../_shared/voxi-reader.ts";
 import { validateSettings, renderReport } from "../_shared/report-model.ts";
-import { collectReport } from "../_shared/report-engine.ts";
+import {
+  collectReport,
+  metaCampaignCatalog,
+} from "../_shared/report-engine.ts";
 import {
   connectionState,
   evolutionReport,
@@ -38,8 +41,9 @@ async function sourceFor(db: any, clientId: string) {
   return data;
 }
 async function checkedSettings(db: any, clientId: string, value: unknown) {
-  const s = validateSettings(value),
-    source = await sourceFor(db, clientId);
+  const s = validateSettings(value);
+  if (s.dataMode === "meta") return { s, source: null };
+  const source = await sourceFor(db, clientId);
   if (s.pipelines.some((id) => !source.pipeline_ids.includes(id)))
     throw new Error("Funil fora do vínculo autorizado.");
   if (source.pipeline_only && !s.pipelines.includes(source.pipeline_only))
@@ -229,6 +233,16 @@ Deno.serve(async (req) => {
       .single();
     if (clientError || !client)
       return reply({ error: "Cliente fora da sua carteira." }, 403);
+    if (body.action === "campaign-catalog") {
+      if (!client.ad_account_id)
+        throw new Error("Vincule a conta Meta na área Anúncios deste cliente.");
+      return reply({
+        campaigns: await metaCampaignCatalog(
+          client.ad_account_id,
+          Deno.env.get("META_ADS_ACCESS_TOKEN") || "",
+        ),
+      });
+    }
     if (body.action === "bind-source") {
       if (!ctx.isMaster || body.confirm !== true)
         return reply({ error: "O Master deve confirmar o vínculo." }, 403);
@@ -300,6 +314,10 @@ Deno.serve(async (req) => {
       client.id,
       body.settings,
     );
+    if (s.dataMode === "meta" && !client.ad_account_id)
+      throw new Error(
+        "Vincule a conta Meta deste cliente antes de configurar o relatório.",
+      );
     const owner = ctx.isMaster ? body.ownerUserId || ctx.user.id : ctx.user.id;
     const { data: ownerProfile } = await service
       .from("profiles")
@@ -315,7 +333,7 @@ Deno.serve(async (req) => {
       throw new Error("O remetente não gerencia este cliente.");
     const hash = await digest({
       settings: s,
-      sourceVersion: source.version,
+      sourceVersion: source?.version || null,
       group: client.group_id,
       account: client.ad_account_id,
       owner,
@@ -361,6 +379,10 @@ Deno.serve(async (req) => {
       previewAge < 10 * 60000;
     if (body.action === "save") {
       if (body.enabled === true) {
+        if (s.period === "custom" && s.frequency !== "once")
+          throw new Error(
+            "Datas fixas exigem envio único. Use 7/30 dias para agendas recorrentes.",
+          );
         if (!validPreview && config?.preview_hash !== hash)
           throw new Error("Gere a prévia desta configuração antes de ativar.");
         await verifyReportGroup(owner, client.group_id);

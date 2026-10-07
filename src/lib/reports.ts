@@ -2,6 +2,11 @@ import { supabase } from "@/integrations/supabase/client";
 export {
   defaultSettings,
   metricLabels,
+  metricTokens,
+  templateFromSettings,
+  unknownTokens,
+  reportPeriod,
+  crmMetrics,
 } from "../../supabase/functions/_shared/report-model";
 export type {
   ReportSettings,

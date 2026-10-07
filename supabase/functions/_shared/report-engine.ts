@@ -139,11 +139,52 @@ export function aggregateCommercial(
     warnings,
   };
 }
-async function metaRead(account: string, period: any, key: string) {
+export async function metaCampaignCatalog(account: string, key: string) {
+  const normalized = account.startsWith("act_") ? account : "act_" + account;
+  if (!/^act_\d+$/.test(normalized) || !key)
+    throw new Error("Conta Meta não configurada.");
+  const data: any[] = [];
+  let after = "";
+  for (let i = 0; i < 100; i++) {
+    const url = new URL(
+      "https://graph.facebook.com/v21.0/" + normalized + "/campaigns",
+    );
+    url.searchParams.set("fields", "id,name,effective_status");
+    url.searchParams.set("limit", "500");
+    if (after) url.searchParams.set("after", after);
+    const response = await fetch(url, {
+      headers: { Authorization: "Bearer " + key },
+      signal: AbortSignal.timeout(20000),
+    });
+    const body = await response.json();
+    if (!response.ok || !Array.isArray(body.data))
+      throw new Error(
+        "Não foi possível carregar as campanhas desta conta Meta.",
+      );
+    data.push(...body.data);
+    if (!body.paging?.next) return data;
+    after = body.paging?.cursors?.after;
+    if (!after) throw new Error("Paginação de campanhas incompleta.");
+  }
+  throw new Error("Volume de campanhas excede o limite seguro.");
+}
+async function metaRead(
+  account: string,
+  period: any,
+  key: string,
+  campaignIds: string[] = [],
+) {
   account = account.startsWith("act_") ? account : "act_" + account;
   if (!/^act_\d+$/.test(account)) throw new Error("Conta Meta não vinculada.");
   if (!key) throw new Error("Meta não configurada.");
   const headers = { Authorization: "Bearer " + key };
+  if (campaignIds.length) {
+    const catalog = await metaCampaignCatalog(account, key);
+    if (campaignIds.some((id) => !catalog.some((c) => c.id === id)))
+      throw new Error(
+        "Uma campanha selecionada não pertence mais à conta Meta vinculada. Revise a seleção.",
+      );
+  }
   const info = await fetch(
     "https://graph.facebook.com/v21.0/" +
       account +
@@ -160,10 +201,17 @@ async function metaRead(account: string, period: any, key: string) {
     );
     u.searchParams.set(
       "fields",
-      "ad_id,ad_name,spend,impressions,inline_link_clicks",
+      "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks",
     );
     u.searchParams.set("level", "ad");
     u.searchParams.set("limit", "500");
+    if (campaignIds.length)
+      u.searchParams.set(
+        "filtering",
+        JSON.stringify([
+          { field: "campaign.id", operator: "IN", value: campaignIds },
+        ]),
+      );
     u.searchParams.set(
       "time_range",
       JSON.stringify({ since: period.startDate, until: period.endDate }),
@@ -189,43 +237,65 @@ export async function collectReport(
   metaKey = "",
 ) {
   const period = reportPeriod(s, now);
-  const instances = await reader.read("whatsapp_instances"),
-    scope = deriveScope(source.crm_account_id, instances);
-  if (
-    JSON.stringify([...scope.ids].sort()) !==
-    JSON.stringify([...source.instance_ids].sort())
-  )
-    throw new Error(
-      "Escopo do CRM mudou. O Master precisa confirmar o vínculo novamente.",
-    );
-  const filters = { whatsapp_instance_id: inIds(source.instance_ids) };
-  const [leads, links, contacts, opps, stages] = await Promise.all([
-    reader.read("leads", filters),
-    reader.read("lead_identity_links", filters),
-    reader.read("contacts", filters),
-    reader.read("opportunities", { ...filters, won_at: "gte." + period.start }),
-    reader.read("journey_stages", filters),
-  ]);
-  let history: any[] = [];
-  if (s.metrics.some((m) => m === "scheduled" || m === "attended")) {
-    for (let i = 0; i < leads.length; i += 150)
-      history.push(
-        ...(await reader.read("stage_history", {
-          lead_id: inIds(leads.slice(i, i + 150).map((l) => l.id)),
-          changed_at: "gte." + period.start,
-        })),
+  const metaOnly = s.dataMode === "meta";
+  let commercial: any = {
+    metrics: {
+      leads: null,
+      scheduled: null,
+      attended: null,
+      sales: null,
+      revenue: null,
+    },
+    ads: [],
+    attributedEntries: [],
+    warnings: [],
+  };
+  if (!metaOnly) {
+    if (!source) throw new Error("Vincule o CRM ou escolha o modo só Meta.");
+    const instances = await reader.read("whatsapp_instances"),
+      scope = deriveScope(source.crm_account_id, instances);
+    if (
+      JSON.stringify([...scope.ids].sort()) !==
+      JSON.stringify([...source.instance_ids].sort())
+    )
+      throw new Error(
+        "Escopo do CRM mudou. O Master precisa confirmar o vínculo novamente.",
       );
+    const filters = { whatsapp_instance_id: inIds(source.instance_ids) };
+    const [leads, links, contacts, opps, stages] = await Promise.all([
+      reader.read("leads", filters),
+      reader.read("lead_identity_links", filters),
+      reader.read("contacts", filters),
+      reader.read("opportunities", {
+        ...filters,
+        won_at: "gte." + period.start,
+      }),
+      reader.read("journey_stages", filters),
+    ]);
+    let history: any[] = [];
+    if (
+      s.metrics.some((m) => m === "scheduled" || m === "attended") ||
+      /{{\s*(agendamentos|comparecimentos)\s*}}/i.test(s.template || "")
+    ) {
+      for (let i = 0; i < leads.length; i += 150)
+        history.push(
+          ...(await reader.read("stage_history", {
+            lead_id: inIds(leads.slice(i, i + 150).map((l) => l.id)),
+            changed_at: "gte." + period.start,
+          })),
+        );
+    }
+    commercial = aggregateCommercial(
+      leads,
+      links,
+      contacts,
+      opps,
+      history,
+      stages,
+      s,
+      period,
+    );
   }
-  const commercial = aggregateCommercial(
-    leads,
-    links,
-    contacts,
-    opps,
-    history,
-    stages,
-    s,
-    period,
-  );
   const result: any = {
     period,
     metrics: {
@@ -235,13 +305,15 @@ export async function collectReport(
       clicks: null,
       ctr: null,
       cpl: null,
+      cpc: null,
+      cpm: null,
     },
     ads: [],
     warnings: commercial.warnings,
   };
   try {
     if (!account) throw new Error("Conta de anúncios ainda não vinculada.");
-    const meta = await metaRead(account, period, metaKey);
+    const meta = await metaRead(account, period, metaKey, s.campaignIds || []);
     if (meta.currency !== "BRL")
       throw new Error(
         "Conta Meta não está em BRL; valores de moedas diferentes não serão somados.",
@@ -256,13 +328,17 @@ export async function collectReport(
     );
     Object.assign(result.metrics, totals, {
       ctr: totals.impressions ? (100 * totals.clicks) / totals.impressions : 0,
+      cpc: totals.clicks ? totals.spend / totals.clicks : null,
+      cpm: totals.impressions
+        ? (1000 * totals.spend) / totals.impressions
+        : null,
     });
     const sameZone = meta.timezone_name === s.timezone;
     const verified = new Map(meta.data.map((a: any) => [a.ad_id, a]));
     const actualMetaLeads = new Set(
       commercial.attributedEntries
-        .filter((l) => verified.has(l.adId))
-        .map((l) => l.identity),
+        .filter((l: any) => verified.has(l.adId))
+        .map((l: any) => l.identity),
     ).size;
     result.metrics.cpl =
       sameZone && actualMetaLeads ? totals.spend / actualMetaLeads : null;
@@ -270,29 +346,78 @@ export async function collectReport(
       result.warnings.push(
         "Fuso da conta Meta difere do relatório. CPL não é calculado entre períodos desalinhados.",
       );
-    result.ads = commercial.ads
-      .filter((a) => verified.has(a.id) && a.leads >= s.minLeads)
-      .map((a) => {
+    const metaRanking = ["clicks", "spend", "ctr", "cpc"].includes(s.ranking);
+    result.ads = (
+      metaOnly || metaRanking
+        ? meta.data.map((m: any) => ({
+            id: m.ad_id,
+            leads:
+              commercial.ads.find((a: any) => a.id === m.ad_id)?.leads ?? 0,
+            sales:
+              commercial.ads.find((a: any) => a.id === m.ad_id)?.sales ?? 0,
+          }))
+        : commercial.ads
+    )
+      .filter(
+        (a: any) =>
+          verified.has(a.id) &&
+          (metaOnly || metaRanking || a.leads >= s.minLeads),
+      )
+      .map((a: any) => {
         const m: any = verified.get(a.id);
         return {
           ...a,
           name: m.ad_name,
           spend: Number(m.spend || 0),
-          cpl: sameZone ? Number(m.spend || 0) / a.leads : null,
+          clicks: Number(m.inline_link_clicks || 0),
+          impressions: Number(m.impressions || 0),
+          ctr: Number(m.impressions || 0)
+            ? (100 * Number(m.inline_link_clicks || 0)) / Number(m.impressions)
+            : 0,
+          cpc: Number(m.inline_link_clicks || 0)
+            ? Number(m.spend || 0) / Number(m.inline_link_clicks)
+            : null,
+          cpl: sameZone && a.leads ? Number(m.spend || 0) / a.leads : null,
           url: null,
         };
       })
-      .filter((a: any) => s.ranking !== "cpl" || a.cpl !== null)
+      .filter(
+        (a: any) =>
+          a.clicks >= (s.minClicks || 0) &&
+          a.impressions >= (s.minImpressions || 0) &&
+          (s.ranking !== "cpl" || a.cpl !== null) &&
+          (s.ranking !== "cpc" || a.cpc !== null),
+      )
       .sort((a: any, b: any) =>
-        s.ranking === "cpl"
-          ? a.cpl - b.cpl
-          : s.ranking === "sales"
-            ? b.sales - a.sales
-            : b.leads - a.leads,
+        ["cpl", "cpc"].includes(s.ranking)
+          ? a[s.ranking] - b[s.ranking]
+          : b[s.ranking] - a[s.ranking] || a.id.localeCompare(b.id),
       )
       .slice(0, s.top);
+    const campaigns = new Map<string, any>();
+    for (const row of meta.data) {
+      const c = campaigns.get(row.campaign_id) || {
+        id: row.campaign_id,
+        name: row.campaign_name,
+        spend: 0,
+        clicks: 0,
+        impressions: 0,
+      };
+      c.spend += Number(row.spend || 0);
+      c.clicks += Number(row.inline_link_clicks || 0);
+      c.impressions += Number(row.impressions || 0);
+      campaigns.set(c.id, c);
+    }
+    result.campaigns = [...campaigns.values()]
+      .map((c) => ({
+        ...c,
+        ctr: c.impressions ? (100 * c.clicks) / c.impressions : 0,
+      }))
+      .sort((a, b) => b.spend - a.spend);
   } catch (e) {
+    if (metaOnly || s.campaignIds?.length) throw e;
     result.warnings.push(e instanceof Error ? e.message : "Meta indisponível.");
   }
+  result.dataMode = metaOnly ? "meta" : "crm_meta";
   return result;
 }

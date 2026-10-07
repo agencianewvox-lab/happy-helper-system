@@ -68,6 +68,24 @@ try{
   Assert ($TestCrmAccount-and $TestMetaAccount-match '^[0-9]+$') 'Explicit verified CRM/Meta test pair required.'
   $r=Request-Json ('/rest/v1/whatsapp_grupos?id=eq.'+$own) 'PATCH' $adminHeaders @{ad_account_id=$TestMetaAccount}
   Assert ($r.Status-in200,204) 'Could not set the temporary verified Meta fixture.'
+  $metaSettings=@{title='Validation Meta only';intro='No message will be sent.';metrics=@('spend','clicks','impressions','ctr','cpc','cpm');pipelines=@();stages=@{scheduled=@();attended=@()};period='custom';customStart='2026-10-01';customEnd='2026-10-07';frequency='once';onceDate='2026-10-08';weekdays=@(1);monthDay=1;time='09:00';timezone='America/Sao_Paulo';ranking='clicks';top=3;minLeads=1;includeAds=$true;includeCampaigns=$true;dataMode='meta';template='Investment: {{investimento}} · Clicks: {{cliques}}'}
+  $r=Request-Json '/functions/v1/reports-api' 'POST' $master.Headers @{action='preview';clientId=$own;settings=$metaSettings;ownerUserId=$master.Id}
+  Assert ($r.Status-eq200-and $null-ne$r.Data.result.metrics.spend-and $null-eq$r.Data.result.metrics.sales-and $null-eq$r.Data.result.metrics.leads) ('Meta-only preview without CRM failed: '+$r.Data.error)
+  Assert ($r.Data.message-like 'Investment:*'-and $r.Data.message-notlike '*{{*') 'Custom message variables failed.'
+  $metaSpend=$r.Data.result.metrics.spend
+  $campaignId=@($r.Data.result.campaigns)[0].id
+  Assert ($campaignId-match '^[0-9]+$') 'Live Meta fixture has no campaign activity.'
+  $r=Request-Json '/functions/v1/reports-api' 'POST' $master.Headers @{action='campaign-catalog';clientId=$own}
+  Assert ($r.Status-eq200-and @($r.Data.campaigns|Where-Object id -eq $campaignId).Count-eq1) 'Account-bound campaign catalog failed.'
+  $metaSettings.campaignIds=@($campaignId)
+  $r=Request-Json '/functions/v1/reports-api' 'POST' $master.Headers @{action='preview';clientId=$own;settings=$metaSettings;ownerUserId=$master.Id}
+  Assert ($r.Status-eq200-and @($r.Data.result.campaigns).Count-eq1-and $r.Data.result.campaigns[0].id-eq$campaignId) ('Selected campaign preview failed: '+$r.Data.error)
+  $r=Request-Json '/functions/v1/reports-api' 'POST' $manager.Headers @{action='save';clientId=$own;settings=$metaSettings;enabled=$false;version=0}
+  Assert ($r.Status-eq200) 'Meta-only configuration without CRM could not be saved.'
+  $null=Request-Json ('/rest/v1/report_configs?client_id=eq.'+$own) 'DELETE' $adminHeaders $null
+  $r=Request-Json '/functions/v1/reports-api' 'POST' $manager.Headers @{action='campaign-catalog';clientId=$other}
+  Assert ($r.Status-eq403) 'Cross-client Meta campaign catalog was exposed.'
+  Write-Output ('PASS: Meta-only preview without CRM, custom period/text, selected campaign, disabled save and portfolio isolation. Spend='+$metaSpend+'. No send requests.')
  }
  $r=Request-Json '/functions/v1/reports-api' 'POST' $master.Headers @{action='bind-source';clientId=$own;accountId=$accountId;confirm=$true}
  Assert ($r.Status-eq200) 'Temporary source binding failed.'
@@ -88,11 +106,7 @@ try{
  Assert ($r.Status-eq400) 'Activation without a verified preview/connection was accepted.'
  $r=Request-Json '/functions/v1/report-scheduler' 'POST' $manager.Headers @{}
  Assert ($r.Status-eq403) 'Manager was allowed to run the internal scheduler.'
- $configs=Request-Json '/rest/v1/report_configs?enabled=eq.true&select=client_id' 'GET' $adminHeaders $null
- if(@($configs.Data).Count-eq0){
-  $r=Request-Json '/functions/v1/report-scheduler' 'POST' $adminHeaders @{}
-  Assert ($r.Status-eq200-and $r.Data.processed-eq0) 'Internal service scheduler verification failed.'
- }
+ # Never run the service worker in a test: it could dispatch existing real queued jobs.
  Write-Output ('PASS: anonymous rejection, Master bootstrap ('+$existingCount+' cards), manager isolation, source restriction, read-only CRM catalog ('+$crmCount+' accounts), real CRM preview ('+$leadCount+' leads), disabled save, RLS browser-write rejection, activation guard, internal scheduler authorization. No messages sent.')
 }finally{
  if($adminHeaders){

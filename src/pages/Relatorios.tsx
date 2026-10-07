@@ -239,7 +239,7 @@ export default function Relatorios() {
                             CRM:{" "}
                             {bound
                               ? "Vínculo confirmado"
-                              : "Aguardando vínculo do Master"}
+                              : "Não vinculado · disponível relatório só Meta"}
                           </p>
                           <p>
                             Meta:{" "}
@@ -256,6 +256,7 @@ export default function Relatorios() {
                                   daily: "Diária",
                                   weekly: "Semanal",
                                   monthly: "Mensal",
+                                  once: "Envio único",
                                 }[config.settings.frequency]
                               : "Ainda não configurada"}
                           </p>

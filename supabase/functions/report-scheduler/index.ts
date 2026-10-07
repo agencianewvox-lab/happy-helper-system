@@ -67,24 +67,22 @@ Deno.serve(async (req) => {
           .eq("client_id", config.client_id)
           .single(),
       ]);
-      if (!client || !source) continue;
-      const { error: insertError } = await db
-        .from("report_runs")
-        .insert({
-          client_id: client.id,
-          owner_user_id: config.owner_user_id,
-          idempotency_key: "scheduled:" + client.id + ":" + slot,
-          snapshot: {
-            settings,
-            source,
-            groupId: client.group_id,
-            account: client.ad_account_id,
-            name: client.nome,
-            now: now.toISOString(),
-            configVersion: config.version,
-            manual: false,
-          },
-        });
+      if (!client || (!source && settings.dataMode !== "meta")) continue;
+      const { error: insertError } = await db.from("report_runs").insert({
+        client_id: client.id,
+        owner_user_id: config.owner_user_id,
+        idempotency_key: "scheduled:" + client.id + ":" + slot,
+        snapshot: {
+          settings,
+          source: settings.dataMode === "meta" ? null : source,
+          groupId: client.group_id,
+          account: client.ad_account_id,
+          name: client.nome,
+          now: now.toISOString(),
+          configVersion: config.version,
+          manual: false,
+        },
+      });
       if (insertError && insertError.code !== "23505")
         console.error("Report queue insert failed", insertError.code);
     } catch {
@@ -130,8 +128,8 @@ Deno.serve(async (req) => {
       if (
         !allowed ||
         !client ||
-        !source ||
-        source.version !== snap.source.version ||
+        (snap.settings.dataMode !== "meta" &&
+          (!source || source.version !== snap.source?.version)) ||
         client.group_id !== snap.groupId ||
         client.ad_account_id !== snap.account ||
         (!snap.manual &&
@@ -194,7 +192,8 @@ Deno.serve(async (req) => {
           .maybeSingle(),
       ]);
       if (
-        latestSource?.version !== source.version ||
+        (settings.dataMode !== "meta" &&
+          latestSource?.version !== source?.version) ||
         latestClient?.group_id !== snap.groupId ||
         latestClient?.ad_account_id !== snap.account ||
         (!snap.manual &&
