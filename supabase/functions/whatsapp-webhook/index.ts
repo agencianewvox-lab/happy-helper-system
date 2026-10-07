@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendWhatsApp, lookupTeamPhone } from "../_shared/evolution.ts";
+import { retainedMessageText, retainedWhatsAppEvent } from "../_shared/message-retention.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -2396,12 +2397,12 @@ Deno.serve(async (req) => {
           .insert({
             telefone: phone,
             nome_contato: contactName,
-            mensagem: messageText,
+            mensagem: retainedMessageText(messageText, body),
             group_id: groupId,
             direcao: direction,
             status: "recebida",
             recebido_em: receivedAt,
-            dados_extras: body,
+            dados_extras: retainedWhatsAppEvent(body),
           })
           .select();
 
@@ -2465,11 +2466,11 @@ Deno.serve(async (req) => {
     const registros = mensagens.map((msg: any) => ({
       telefone: clean(msg.telefone || msg.phone || msg.from) || null,
       nome_contato: clean(msg.nome_contato || msg.name || msg.pushName) || null,
-      mensagem: clean(msg.mensagem || msg.message || msg.text || msg.body) || null,
+      mensagem: retainedMessageText(clean(msg.mensagem || msg.message || msg.text || msg.body) || null, msg),
       group_id: clean(msg.group_id) || null,
       direcao: detectDirectionLegacy(msg),
       status: clean(msg.status) || "recebida",
-      dados_extras: msg,
+      dados_extras: retainedWhatsAppEvent(msg),
     }));
 
     const { data: legacyData, error: legacyError } = await supabase

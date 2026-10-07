@@ -277,7 +277,7 @@ Inventário agregado em `migration-inventory-2026-10-07.json`: 25 grupos,
 8 formulários, 4 perfis, 8.646 conversas. As conversas incluem aproximadamente
 1,115 GB em registros JSON brutos; mídias/base64 exigem uma exportação completa.
 
-Foi criada SOMENTE uma área privada `migration_stage` no destino, com RLS e
+Na primeira tentativa, foi criada SOMENTE uma área privada `migration_stage` no destino, com RLS e
 sem grants para anon/authenticated. Dois registros de `ai_chat_messages`
 foram copiados e conferidos por SHA-256, como primeiro lote. A cópia seguinte
 foi bloqueada pela franquia de consultas do conector de origem. A consulta
@@ -286,9 +286,49 @@ Nenhuma tabela de aplicação, senha, usuário Auth, arquivo ou função foi mig
 Nenhum dado da origem foi apagado e nenhuma conexão de produção foi trocada.
 O aviso INFO do advisor “RLS enabled no policy” nas três tabelas privadas é
 intencional: acesso de usuários finais é negado, não falta uma política pública.
+Referência do aviso: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy.
 
-Para completar: exportação integral pela ferramenta oficial/backup autorizado
-do banco de origem; esquema, dados e arquivos verificados; Auth e recuperação de
+### Recorte posterior aprovado: três meses, textos e áudios
+
+O proprietário reduziu o histórico para os últimos três meses e depois esclareceu
+que áudios devem ser preservados. Essa decisão substitui a tentativa integral
+descrita acima; não autoriza apagar a origem. O checkpoint atual está em
+`migration-three-months-2026-10-07.json`, separado do inventário integral original.
+
+- Início: 06/07/2026 00:00 de Brasília. Snapshot: 06/10/2026 22:07:39 de Brasília.
+- Preservar cadastros/configurações necessários, mesmo anteriores ao recorte.
+- Conversas: texto, remetente, datas e identificador do evento. Imagens e vídeos
+  viram `[Imagem]` / `[Vídeo]`, sem arquivo, miniatura, URL ou legenda.
+- Áudio: manter transcrição existente e arquivo quando disponível. Inventário
+  da origem: 145 mensagens de áudio, 96 arquivos embutidos (8.933.404 caracteres
+  base64), 82 mensagens com transcrição. Essas contagens podem se sobrepor.
+  Os outros 49 não têm arquivo embutido; uma URL antiga não comprova recuperação.
+- Não levar apikey, payload completo, mídia citada ou outros binários no evento.
+- Cópia parcial privada: 3.000/3.250 conversas normalizadas e 154 registros de
+  cadastros/configurações/históricos menores. SHA-256 conferido por registro;
+  nenhuma imagem/vídeo/base64 não autorizado nos lotes normalizados.
+- Nenhum arquivo de áudio foi copiado ainda. `audio_copy_pending` impede
+  confundir metadados já copiados com preservação do arquivo.
+- Dois registros de teste de chat IA, anteriores ao recorte, foram retirados
+  apenas da área privada do destino. A origem continua disponível para recuperação.
+
+O conector da origem limitou temporariamente a próxima leitura. Retomar pelo
+UUID do checkpoint usando `scripts/migration/export-messages.sql`; não reiniciar
+com OFFSET nem sobrescrever arquivos de áudio já conciliados com um lote somente
+de metadados. `export-audio.sql` é somente leitura e nunca deve ter seus resultados
+impressos em logs ou versionados. Ainda faltam 250 conversas, arquivos de áudio e
+cinco tabelas históricas indicadas no checkpoint. Recontar e conciliar alterações
+posteriores ao snapshot antes da troca; o recorte não é expurgo automático futuro.
+
+`message-retention.ts` prepara a mesma política no código do receptor de eventos,
+com testes de remoção de imagens/vídeos, segredos e anexos citados, preservando
+áudio e transcrição. Publicar código no GitHub/Vercel NÃO publica essa Edge Function.
+Ela não foi ativada na origem nem no destino nesta etapa. Auth, esquema público,
+permissões, funções e virada de produção continuam pendentes. Não considerar o
+painel independente do Lovable antes dessas validações.
+
+Para completar: exportação do recorte aprovado (ou backup oficial como origem
+para restauração seletiva); esquema, dados e áudios verificados; Auth e recuperação de
 senha; funções com autenticação/escopo de carteira; segredos no runtime correto;
 rotas públicas de formulários; webhook compartilhado e agendamentos; conciliação
 do delta de mensagens antes de qualquer troca. Não criar endpoint público de
