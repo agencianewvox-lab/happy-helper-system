@@ -26,6 +26,7 @@ const navItems = [
   { title: "Início", url: "/", icon: Home, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Performance", url: "/performance", icon: BarChart3, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Anúncios", url: "/anuncios", icon: Megaphone, adminOnly: false, masterOnly: false, badgeKey: null },
+  { title: "Relatórios", url: "/relatorios", icon: ClipboardCheck, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
   { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false, masterOnly: false, badgeKey: "agenda" as const },
   { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false, masterOnly: false, badgeKey: "pendencias" as const },

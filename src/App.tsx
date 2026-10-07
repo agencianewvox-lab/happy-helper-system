@@ -16,6 +16,7 @@ import { WorkspaceLoading } from "./components/WorkspaceLoading";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Performance = lazy(() => import("./pages/Performance"));
 const Anuncios = lazy(() => import("./pages/Anuncios"));
+const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Pendencias = lazy(() => import("./pages/Pendencias"));
 const Tarefas = lazy(() => import("./pages/Tarefas"));
@@ -75,6 +76,7 @@ function AppRoutes() {
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
         <Route path="/anuncios" element={<ProtectedRoute><Anuncios /></ProtectedRoute>} />
+        <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
         <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
         <Route path="/pendencias" element={<ProtectedRoute><Pendencias /></ProtectedRoute>} />
         <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />

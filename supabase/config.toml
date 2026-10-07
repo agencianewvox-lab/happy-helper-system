@@ -69,3 +69,10 @@ verify_jwt = false
 
 [functions.team-performance]
 verify_jwt = false
+
+# Custom staff/session and service verification inside these handlers.
+[functions.reports-api]
+verify_jwt = false
+
+[functions.report-scheduler]
+verify_jwt = false
