@@ -18,6 +18,7 @@ const Performance = lazy(() => import("./pages/Performance"));
 const Anuncios = lazy(() => import("./pages/Anuncios"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Social = lazy(() => import("./pages/Social"));
+const InstagramReturn = lazy(() => import("./pages/InstagramReturn"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Pendencias = lazy(() => import("./pages/Pendencias"));
 const Tarefas = lazy(() => import("./pages/Tarefas"));
@@ -79,6 +80,7 @@ function AppRoutes() {
         <Route path="/anuncios" element={<ProtectedRoute><Anuncios /></ProtectedRoute>} />
         <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
         <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
+        <Route path="/social/instagram/retorno" element={<InstagramReturn />} />
         <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
         <Route path="/pendencias" element={<ProtectedRoute><Pendencias /></ProtectedRoute>} />
         <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />

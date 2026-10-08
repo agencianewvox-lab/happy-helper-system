@@ -3,9 +3,9 @@
 Módulo independente do Voxi. Calendário, produção, revisão, aprovação por versão,
 biblioteca privada, comentários e registro de publicação manual com link.
 Datas são planejamento, NÃO agendamento automático. Aprovação externa por link
-e conexão/publicação Meta ainda não são habilitadas nesta entrega.
+e publicação Meta ainda não são habilitadas nesta entrega.
 
-## Configuração Instagram pendente
+## Conexão Instagram (OAuth)
 
 O Voxi utiliza Instagram Login, INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET e retorno
 próprio. Não alterar callbacks, webhooks, tokens ou código do CRM.
@@ -13,10 +13,26 @@ próprio. Não alterar callbacks, webhooks, tokens ou código do CRM.
 Antes de OAuth no Painel: verificar permissões de publicação, modo do aplicativo
 e revisão/acesso avançado exigidos pela Meta. Cadastrar INSTAGRAM_APP_ID e
 INSTAGRAM_APP_SECRET no Supabase do Painel, nunca em chat ou código público.
-A implementação OAuth terá armazenamento criptografado com uma chave exclusiva
-INSTAGRAM_TOKEN_ENCRYPTION_KEY, estado aleatório de uso único, vinculação por ID
-de cliente e confirmação explícita do perfil. A URI definitiva será informada
-quando a rota de retorno estiver implementada; não reutilizar /conexoes do Voxi.
+Tokens são armazenados criptografados pelo Supabase Vault; não é necessária
+uma terceira chave de criptografia. O navegador nunca recebe tokens de acesso.
+Estado aleatório de uso único, hash SHA-256, validade de dez minutos e vínculo
+com o usuário ativo e o ID do cliente protegem o retorno. A confirmação explícita
+mostra cliente e @perfil; uma conta Instagram não pode pertencer a dois clientes.
+Reconectar substitui apenas o token do Painel depois da confirmação.
+
+URI exata a ADICIONAR no aplicativo Meta (não substituir os retornos do Voxi):
+https://paineldecontrole.newvox.site/social/instagram/retorno
+
+Escopos: instagram_business_basic e instagram_business_content_publish.
+Modo de desenvolvimento/revisão e acesso avançado na Meta podem limitar quais
+contas autorizam. A presença das duas chaves não confirma a validade delas.
+A autorização real será validada somente após cadastrar a URI e conectar um
+perfil autorizado. Nenhuma assinatura de webhook, mensagem ou publicação é
+realizada por esse fluxo. Renovação automática e desconexão ficam para a próxima
+fase; a interface mostra a expiração e permite reconectar.
+Autorizações abandonadas não são acessíveis por usuários nem usadas para publicar.
+Ao iniciar uma nova conexão, a limpeza remove autorizações expiradas e somente
+seus tokens pendentes, sem remover credenciais de contas confirmadas.
 
 ## Acesso e segurança
 
@@ -46,6 +62,6 @@ Teste mutável de ponta a ponta em produção não foi executado: a proteção d
 segurança bloqueou criação/exclusão de usuários e arquivos temporários.
 Revisão visual via navegador também ficou indisponível por falha do runtime.
 
-Próxima fase: OAuth, capacidades por perfil, validação de formatos, fila durável,
+Próxima fase: capacidades por perfil, validação de formatos, fila durável,
 agendamento real, ID publicado, reconciliação de respostas incertas e piloto
-autorizado. Integrações continuam desligadas até concluir essa validação.
+autorizado. Publicação automática continua desligada até concluir essa validação.

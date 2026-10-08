@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { SocialEditor } from "@/components/social/SocialEditor";
 import { EditorialCalendar } from "@/components/social/EditorialCalendar";
+import { InstagramAccounts } from "@/components/social/InstagramAccounts";
 import {
   editorialDate,
   formatLabels,
@@ -48,7 +49,11 @@ export default function Social() {
   const { user, signOut } = useAuth(),
     { isAdmin, isMaster, loading } = useProfile(),
     qc = useQueryClient();
-  const [tab, setTab] = useState("calendar"),
+  const [tab, setTab] = useState(() =>
+      new URLSearchParams(window.location.search).get("aba") === "accounts"
+        ? "accounts"
+        : "calendar",
+    ),
     [month, setMonth] = useState(() => new Date()),
     [clientId, setClientId] = useState(() =>
       typeof window === "undefined"
@@ -490,36 +495,8 @@ export default function Social() {
                   </div>
                 </section>
               </TabsContent>
-              <TabsContent value="accounts" className="space-y-4">
-                <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-6">
-                  <Instagram className="h-6 w-6 text-primary mb-3" />
-                  <h2 className="text-lg font-semibold">
-                    Conexão oficial, sem compartilhar senhas.
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
-                    {data?.integration.message ||
-                      "A conexão Instagram será habilitada após configuração do aplicativo."}{" "}
-                    A integração do Voxi permanece independente e não foi
-                    alterada.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    Cada cliente autorizará seu próprio perfil. Contas, tokens e
-                    permissões não serão associados apenas pelo nome.
-                  </p>
-                </div>
-                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {clients.map((c) => (
-                    <div key={c.id} className="rounded-2xl border bg-card p-5">
-                      <h3 className="font-semibold text-sm">{c.nome}</h3>
-                      <p className="text-xs text-amber-500 mt-3">
-                        Instagram não conectado neste módulo
-                      </p>
-                      <Button className="mt-4" variant="outline" disabled>
-                        Conexão pendente de configuração
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+              <TabsContent value="accounts">
+                <InstagramAccounts clients={clients} />
               </TabsContent>
               {isMaster ? (
                 <TabsContent value="team" className="space-y-5">
