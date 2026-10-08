@@ -72,7 +72,21 @@ export async function exchangeInstagram(
       else if (/code.*(used|expired|invalid)|authorization code|matching code|verification code/.test(message)) reason = "O código de autorização foi recusado ou já utilizado. Volte à Social Media e inicie uma nova conexão, sem atualizar esta página.";
       else if (/professional|business account|creator/.test(message)) reason = "Esta integração exige um Instagram profissional (Empresa ou Criador).";
       else if (/permission|scope|access denied/.test(message)) reason = "A Meta não concedeu as permissões necessárias. Confira o acesso avançado e a autorização deste perfil no aplicativo.";
-      throw new Error("A Meta não concluiu a autorização (" + stage + "; HTTP " + response.status + (code ? "; código " + code : "") + "). " + reason);
+      // Preserve the actionable explanation, but redact every credential sent in this request.
+      const sensitive = [secret, code];
+      const requestUrl = new URL(url);
+      for (const key of ["access_token", "client_secret", "code"]) {
+        const value = requestUrl.searchParams.get(key);
+        if (value) sensitive.push(value);
+        if (init.body instanceof URLSearchParams) {
+          const bodyValue = init.body.get(key);
+          if (bodyValue) sensitive.push(bodyValue);
+        }
+      }
+      let safeDetail = String(provider.message || provider.error_message || "");
+      for (const value of sensitive) if (typeof value === "string" && value) safeDetail = safeDetail.split(value).join("[protegido]");
+      safeDetail = safeDetail.replace(/https?:\/\/\S+/g, "[endereço protegido]").replace(/[A-Za-z0-9_.~-]{24,}/g, "[protegido]").slice(0, 350);
+      throw new Error("A Meta não concluiu a autorização (" + stage + "; HTTP " + response.status + (code ? "; código " + code : "") + "). " + reason + (safeDetail ? " Detalhe da Meta: " + safeDetail : ""));
     }
     return data;
   }
