@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 
 import Login from "./pages/Login";
 
@@ -49,12 +50,16 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
+  const { pathname } = useLocation();
 
   if (loading) {
     return <WorkspaceLoading />;
   }
 
   if (!user) return <Navigate to="/login" replace />;
+  if (profileLoading) return <WorkspaceLoading />;
+  if (profile?.role === "social_media" && pathname !== "/social" && pathname !== "/configuracoes/minha-conta") return <Navigate to="/social" replace />;
   return <>
     <DailyMotivationalPopup />
     {children}

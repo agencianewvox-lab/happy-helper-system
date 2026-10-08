@@ -55,7 +55,7 @@ export default function Social() {
   const [tab, setTab] = useState(() =>
       new URLSearchParams(window.location.search).get("aba") === "accounts"
         ? "accounts"
-        : "calendar",
+        : new URLSearchParams(window.location.search).get("aba") === "team" ? "team" : "calendar",
     ),
     [month, setMonth] = useState(() => new Date()),
     [clientId, setClientId] = useState(() =>
@@ -525,6 +525,7 @@ export default function Social() {
               </TabsContent>
               {isMaster ? (
                 <TabsContent value="team" className="space-y-5">
+                  <Button variant="outline" onClick={() => { window.location.href = "/configuracoes?aba=equipe"; }}>Adicionar pessoa à equipe</Button>
                   <section className="rounded-2xl border bg-card p-6 space-y-4">
                     <h2 className="text-lg font-semibold">
                       Carteira da social media

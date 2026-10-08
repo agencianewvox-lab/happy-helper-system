@@ -90,3 +90,5 @@ verify_jwt = false
 
 [functions.social-publisher]
 verify_jwt = false
+[functions.create-team-users]
+verify_jwt = false

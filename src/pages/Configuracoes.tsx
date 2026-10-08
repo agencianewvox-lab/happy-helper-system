@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -51,6 +51,7 @@ type TabType = "prompts" | "system" | "equipe";
 export default function Configuracoes() {
   const { isMaster, profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
+  const { search } = useLocation();
 
   // Prompts state
   const [prompts, setPrompts] = useState<PromptConfig[]>([]);
@@ -63,7 +64,8 @@ export default function Configuracoes() {
   const [configSaving, setConfigSaving] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>("prompts");
+  const [activeTab, setActiveTab] = useState<TabType>(() => new URLSearchParams(window.location.search).get("aba") === "equipe" ? "equipe" : "prompts");
+  useEffect(() => { if (new URLSearchParams(search).get("aba") === "equipe") setActiveTab("equipe"); }, [search]);
 
   // Password verification
   const [pendingSave, setPendingSave] = useState<{ type: "prompt" | "config"; item: any } | null>(null);

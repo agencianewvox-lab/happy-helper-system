@@ -16,6 +16,22 @@ interface Profile {
 }
 
 export function EquipeManager() {
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "social_media" });
+  const [submitting, setSubmitting] = useState(false);
+  const createPerson = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-team-users", { body: form });
+      if (error || !data?.ok) throw new Error(data?.error || "Não foi possível criar o acesso. Confira o e-mail e a senha.");
+      setForm({ name: "", email: "", password: "", role: "social_media" });
+      setCreating(false);
+      toast.success("Acesso criado. Agora atribua os clientes em Social Media → Equipe.");
+      await fetch();
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Erro ao cadastrar."); }
+    finally { setSubmitting(false); }
+  };
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -70,6 +86,21 @@ export function EquipeManager() {
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 className="text-lg font-semibold">Equipe e acessos</h2><p className="text-sm text-muted-foreground">Cadastre a pessoa e depois escolha os clientes que ela poderá gerenciar.</p></div>
+        <Button onClick={() => setCreating(value => !value)}>{creating ? "Cancelar" : "Adicionar pessoa"}</Button>
+      </div>
+      {creating && <Card><CardHeader><CardTitle className="text-base">Novo acesso à equipe</CardTitle></CardHeader><CardContent>
+        <form onSubmit={createPerson} className="space-y-4">
+          <label className="block text-sm">Nome completo<Input required minLength={2} maxLength={100} autoComplete="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
+          <label className="block text-sm">E-mail de acesso<Input required type="email" autoComplete="off" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
+          <label className="block text-sm">Senha inicial<Input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /><span className="text-xs text-muted-foreground">Mínimo de 12 caracteres. Compartilhe por um canal seguro; a pessoa pode trocar em Minha conta.</span></label>
+          <label className="block text-sm">Perfil<select className="mt-1 block h-10 w-full rounded-md border bg-background px-3" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}><option value="social_media">Social Media — apenas área social e Minha conta</option><option value="gestor">Gestor — operação da própria carteira</option></select></label>
+          <p className="text-xs text-muted-foreground">Nenhum cliente é liberado automaticamente. Para a área social, selecione a pessoa em Social Media → Equipe, atribua cada cliente e escolha se ela pode aprovar, conectar e publicar. Não é enviado convite por e-mail.</p>
+          <Button type="submit" disabled={submitting}>{submitting ? "Criando acesso…" : "Criar acesso"}</Button>
+        </form>
+      </CardContent></Card>}
+      <Button variant="outline" onClick={() => { window.location.href = "/social?aba=team"; }}>Definir clientes e permissões da Social Media</Button>
       <div className="text-xs text-muted-foreground mb-2">
         Cadastre o telefone no formato internacional (só dígitos): <span className="font-mono">DDI + DDD + número</span> — ex: <span className="font-mono">5564992565779</span>. Este número é usado pela Evolution API para envio de notificações (NPS, onboarding, briefing, feedback).
       </div>
@@ -85,7 +116,7 @@ export function EquipeManager() {
                 {p.is_master && (
                   <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30 text-[10px]">MASTER</Badge>
                 )}
-                <Badge variant="outline" className="text-[10px] capitalize">{p.role}</Badge>
+                <Badge variant="outline" className="text-[10px] capitalize">{p.role === "social_media" ? "Social Media" : p.role}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">

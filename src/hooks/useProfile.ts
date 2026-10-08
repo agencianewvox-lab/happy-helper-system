@@ -6,7 +6,7 @@ export interface Profile {
   id: string;
   user_id: string;
   full_name: string;
-  role: "admin" | "gestor";
+  role: "admin" | "gestor" | "social_media";
   is_master?: boolean;
 }
 

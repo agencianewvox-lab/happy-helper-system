@@ -1,98 +1,29 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.97.0/cors";
+import { requireStaff, authCors, authFailure } from "../_shared/staff-auth.ts";
+import { validTeamInput } from "../_shared/team-input.ts";
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+ if(req.method==="OPTIONS") return new Response("ok",{headers:authCors});
+ try {
+  await requireStaff(req,true);
+  if(req.method!=="POST") return Response.json({error:"Método inválido."},{status:405,headers:authCors});
+  const body=await req.json();
+  const name=String(body.name||"").trim(), email=String(body.email||"").trim().toLowerCase();
+  const password=String(body.password||""), role=body.role;
+  if(!validTeamInput(body))
+   return Response.json({error:"Informe nome, e-mail válido, perfil e senha entre 12 e 128 caracteres."},{status:400,headers:authCors});
+  const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{persistSession:false}});
+  const {data:existing,error:lookupError}=await db.from("profiles").select("full_name");
+  if(lookupError) throw lookupError;
+  if(existing?.some(p=>p.full_name.trim().toLowerCase()===name.toLowerCase()))
+   return Response.json({error:"Já existe uma pessoa com esse nome. Utilize um nome completo distinto."},{status:409,headers:authCors});
+  const {data,error}=await db.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:name}});
+  if(error||!data.user) return Response.json({error:"Não foi possível cadastrar. Verifique se o e-mail já possui acesso e a força da senha."},{status:400,headers:authCors});
+  const {error:profileError}=await db.from("profiles").upsert({user_id:data.user.id,full_name:name,role,is_master:false},{onConflict:"user_id"});
+  if(profileError){
+   await db.auth.admin.updateUserById(data.user.id,{ban_duration:"876000h"});
+   return Response.json({error:"Cadastro não concluído. O acesso foi bloqueado por segurança; contate o administrador."},{status:503,headers:authCors});
   }
-
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-
-  // Verify caller is admin
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader) {
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-    if (user) {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("role")
-        .eq("user_id", user.id)
-        .single();
-      if (profile && profile.role !== "admin") {
-        return new Response(JSON.stringify({ error: "Not admin" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-  }
-
-  const users = [
-    { email: "mads.gestao@gmail.com", password: "14253117nv", full_name: "Murillo", role: "gestor" },
-    { email: "adolfo_cassitas@hotmail.com", password: "14253117nv", full_name: "Netto", role: "gestor" },
-    { email: "priscilaborges_1158@outlook.com", password: "14253117nv", full_name: "Priscilla", role: "admin" },
-  ];
-
-  // Also ensure existing admin user has a profile
-  const results = [];
-
-  for (const u of users) {
-    // Create user with auto-confirm
-    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: u.email,
-      password: u.password,
-      email_confirm: true,
-    });
-
-    if (createError) {
-      // User might already exist
-      if (createError.message.includes("already been registered")) {
-        // Get user by email
-        const { data: { users: existingUsers } } = await supabaseAdmin.auth.admin.listUsers();
-        const existing = existingUsers?.find((eu: any) => eu.email === u.email);
-        if (existing) {
-          // Ensure profile exists
-          await supabaseAdmin.from("profiles").upsert({
-            user_id: existing.id,
-            full_name: u.full_name,
-            role: u.role,
-          }, { onConflict: "user_id" });
-          results.push({ email: u.email, status: "already_exists", profile: "ensured" });
-        }
-        continue;
-      }
-      results.push({ email: u.email, error: createError.message });
-      continue;
-    }
-
-    if (created.user) {
-      await supabaseAdmin.from("profiles").upsert({
-        user_id: created.user.id,
-        full_name: u.full_name,
-        role: u.role,
-      }, { onConflict: "user_id" });
-      results.push({ email: u.email, status: "created" });
-    }
-  }
-
-  // Also ensure the main admin has a profile
-  const { data: { users: allUsers } } = await supabaseAdmin.auth.admin.listUsers();
-  const adminEmail = "agenciavox.comunicacao@outlook.com";
-  const adminUser = allUsers?.find((u: any) => u.email === adminEmail);
-  if (adminUser) {
-    await supabaseAdmin.from("profiles").upsert({
-      user_id: adminUser.id,
-      full_name: "Alisson",
-      role: "admin",
-    }, { onConflict: "user_id" });
-    results.push({ email: adminEmail, status: "admin_profile_ensured" });
-  }
-
-  return new Response(JSON.stringify({ results }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return Response.json({ok:true},{headers:authCors});
+ }catch(e){return authFailure(e);}
 });

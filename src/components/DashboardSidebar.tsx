@@ -15,6 +15,7 @@ import newvoxLogo from "@/assets/newvox-logo.jpg";
 import { cn } from "@/lib/utils";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 import { ThemePreference } from "@/components/ThemePreference";
+import { useProfile } from "@/hooks/useProfile";
 
 interface DashboardSidebarProps {
   isAdmin: boolean;
@@ -36,6 +37,7 @@ const navItems = [
   { title: "NPS Real", url: "/nps-real", icon: ClipboardCheck, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "WhatsApp central", url: "/master/whatsapp", icon: Smartphone, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Acesso Master", url: "/admin", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },
+  { title: "Equipe e acessos", url: "/configuracoes?aba=equipe", icon: Shield, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Configurações", url: "/configuracoes", icon: Settings, adminOnly: false, masterOnly: true, badgeKey: null },
   { title: "Minha conta", url: "/configuracoes/minha-conta", icon: Settings, adminOnly: false, masterOnly: false, badgeKey: null },
 ];
@@ -46,8 +48,10 @@ export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: Dashb
   const navigate = useNavigate();
   const location = useLocation();
   const badges = useSidebarBadges();
+  const { profile } = useProfile();
 
   const filteredItems = navItems.filter(item => {
+    if (profile?.role === "social_media" && !["/social", "/configuracoes/minha-conta"].includes(item.url)) return false;
     if (item.masterOnly && !isMaster) return false;
     if (item.adminOnly && !isAdmin) return false;
     return true;
