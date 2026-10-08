@@ -7,6 +7,10 @@ import {
 } from "../_shared/social-publishing.ts";
 import { credential, dbData } from "../_shared/social-worker.ts";
 import { contentInput, type SocialPost } from "../_shared/social-model.ts";
+import {
+  remotePublication,
+  instagramMediaItems,
+} from "../_shared/social-retention.ts";
 const reply = (v: unknown, status = 200) =>
   Response.json(v, {
     status,
@@ -35,7 +39,7 @@ Deno.serve(async (req) => {
           await ctx.db
             .from("social_publications")
             .select(
-              "id,post_id,client_id,instagram_id,status,due_at,media_id,permalink,error,updated_at",
+              "id,post_id,client_id,instagram_id,status,due_at,media_id,permalink,error,updated_at,media_removed_at,cleanup_error",
             )
             .order("updated_at", { ascending: false })
             .limit(500),
@@ -88,9 +92,19 @@ Deno.serve(async (req) => {
           .eq("client_id", c.id)
           .single(),
       );
+      const job = dbData(
+        await ctx.db
+          .from("social_publications")
+          .select("media_removed_at")
+          .eq("post_id", p.id)
+          .maybeSingle(),
+      );
       const content = contentInput(
         {
           ...p,
+          assets: job?.media_removed_at
+            ? p.assets.filter((a: any) => !a.type.startsWith("video/"))
+            : p.assets,
           title: (p.title + " — cópia").slice(0, 160),
           scheduled_at: null,
         },
@@ -109,6 +123,27 @@ Deno.serve(async (req) => {
             .select()
             .single(),
         ),
+      });
+    }
+    if (b.action === "published-media") {
+      const job = dbData(
+        await ctx.db
+          .from("social_publications")
+          .select("*")
+          .eq("post_id", b.postId)
+          .eq("client_id", c.id)
+          .single(),
+      );
+      const media = await remotePublication(db, job);
+      return reply({
+        assets: instagramMediaItems(media).map((m: any, i: number) => ({
+          path: "instagram/" + m.id,
+          name: "Publicação " + (i + 1),
+          type: m.media_type === "VIDEO" ? "video/mp4" : "image/jpeg",
+          size: 0,
+          url: m.media_url,
+        })),
+        permalink: media.permalink || job.permalink,
       });
     }
     const a = await credential(db, c.id);

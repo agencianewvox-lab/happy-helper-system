@@ -1,6 +1,9 @@
 import { Upload } from "tus-js-client";
 import { supabase } from "@/integrations/supabase/client";
 import type { SocialAsset, SocialPost } from "@/lib/social";
+// Increase after the Supabase project plan/global limit is upgraded and verified.
+export const socialUploadLimit =
+  Number(import.meta.env.VITE_SOCIAL_UPLOAD_LIMIT_BYTES) || 50 * 1024 * 1024;
 export async function prepareMedia(
   file: File,
   format: SocialPost["format"],
@@ -18,6 +21,12 @@ export async function prepareMedia(
     throw new Error("Use JPG, PNG, WebP, MP4 ou MOV.");
   if (file.size > 1024 * 1024 * 1024)
     throw new Error("O arquivo ultrapassa 1 GB.");
+  if (file.type.startsWith("video/") && file.size > socialUploadLimit)
+    throw new Error(
+      "O plano atual do Supabase permite até " +
+        Math.round(socialUploadLimit / 1024 / 1024) +
+        " MB por arquivo. Para vídeos de até 1 GB, o administrador precisa liberar um plano pago e o limite global.",
+    );
   if (file.type.startsWith("image/")) {
     const image = await createImageBitmap(file);
     try {

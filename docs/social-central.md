@@ -19,7 +19,7 @@ Nenhuma alteração no Voxi ou em seus callbacks/webhooks.
 - Imagens convertidas em JPEG e redimensionadas; margens preservam a arte.
 - Upload TUS em blocos de 6 MB, progresso e tentativas de retomada enquanto a janela permanece aberta.
 - Limite do bucket e validação local: até 1 GB; Stories até 100 MB; JPEG até 8 MB.
-- O limite global de Storage do projeto não foi confirmado. Ele pode restringir arquivos antes do limite do bucket. Não foi realizado upload mutável de teste.
+- Limite global confirmado: 50 MiB, plano gratuito. Tentativa isolada de elevar a 1 GiB retornou HTTP 402 exigindo plano pago; nenhum plano foi alterado. A interface bloqueia vídeos maiores antes do upload. Após upgrade e limite global verificado, definir VITE_SOCIAL_UPLOAD_LIMIT_BYTES=1073741824 na Vercel e reconstruir.
 - Não há transcodificação de vídeo: use MP4/MOV compatível (H.264/AAC recomendado); validação local lê dimensões/duração, a Meta valida o codec/processamento.
 - Reels: 3–900 segundos, largura até 1920. Stories/carrossel: 3–60 segundos no fluxo atual.
 
@@ -34,6 +34,8 @@ A aprovação do app/acesso avançado e a concessão pelo titular são pré-requ
 O relatório não contém conversas, dados de CRM ou de outros clientes.
 
 ## Segurança e resiliência
+Após uma hora da publicação confirmada, vídeos são removidos do Storage somente se a Meta disponibilizar a mídia e nenhum outro conteúdo referenciar o arquivo. Reserva transacional impede novas referências durante a limpeza. Falhas preservam a cópia para nova tentativa. Imagens e metadados/histórico permanecem.
+A prévia do histórico passa a consultar a mídia do Instagram, sem persistir URLs temporárias. Remoção/expiração da publicação (especialmente Stories) ou revogação da conta podem impedir a reprodução; isso não constitui backup. Duplicar uma publicação limpa exige reenviar os vídeos.
 RLS por carteira, tokens somente no Vault/servidor, função de credencial negada a anon/authenticated.
 OAuth com estado aleatório de uso único; confirmação explícita do vínculo.
 Desconectar remove apenas a credencial local do Painel e cancela filas pendentes, sem revogar o app no Voxi.

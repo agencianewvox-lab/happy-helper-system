@@ -6,6 +6,7 @@ import {
   credential,
 } from "../_shared/social-worker.ts";
 import { graph } from "../_shared/social-publishing.ts";
+import { cleanPublishedVideos } from "../_shared/social-retention.ts";
 Deno.serve(async (req) => {
   if (req.method !== "POST")
     return new Response("Método não permitido", { status: 405 });
@@ -69,9 +70,10 @@ Deno.serve(async (req) => {
       );
     }
     const jobs = dbData(await db.rpc("social_claim"));
-    await Promise.all(
-      (jobs || []).map((j: unknown) => processPublication(db, j)),
-    );
+    await Promise.all([
+      ...(jobs || []).map((j: unknown) => processPublication(db, j)),
+      cleanPublishedVideos(db),
+    ]);
     return Response.json({ processed: jobs.length });
   } catch (e) {
     return authFailure(e);

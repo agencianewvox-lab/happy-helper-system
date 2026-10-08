@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { uploadSocialFile } from "@/lib/social-media-upload";
+import { uploadSocialFile, socialUploadLimit } from "@/lib/social-media-upload";
 import { InstagramPreview } from "./InstagramPreview";
 import {
   publishingApi,
@@ -106,6 +106,19 @@ export function SocialEditor({
     refetchInterval: 15000,
   });
   const job = jobs.data?.jobs.find((j) => j.post_id === post?.id);
+  const remoteMedia = useQuery({
+    queryKey: ["social-published-media", userId, post?.id],
+    enabled:
+      job?.status === "published" && !!job.media_removed_at && !!job.media_id,
+    queryFn: () =>
+      publishingApi<{ assets: SocialAsset[] }>({
+        action: "published-media",
+        clientId: client.id,
+        postId: post!.id,
+      }),
+    staleTime: 60000,
+    retry: false,
+  });
   const queued =
     !!job &&
     ["queued", "processing", "publishing", "uncertain", "published"].includes(
@@ -411,8 +424,9 @@ export function SocialEditor({
                   <ImagePlus className="h-4 w-4 text-primary" />
                 </div>
                 <label className="text-xs text-muted-foreground block">
-                  Imagens JPG/PNG/WebP · vídeos MP4/MOV até 1 GB (Stories: 100
-                  MB)
+                  Imagens JPG/PNG/WebP · vídeos MP4/MOV até{" "}
+                  {Math.round(socialUploadLimit / 1024 / 1024)} MB por arquivo
+                  no plano atual
                   <input
                     className="block mt-3 w-full text-xs"
                     type="file"
@@ -701,16 +715,40 @@ export function SocialEditor({
                 </Button>
               ) : null}
             </section>
+            {job?.media_removed_at ? (
+              <p className="text-xs text-muted-foreground">
+                Vídeos publicados são consultados no Instagram; a cópia local é
+                removida quando não há outros conteúdos usando o arquivo.{" "}
+                {remoteMedia.isPending && job.media_id
+                  ? "Consultando mídia…"
+                  : ""}
+              </p>
+            ) : null}
+            {remoteMedia.isError ? (
+              <p role="alert" className="text-xs text-amber-500">
+                Não foi possível consultar a mídia no Instagram. Use o link da
+                publicação; ela pode ter expirado, sido removida ou exigir
+                reconexão.
+              </p>
+            ) : null}
             <InstagramPreview
               format={format}
               caption={caption}
               username={account?.username || client.nome}
-              assets={assets.map((a) => ({
-                ...a,
-                url:
-                  a.url ||
-                  details.data?.assets.find((x) => x.path === a.path)?.url,
-              }))}
+              assets={
+                remoteMedia.data?.assets ||
+                assets
+                  .filter(
+                    (a) =>
+                      !job?.media_removed_at || !a.type.startsWith("video/"),
+                  )
+                  .map((a) => ({
+                    ...a,
+                    url:
+                      a.url ||
+                      details.data?.assets.find((x) => x.path === a.path)?.url,
+                  }))
+              }
             />
             {post ? (
               <>

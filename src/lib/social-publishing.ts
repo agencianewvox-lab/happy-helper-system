@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 export type Publication = {
+  media_removed_at?: string | null;
+  cleanup_error?: string | null;
   id: string;
   post_id: string;
   client_id: string;
