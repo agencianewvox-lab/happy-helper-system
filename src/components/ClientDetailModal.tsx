@@ -321,6 +321,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
             <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
             <TabsTrigger value="notas" className="flex-1 gap-1"><StickyNote className="w-3 h-3" /> Notas</TabsTrigger>
             <TabsTrigger value="onboarding" className="flex-1 gap-1">📋 Onboarding</TabsTrigger>
+            <TabsTrigger value="social" className="flex-1 gap-1">Social</TabsTrigger>
           </TabsList></div>
 
           <TabsContent value="indicadores" className="space-y-4 mt-4">
@@ -825,6 +826,12 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
 
           <TabsContent value="notas" className="mt-4">
             <ClientNotesTab groupId={grupo.group_id} />
+          </TabsContent>
+
+          <TabsContent value="social" className="mt-4 space-y-4 rounded-xl border p-5">
+            <h3 className="font-semibold">Conteúdo e calendário editorial</h3>
+            <p className="text-sm text-muted-foreground">Planeje artes, vídeos e legendas, acompanhe revisões e aprove os conteúdos deste cliente na Central Social.</p>
+            <Button asChild><a href={`/social?cliente=${encodeURIComponent(grupo.id)}`}>Abrir Central Social deste cliente</a></Button>
           </TabsContent>
 
           <TabsContent value="onboarding" className="mt-4 space-y-3">

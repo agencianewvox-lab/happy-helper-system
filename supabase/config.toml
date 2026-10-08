@@ -76,3 +76,7 @@ verify_jwt = false
 
 [functions.report-scheduler]
 verify_jwt = false
+
+# Handler validates the active staff session with Supabase Auth before every action.
+[functions.social-api]
+verify_jwt = false
