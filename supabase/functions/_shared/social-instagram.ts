@@ -47,21 +47,34 @@ export async function exchangeInstagram(
   secret: string,
   request: typeof fetch = fetch,
 ) {
-  async function json(url: string, init: RequestInit) {
+  async function json(url: string, init: RequestInit, stage: string) {
+    let response: Response;
+    let data;
     try {
-      const response = await request(url, {
+      response = await request(url, {
         ...init,
         redirect: "error",
         signal: AbortSignal.timeout(15000),
       });
-      const data = await response.json();
-      if (!response.ok || data.error) throw new Error();
-      return data;
+      data = await response.json();
     } catch {
-      throw new Error(
-        "A Meta não concluiu a autorização. Confira o aplicativo, endereço de retorno e permissões e tente novamente.",
-      );
+      throw new Error("A Meta não concluiu a autorização: indisponibilidade de comunicação (" + stage + "). Inicie uma nova conexão.");
     }
+    if (!response.ok || data.error || data.error_type) {
+      const provider = typeof data.error === "object" && data.error ? data.error : data;
+      const code = Number.isInteger(provider.code) ? provider.code : 0;
+      const message = String(provider.message || provider.error_message || "").toLowerCase();
+      // Never log URLs, bodies, provider messages, tokens, authorization codes or app secrets.
+      console.warn("instagram_oauth_failure", JSON.stringify({ stage, status: response.status, code }));
+      let reason = "Verifique as credenciais e permissões do aplicativo Instagram.";
+      if (/redirect|redirect_uri/.test(message)) reason = "O endereço de retorno precisa ser autorizado exatamente como https://paineldecontrole.newvox.site/social/instagram/retorno nas configurações do aplicativo Instagram.";
+      else if (/secret|client_id|client id|invalid app|application id/.test(message)) reason = "O ID e o segredo precisam pertencer ao mesmo aplicativo Instagram (não ao aplicativo Facebook). Revise INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET.";
+      else if (/code.*(used|expired|invalid)|authorization code|matching code|verification code/.test(message)) reason = "O código de autorização foi recusado ou já utilizado. Volte à Social Media e inicie uma nova conexão, sem atualizar esta página.";
+      else if (/professional|business account|creator/.test(message)) reason = "Esta integração exige um Instagram profissional (Empresa ou Criador).";
+      else if (/permission|scope|access denied/.test(message)) reason = "A Meta não concedeu as permissões necessárias. Confira o acesso avançado e a autorização deste perfil no aplicativo.";
+      throw new Error("A Meta não concluiu a autorização (" + stage + "; HTTP " + response.status + (code ? "; código " + code : "") + "). " + reason);
+    }
+    return data;
   }
   const short = await json("https://api.instagram.com/oauth/access_token", {
     method: "POST",
@@ -72,7 +85,7 @@ export async function exchangeInstagram(
       redirect_uri: INSTAGRAM_REDIRECT,
       code,
     }),
-  });
+  }, "código de acesso");
   if (typeof short.access_token !== "string")
     throw new Error("A Meta não retornou uma autorização válida.");
   const query = new URLSearchParams({
@@ -82,7 +95,7 @@ export async function exchangeInstagram(
   });
   const long = await json("https://graph.instagram.com/access_token?" + query, {
     method: "GET",
-  });
+  }, "autorização duradoura");
   if (
     typeof long.access_token !== "string" ||
     !Number.isFinite(long.expires_in) ||
@@ -93,7 +106,7 @@ export async function exchangeInstagram(
     "https://graph.instagram.com/v26.0/me?fields=user_id,username,account_type",
     {
       headers: { Authorization: "Bearer " + long.access_token },
-    },
+    }, "identificação do perfil",
   );
   // Fail closed on unsafe numeric IDs: never round an Instagram identifier.
   const idValue = profile.user_id ?? profile.id;

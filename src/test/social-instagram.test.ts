@@ -96,6 +96,15 @@ describe("Panel Instagram OAuth", () => {
       expect(String(e)).not.toContain("app-secret");
     }
   });
+  it("identifies rejected callback without exposing provider content", async () => {
+    const request = vi.fn(async () => Response.json({error:{code:100,message:"redirect_uri mismatch secret-token"}},{status:400})) as unknown as typeof fetch;
+    await expect(exchangeInstagram("code","123","secret",request)).rejects.toThrow("endereço de retorno");
+  });
+  it("identifies the failing long-lived token step", async () => {
+    const responses = [Response.json({access_token:"short"}),Response.json({error:{code:190,message:"Invalid token"}},{status:400})];
+    const request = vi.fn(async () => responses.shift()!) as unknown as typeof fetch;
+    await expect(exchangeInstagram("code","123","secret",request)).rejects.toThrow("autorização duradoura; HTTP 400; código 190");
+  });
   it("rejects missing expiry", async () => {
     const responses = [{ access_token: "a" }, { access_token: "b" }];
     const request = vi.fn(async () =>
