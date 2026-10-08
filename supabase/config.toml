@@ -84,3 +84,9 @@ verify_jwt = false
 # Every action validates an active staff JWT and the client's editorial portfolio.
 [functions.social-instagram]
 verify_jwt = false
+
+[functions.social-publishing]
+verify_jwt = false
+
+[functions.social-publisher]
+verify_jwt = false

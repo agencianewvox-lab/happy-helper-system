@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Instagram, ShieldCheck } from "lucide-react";
+import { Instagram, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { instagramApi } from "@/lib/social-instagram";
@@ -45,7 +45,7 @@ export default function InstagramReturn() {
     const code = params.get("code"),
       state = params.get("state");
     if (!code || !state) {
-      setError("Retorno inválido. Inicie a conexão pela Central Social.");
+      setError("Retorno inválido. Inicie a conexão pela Social Media.");
       return;
     }
     void instagramApi<Candidate>({ action: "exchange", code, state })
@@ -72,10 +72,16 @@ export default function InstagramReturn() {
   return (
     <main className="min-h-screen grid place-items-center bg-background p-6">
       <section className="w-full max-w-xl rounded-3xl border bg-card p-8 space-y-6">
-        <Instagram className="size-10 text-primary" aria-hidden="true" />
+        <div className="w-fit rounded-2xl bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 p-4 text-white">
+          {done ? (
+            <CheckCircle2 className="size-8" aria-hidden="true" />
+          ) : (
+            <Instagram className="size-8" aria-hidden="true" />
+          )}
+        </div>
         <div>
           <p className="text-xs tracking-widest text-muted-foreground">
-            NEWVOX / CENTRAL SOCIAL
+            NEWVOX / SOCIAL MEDIA
           </p>
           <h1 className="text-2xl font-semibold mt-2">
             {done
@@ -124,7 +130,7 @@ export default function InstagramReturn() {
           to={user ? "/social?aba=accounts" : "/login"}
           className="text-sm text-primary underline"
         >
-          {done ? "Voltar à Central Social" : "Voltar sem confirmar"}
+          {done ? "Voltar à Social Media" : "Voltar sem confirmar"}
         </Link>
       </section>
     </main>

@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
         );
       const state = newState(),
         hash = await stateHash(state);
-      const url = loginUrl(appId, state);
+      const url = loginUrl(appId, state, b.reports === true);
       check(
         await service
           .from("social_instagram_oauth")

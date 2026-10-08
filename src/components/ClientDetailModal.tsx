@@ -830,8 +830,8 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
 
           <TabsContent value="social" className="mt-4 space-y-4 rounded-xl border p-5">
             <h3 className="font-semibold">Conteúdo e calendário editorial</h3>
-            <p className="text-sm text-muted-foreground">Planeje artes, vídeos e legendas, acompanhe revisões e aprove os conteúdos deste cliente na Central Social.</p>
-            <Button asChild><a href={`/social?cliente=${encodeURIComponent(grupo.id)}`}>Abrir Central Social deste cliente</a></Button>
+            <p className="text-sm text-muted-foreground">Planeje artes, vídeos e legendas, acompanhe revisões e aprove os conteúdos deste cliente na Social Media.</p>
+            <Button asChild><a href={`/social?cliente=${encodeURIComponent(grupo.id)}`}>Abrir Social Media deste cliente</a></Button>
           </TabsContent>
 
           <TabsContent value="onboarding" className="mt-4 space-y-3">

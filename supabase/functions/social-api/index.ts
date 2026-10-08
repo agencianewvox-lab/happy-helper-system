@@ -52,9 +52,9 @@ Deno.serve(async (req) => {
         members: check(members),
         profiles: check(profiles),
         integration: {
-          ready: false,
+          ready: true,
           message:
-            "Publicação automática aguarda configuração e validação do aplicativo Instagram. Datas são planejamento editorial, não disparo automático.",
+            "Publicação disponível após conexão, aprovação da versão e agendamento explícito. As capacidades dependem das permissões e do tipo da conta Instagram.",
         },
       });
     }
@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
             .maybeSingle(),
         );
         if (!old) return reply({ error: "Conteúdo não encontrado." }, 404);
-        if (["published_manual", "cancelled"].includes(old.status))
+        if (["published", "published_manual", "cancelled"].includes(old.status))
           throw new Error(
             "Conteúdo finalizado não pode ser editado. Crie um novo conteúdo.",
           );

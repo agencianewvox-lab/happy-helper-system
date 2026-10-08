@@ -23,7 +23,7 @@ export function newState() {
     .replace(/\//g, "_")
     .replace(/=/g, "");
 }
-export function loginUrl(appId: string, state: string) {
+export function loginUrl(appId: string, state: string, reports = false) {
   if (!/^\d{1,64}$/.test(appId))
     throw new Error("Aplicativo Instagram não configurado.");
   const url = new URL("https://www.instagram.com/oauth/authorize");
@@ -31,7 +31,10 @@ export function loginUrl(appId: string, state: string) {
     client_id: appId,
     redirect_uri: INSTAGRAM_REDIRECT,
     response_type: "code",
-    scope: INSTAGRAM_SCOPES.join(","),
+    scope: [
+      ...INSTAGRAM_SCOPES,
+      ...(reports ? ["instagram_business_manage_insights"] : []),
+    ].join(","),
     state,
     enable_fb_login: "0",
     force_authentication: "1",

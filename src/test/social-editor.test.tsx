@@ -14,6 +14,13 @@ vi.mock("@/lib/social", async () => ({
   ...(await vi.importActual("@/lib/social")),
   socialApi: vi.fn(),
 }));
+vi.mock("@/lib/social-instagram", () => ({
+  instagramApi: vi.fn().mockResolvedValue({ accounts: [] }),
+}));
+vi.mock("@/lib/social-publishing", async () => ({
+  ...(await vi.importActual("@/lib/social-publishing")),
+  publishingApi: vi.fn().mockResolvedValue({ jobs: [] }),
+}));
 const post: SocialPost = {
   id: "post-a",
   client_id: "client-a",
@@ -89,7 +96,7 @@ describe("Social editorial interface", () => {
       screen.queryByRole("button", { name: "Aprovado" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText(/não dispara uma publicação automática/),
+      screen.getByText(/A data sozinha não ativa um envio/),
     ).toBeInTheDocument();
   });
   it("requires saved content before an approver can approve", () => {

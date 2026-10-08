@@ -1,17 +1,24 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
   ExternalLink,
-  FileVideo,
   ImagePlus,
   Loader2,
   Send,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { uploadSocialFile } from "@/lib/social-media-upload";
+import { InstagramPreview } from "./InstagramPreview";
+import {
+  publishingApi,
+  publicationLabels,
+  type Publication,
+} from "@/lib/social-publishing";
+import { instagramApi, type InstagramAccount } from "@/lib/social-instagram";
+import { publishIssues } from "../../../supabase/functions/_shared/social-publishing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,6 +83,34 @@ export function SocialEditor({
     [comment, setComment] = useState(""),
     [publication, setPublication] = useState("");
   const qc = useQueryClient();
+  const previewUrls = useRef(new Set<string>());
+  useEffect(() => {
+    const urls = previewUrls.current;
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+  const [progress, setProgress] = useState<number | null>(null);
+  const accounts = useQuery({
+    queryKey: ["social-instagram", userId],
+    queryFn: () =>
+      instagramApi<{ accounts: InstagramAccount[] }>({ action: "list" }),
+  });
+  const account = accounts.data?.accounts.find(
+    (a) => a.client_id === client.id,
+  );
+  const jobs = useQuery({
+    queryKey: ["social-jobs", userId],
+    queryFn: () => publishingApi<{ jobs: Publication[] }>({ action: "jobs" }),
+    enabled: !!post,
+    refetchInterval: 15000,
+  });
+  const job = jobs.data?.jobs.find((j) => j.post_id === post?.id);
+  const queued =
+    !!job &&
+    ["queued", "processing", "publishing", "uncertain", "published"].includes(
+      job.status,
+    );
   const details = useQuery({
     queryKey: ["social-details", userId, post?.id, post?.version],
     enabled: !!post,
@@ -88,7 +123,10 @@ export function SocialEditor({
     refetchOnMount: true,
   });
   const locked =
-    post?.status === "published_manual" || post?.status === "cancelled";
+    queued ||
+    post?.status === "published" ||
+    post?.status === "published_manual" ||
+    post?.status === "cancelled";
   function close() {
     if (busy) return;
     if (
@@ -137,54 +175,98 @@ export function SocialEditor({
     if (!files?.length) return;
     setBusy(true);
     try {
-      if (assets.length + files.length > 20)
-        throw new Error("Máximo de 20 arquivos por conteúdo.");
-      const uploaded: SocialAsset[] = [];
+      const max = format === "carousel" ? 10 : 1;
+      if (assets.length + files.length > max)
+        throw new Error("Este formato permite " + max + " arquivo(s).");
       for (const file of Array.from(files)) {
-        if (
-          ![
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-            "video/mp4",
-            "video/quicktime",
-          ].includes(file.type) ||
-          file.size > 50 * 1024 * 1024 ||
-          file.size === 0
-        )
-          throw new Error(
-            "Use imagens JPG/PNG/WebP ou vídeos MP4/MOV de até 50 MB.",
-          );
-        const extension = (
-          {
-            "image/jpeg": "jpg",
-            "image/png": "png",
-            "image/webp": "webp",
-            "video/mp4": "mp4",
-            "video/quicktime": "mov",
-          } as Record<string, string>
-        )[file.type];
-        const path = client.id + "/" + crypto.randomUUID() + "." + extension;
-        const { error } = await supabase.storage
-          .from("social-assets")
-          .upload(path, file, { upsert: false, contentType: file.type });
-        if (error)
-          throw new Error(
-            "Falha no upload. Confira sua permissão e tente novamente.",
-          );
-        const asset = {
-          path,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        };
-        uploaded.push(asset);
-        // Preserve successful uploads even if a later file fails.
+        setProgress(0);
+        const asset = await uploadSocialFile(
+          client.id,
+          file,
+          format,
+          setProgress,
+        );
+        if (asset.url) previewUrls.current.add(asset.url);
         setAssets((current) => [...current, asset]);
         setDirty(true);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha no upload.");
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  }
+  async function publish(now: boolean) {
+    if (!post || dirty || !account) return;
+    if (
+      !window.confirm(
+        (now ? "Publicar agora" : "Agendar") +
+          " esta versão aprovada em @" +
+          account.username +
+          " para " +
+          client.nome +
+          "?",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await publishingApi({
+        action: "queue",
+        clientId: client.id,
+        postId: post.id,
+        version: post.version,
+        now,
+      });
+      await jobs.refetch();
+      onSaved();
+      toast.success(
+        now
+          ? "Conteúdo enviado para processamento. Acompanhe a confirmação."
+          : "Publicação agendada.",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao publicar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function cancelSchedule() {
+    if (
+      !job ||
+      !window.confirm("Cancelar este agendamento? O conteúdo será preservado.")
+    )
+      return;
+    setBusy(true);
+    try {
+      await publishingApi({
+        action: "cancel",
+        clientId: client.id,
+        jobId: job.id,
+      });
+      await jobs.refetch();
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao cancelar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function duplicate() {
+    if (!post) return;
+    setBusy(true);
+    try {
+      await publishingApi({
+        action: "duplicate",
+        clientId: client.id,
+        postId: post.id,
+      });
+      onSaved();
+      toast.success("Cópia criada como rascunho.");
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao duplicar.");
     } finally {
       setBusy(false);
     }
@@ -209,7 +291,8 @@ export function SocialEditor({
       setBusy(false);
     }
   }
-  const status = post?.status || "draft";
+  const status =
+    job?.status === "published" ? "published" : post?.status || "draft";
   const next: Partial<Record<SocialStatus, SocialStatus[]>> = {
     draft: ["production", "review"],
     production: ["review"],
@@ -218,9 +301,9 @@ export function SocialEditor({
     approved: client.can_approve ? ["review", "published_manual"] : ["review"],
     cancelled: ["draft"],
   };
-  const cover = assets[0];
-  const coverUrl =
-    cover?.url || details.data?.assets.find((a) => a.path === cover?.path)?.url;
+  const issues = account
+    ? publishIssues({ format, assets, caption }, account)
+    : ["Conecte o Instagram deste cliente."];
   return (
     <Dialog
       open
@@ -287,8 +370,8 @@ export function SocialEditor({
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Planejamento editorial. Esta data ainda não dispara uma
-                publicação automática.
+                Após salvar e aprovar, clique em Agendar publicação. A data
+                sozinha não ativa um envio.
               </p>
               <label className="block space-y-2 text-sm font-medium">
                 Objetivo e briefing
@@ -322,12 +405,14 @@ export function SocialEditor({
               <div className="rounded-xl border border-dashed p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">
-                    Artes e vídeos · {assets.length}/20
+                    Artes e vídeos · {assets.length}/
+                    {format === "carousel" ? 10 : 1}
                   </span>
                   <ImagePlus className="h-4 w-4 text-primary" />
                 </div>
                 <label className="text-xs text-muted-foreground block">
-                  Enviar arquivos prontos · até 50 MB cada
+                  Imagens JPG/PNG/WebP · vídeos MP4/MOV até 1 GB (Stories: 100
+                  MB)
                   <input
                     className="block mt-3 w-full text-xs"
                     type="file"
@@ -339,6 +424,17 @@ export function SocialEditor({
                     }}
                   />
                 </label>
+                {progress !== null ? (
+                  <div role="status" className="space-y-1 text-xs">
+                    <progress max={100} value={progress} className="w-full" />
+                    Enviando: {progress}% · Mantenha esta janela aberta.
+                  </div>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  Imagens são preparadas em JPEG. Margens preservam a arte sem
+                  cortar. Vídeos precisam estar no formato e codec aceitos pelo
+                  Instagram.
+                </p>
                 {assets.map((a, i) => (
                   <div
                     className="flex items-center gap-2 text-xs rounded-lg bg-muted/50 p-2"
@@ -439,7 +535,7 @@ export function SocialEditor({
                   </label>
                 ) : null}
                 <div className="flex flex-wrap gap-2">
-                  {(next[status] || []).map((s) => (
+                  {(queued ? [] : next[status] || []).map((s) => (
                     <Button
                       key={s}
                       variant="outline"
@@ -464,7 +560,10 @@ export function SocialEditor({
                         : statusLabels[s]}
                     </Button>
                   ))}
-                  {!["published_manual", "cancelled"].includes(status) ? (
+                  {!queued &&
+                  !["published", "published_manual", "cancelled"].includes(
+                    status,
+                  ) ? (
                     <Button
                       variant="ghost"
                       disabled={busy || dirty}
@@ -496,64 +595,123 @@ export function SocialEditor({
             )}
           </div>
           <aside className="border-t lg:border-t-0 lg:border-l bg-muted/20 p-6 space-y-6">
-            <div>
-              <p className="text-xs font-semibold tracking-wider uppercase text-muted-foreground mb-3">
-                Prévia de composição
+            <section className="rounded-2xl border bg-card p-4 space-y-3">
+              <h3 className="font-semibold">Publicação no Instagram</h3>
+              <p className="text-sm text-muted-foreground">
+                {account
+                  ? "@" + account.username
+                  : "Conecte o perfil na aba Instagram."}
               </p>
-              <div className="rounded-2xl border bg-card overflow-hidden max-w-sm mx-auto">
-                <div className="p-4 text-sm font-semibold truncate">
-                  {client.nome}
-                  <span className="block text-[10px] font-normal text-muted-foreground">
-                    Perfil ainda não conectado · {formatLabels[format]}
-                  </span>
-                </div>
-                <div
-                  className={
-                    (format === "story" || format === "reel"
-                      ? "aspect-[9/16] max-h-80"
-                      : "aspect-square") +
-                    " bg-gradient-to-br from-sky-500/10 via-muted to-indigo-500/10 grid place-items-center overflow-hidden"
-                  }
-                >
-                  {coverUrl ? (
-                    cover.type.startsWith("video") ? (
-                      <video
-                        className="w-full h-full object-contain"
-                        src={coverUrl}
-                        controls
-                        preload="metadata"
-                      />
-                    ) : (
-                      <img
-                        className="w-full h-full object-contain"
-                        src={coverUrl}
-                        alt={cover.name}
-                      />
-                    )
-                  ) : (
-                    <div className="text-center p-6 text-muted-foreground">
-                      <FileVideo className="h-8 w-8 mx-auto mb-3" />
-                      <p className="text-xs">
-                        {assets.length
-                          ? "Salve para visualizar os arquivos enviados."
-                          : "Sua arte ou vídeo aparece aqui."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <p className="p-4 text-sm whitespace-pre-wrap break-words">
-                  {caption || "A legenda acompanha o conteúdo aqui."}
-                </p>
-                {assets.length > 1 ? (
-                  <p className="px-4 pb-4 text-xs text-muted-foreground">
-                    {assets.length} arquivos · ordem definida na ficha
+              {job ? (
+                <div className="rounded-lg bg-muted p-3 text-sm">
+                  <strong>{publicationLabels[job.status]}</strong>
+                  <p className="text-xs mt-1">
+                    {new Date(job.due_at).toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                    })}{" "}
+                    · Brasília
                   </p>
-                ) : null}
-              </div>
-              <p className="text-[11px] mt-3 text-muted-foreground">
-                Prévia ilustrativa. A aparência final depende do Instagram.
-              </p>
-            </div>
+                  {job.error ? (
+                    <p role="status" className="text-xs mt-2">
+                      {job.error}
+                    </p>
+                  ) : null}
+                  {job.permalink ? (
+                    <a
+                      className="block text-primary mt-2"
+                      href={job.permalink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Abrir no Instagram ↗
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+              {jobs.isError ? (
+                <p role="alert" className="text-xs text-destructive">
+                  Não foi possível consultar a fila. Atualize antes de publicar.
+                </p>
+              ) : null}
+              {!queued && post?.status === "approved" && client.can_approve ? (
+                <>
+                  {issues.map((issue) => (
+                    <p key={issue} className="text-xs text-amber-500">
+                      {issue}
+                    </p>
+                  ))}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      disabled={
+                        busy ||
+                        dirty ||
+                        !!issues.length ||
+                        jobs.isPending ||
+                        jobs.isError
+                      }
+                      onClick={() => void publish(true)}
+                    >
+                      Publicar agora
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={
+                        busy ||
+                        dirty ||
+                        !date ||
+                        !!issues.length ||
+                        jobs.isPending ||
+                        jobs.isError
+                      }
+                      onClick={() => void publish(false)}
+                    >
+                      Agendar publicação
+                    </Button>
+                  </div>
+                  {dirty ? (
+                    <p className="text-xs text-muted-foreground">
+                      Salve e aprove novamente as alterações.
+                    </p>
+                  ) : null}
+                </>
+              ) : !queued ? (
+                <p className="text-xs text-muted-foreground">
+                  Salve, envie para revisão e aprove a versão antes de publicar
+                  ou agendar.
+                </p>
+              ) : null}
+              {job &&
+              ["queued", "processing"].includes(job.status) &&
+              client.can_approve ? (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void cancelSchedule()}
+                >
+                  Cancelar agendamento
+                </Button>
+              ) : null}
+              {post ? (
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => void duplicate()}
+                >
+                  Duplicar conteúdo
+                </Button>
+              ) : null}
+            </section>
+            <InstagramPreview
+              format={format}
+              caption={caption}
+              username={account?.username || client.nome}
+              assets={assets.map((a) => ({
+                ...a,
+                url:
+                  a.url ||
+                  details.data?.assets.find((x) => x.path === a.path)?.url,
+              }))}
+            />
             {post ? (
               <>
                 <section className="space-y-3">

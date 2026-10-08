@@ -34,6 +34,9 @@ import {
 import { SocialEditor } from "@/components/social/SocialEditor";
 import { EditorialCalendar } from "@/components/social/EditorialCalendar";
 import { InstagramAccounts } from "@/components/social/InstagramAccounts";
+import { InstagramReports } from "@/components/social/InstagramReports";
+import { PublicationHistory } from "@/components/social/PublicationHistory";
+import { publishingApi, type Publication } from "@/lib/social-publishing";
 import {
   editorialDate,
   formatLabels,
@@ -77,6 +80,13 @@ export default function Social() {
     queryFn: () => socialApi<SocialBootstrap>({ action: "bootstrap" }),
     staleTime: 30000,
     refetchOnMount: true,
+    refetchInterval: 30000,
+  });
+  const jobs = useQuery({
+    queryKey: ["social-jobs", user?.id],
+    enabled: !!user && !loading,
+    queryFn: () => publishingApi<{ jobs: Publication[] }>({ action: "jobs" }),
+    refetchInterval: 15000,
   });
   const data = query.data;
   const refresh = () =>
@@ -117,7 +127,7 @@ export default function Social() {
       value: allPosts.filter(
         (p) =>
           editorialDate(p.scheduled_at) === today &&
-          !["cancelled", "published_manual"].includes(p.status),
+          !["cancelled", "published_manual", "published"].includes(p.status),
       ).length,
       icon: CalendarDays,
     },
@@ -171,7 +181,7 @@ export default function Social() {
             <div className="flex items-center gap-3">
               <SidebarTrigger />
               <span className="text-[10px] uppercase tracking-[.2em] text-primary">
-                Workspace / Central Social
+                Workspace / Social Media
               </span>
             </div>
             <span className="text-xs text-muted-foreground flex items-center gap-2">
@@ -200,7 +210,7 @@ export default function Social() {
                   <Button
                     variant="outline"
                     size="icon"
-                    aria-label="Atualizar Central Social"
+                    aria-label="Atualizar Social Media"
                     disabled={query.isFetching}
                     onClick={refresh}
                   >
@@ -240,7 +250,7 @@ export default function Social() {
                 <p className="text-sm">
                   {query.error instanceof Error
                     ? query.error.message
-                    : "Não foi possível carregar a Central Social."}
+                    : "Não foi possível carregar a Social Media."}
                 </p>
                 <Button className="mt-3" variant="outline" onClick={refresh}>
                   Tentar novamente
@@ -270,6 +280,8 @@ export default function Social() {
                   <Instagram className="h-4 w-4 mr-2" />
                   Instagram
                 </TabsTrigger>
+                <TabsTrigger value="reports">Relatórios</TabsTrigger>
+                <TabsTrigger value="history">Publicações</TabsTrigger>
                 {isMaster ? (
                   <TabsTrigger value="team">
                     <Users className="h-4 w-4 mr-2" />
@@ -350,6 +362,7 @@ export default function Social() {
                   </div>
                 </div>
                 <EditorialCalendar
+                  jobs={jobs.data?.jobs}
                   month={month}
                   posts={posts}
                   onSelect={open}
@@ -383,6 +396,7 @@ export default function Social() {
                       "review",
                       "changes",
                       "approved",
+                      "published",
                       "published_manual",
                     ] as SocialStatus[]
                   ).map((stage) => (
@@ -498,6 +512,17 @@ export default function Social() {
               <TabsContent value="accounts">
                 <InstagramAccounts clients={clients} />
               </TabsContent>
+              <TabsContent value="reports">
+                <InstagramReports clients={clients} />
+              </TabsContent>
+              <TabsContent value="history">
+                <PublicationHistory
+                  userId={user?.id || ""}
+                  clients={clients}
+                  posts={allPosts}
+                  onSelect={open}
+                />
+              </TabsContent>
               {isMaster ? (
                 <TabsContent value="team" className="space-y-5">
                   <section className="rounded-2xl border bg-card p-6 space-y-4">
@@ -506,7 +531,7 @@ export default function Social() {
                     </h2>
                     <p className="text-sm text-muted-foreground">
                       Atribua usuários já cadastrados. Este acesso vale somente
-                      para a Central Social; não libera conversas, anúncios ou o
+                      para a Social Media; não libera conversas, anúncios ou o
                       CRM.
                     </p>
                     <div className="grid md:grid-cols-2 gap-4">
@@ -547,8 +572,7 @@ export default function Social() {
                         checked={canApprove}
                         onChange={(e) => setCanApprove(e.target.checked)}
                       />
-                      Permitir também aprovação interna e registro de publicação
-                      manual
+                      Permitir aprovação, conexão de contas e publicação
                     </label>
                     <Button
                       disabled={busy || !memberClient || !memberUser}
@@ -612,8 +636,10 @@ export default function Social() {
               {allPosts.length >= 500
                 ? "Exibindo os 500 conteúdos mais recentes. "
                 : ""}
-              Publicações automáticas e aprovação externa por link serão
-              habilitadas em uma próxima etapa.
+              Agendamentos exigem uma versão aprovada e autorização ativa do
+              Instagram. Recursos exclusivos do aplicativo, como músicas
+              licenciadas e stickers interativos, não estão disponíveis nesta
+              integração.
             </p>
           </div>
         </main>

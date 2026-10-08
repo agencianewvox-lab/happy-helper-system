@@ -11,14 +11,17 @@ import {
   statusLabels,
   type SocialPost,
 } from "@/lib/social";
+import { publicationLabels, type Publication } from "@/lib/social-publishing";
 export function EditorialCalendar({
   month,
   posts,
   onSelect,
+  jobs = [],
 }: {
   month: Date;
   posts: SocialPost[];
   onSelect: (post: SocialPost) => void;
+  jobs?: Publication[];
 }) {
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
   const length =
@@ -78,7 +81,11 @@ export function EditorialCalendar({
                     >
                       <span className="text-[9px] uppercase tracking-wider text-primary">
                         {formatLabels[post.format]} ·{" "}
-                        {statusLabels[post.status]}
+                        {jobs.find((j) => j.post_id === post.id)
+                          ? publicationLabels[
+                              jobs.find((j) => j.post_id === post.id)!.status
+                            ]
+                          : statusLabels[post.status]}
                       </span>
                       <span className="block text-xs font-semibold line-clamp-2 mt-1">
                         {post.title}

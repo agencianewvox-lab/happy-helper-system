@@ -5,6 +5,7 @@ export const statusLabels = {
   changes: "Ajustes",
   approved: "Aprovado",
   published_manual: "Publicado manualmente",
+  published: "Publicado no Instagram",
   cancelled: "Cancelado",
 } as const;
 export type SocialStatus = keyof typeof statusLabels;
@@ -20,6 +21,9 @@ export type SocialAsset = {
   type: string;
   size: number;
   url?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
 };
 export type SocialPost = {
   id: string;
@@ -71,13 +75,18 @@ export function contentInput(raw: Record<string, unknown>, clientId: string) {
     )
       throw new Error("Tipo de arquivo não suportado.");
     const size = Number(a.size);
-    if (!Number.isInteger(size) || size <= 0 || size > 50 * 1024 * 1024)
-      throw new Error("Cada arquivo deve ter até 50 MB.");
+    if (!Number.isInteger(size) || size <= 0 || size > 1024 * 1024 * 1024)
+      throw new Error("Cada arquivo deve ter até 1 GB.");
     return {
       path,
       name: String(a.name || "Arquivo").slice(0, 200),
       type,
       size,
+      ...Object.fromEntries(
+        ["width", "height", "duration"]
+          .filter((k) => Number.isFinite(Number(a[k])) && Number(a[k]) > 0)
+          .map((k) => [k, Number(a[k])]),
+      ),
     };
   });
   const date = raw.scheduled_at ? String(raw.scheduled_at) : null;
@@ -105,6 +114,7 @@ export function transition(
     changes: ["production", "review", "cancelled"],
     approved: ["review", "published_manual", "cancelled"],
     published_manual: [],
+    published: [],
     cancelled: ["draft"],
   };
   if (!allowed[current]?.includes(next))
