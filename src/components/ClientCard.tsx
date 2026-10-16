@@ -4,13 +4,41 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import ReactMarkdown from "react-markdown";
-import { MessageSquare, Clock, AlertTriangle, TrendingUp, TrendingDown, Minus, AlertCircle, PhoneOff, DollarSign, CalendarDays, Siren, ArrowUpRight, ArrowDownRight, FileText, Loader2 } from "lucide-react";
+import {
+  MessageSquare,
+  Clock,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertCircle,
+  PhoneOff,
+  DollarSign,
+  CalendarDays,
+  Siren,
+  ArrowUpRight,
+  ArrowDownRight,
+  FileText,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { ClientWorkspaceDialog } from "@/components/ClientWorkspace";
 import { ClientHealthBadge } from "@/components/ClientHealth";
 import { calculateSlaStatus } from "@/lib/clientMonitoring";
 
@@ -24,22 +52,44 @@ interface ClientCardProps {
 
 const categoriaConfig: Record<string, { color: string; icon: string }> = {
   "Clientes / Operação": { color: "bg-blue-500", icon: "🚗" },
-  "Clínicas": { color: "bg-emerald-500", icon: "🦷" },
+  Clínicas: { color: "bg-emerald-500", icon: "🦷" },
   "Internos / Gestão": { color: "bg-purple-500", icon: "🧠" },
 };
 
-const intentConfig: Record<string, { emoji: string; color: string; bg: string }> = {
-  "Aprovação": { emoji: "🎨", color: "text-violet-500", bg: "bg-violet-500/10" },
-  "Suporte Técnico": { emoji: "🔧", color: "text-blue-500", bg: "bg-blue-500/10" },
-  "Financeiro": { emoji: "💰", color: "text-amber-500", bg: "bg-amber-500/10" },
-  "Urgência": { emoji: "🚨", color: "text-red-500", bg: "bg-red-500/10" },
-  "Informativo": { emoji: "💬", color: "text-muted-foreground", bg: "bg-muted" },
+const intentConfig: Record<
+  string,
+  { emoji: string; color: string; bg: string }
+> = {
+  Aprovação: { emoji: "🎨", color: "text-violet-500", bg: "bg-violet-500/10" },
+  "Suporte Técnico": {
+    emoji: "🔧",
+    color: "text-blue-500",
+    bg: "bg-blue-500/10",
+  },
+  Financeiro: { emoji: "💰", color: "text-amber-500", bg: "bg-amber-500/10" },
+  Urgência: { emoji: "🚨", color: "text-red-500", bg: "bg-red-500/10" },
+  Informativo: { emoji: "💬", color: "text-muted-foreground", bg: "bg-muted" },
 };
 
 const sentimentConfig = {
-  positivo: { icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-500/10", label: "Positivo" },
-  neutro: { icon: Minus, color: "text-amber-500", bg: "bg-amber-500/10", label: "Neutro" },
-  negativo: { icon: TrendingDown, color: "text-red-500", bg: "bg-red-500/10", label: "Negativo" },
+  positivo: {
+    icon: TrendingUp,
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10",
+    label: "Positivo",
+  },
+  neutro: {
+    icon: Minus,
+    color: "text-amber-500",
+    bg: "bg-amber-500/10",
+    label: "Neutro",
+  },
+  negativo: {
+    icon: TrendingDown,
+    color: "text-red-500",
+    bg: "bg-red-500/10",
+    label: "Negativo",
+  },
 };
 
 function formatFrt(minutes: number | null | undefined): string {
@@ -71,22 +121,37 @@ function formatDelay(minutes: number): string {
 }
 
 function TrendArrow({ trend }: { trend?: string }) {
-  if (trend === "melhorando") return <ArrowUpRight className="w-3 h-3 text-emerald-500" />;
-  if (trend === "piorando") return <ArrowDownRight className="w-3 h-3 text-red-500" />;
+  if (trend === "melhorando")
+    return <ArrowUpRight className="w-3 h-3 text-emerald-500" />;
+  if (trend === "piorando")
+    return <ArrowDownRight className="w-3 h-3 text-red-500" />;
   return <Minus className="w-2.5 h-2.5 text-muted-foreground" />;
 }
 
-const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-analyze`;
-const CARD_CATEGORIAS = ["Clientes / Operação", "Clínicas", "Internos / Gestão"];
+const CARD_CATEGORIAS = [
+  "Clientes / Operação",
+  "Clínicas",
+  "Internos / Gestão",
+];
 
-export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true, compact }: ClientCardProps) {
-  const catConfig = categoriaConfig[grupo.categoria || ""] || { color: "bg-muted", icon: "📁" };
+export function ClientCard({
+  grupo,
+  onClick,
+  isMaster,
+  messageStatsReady = true,
+  compact,
+}: ClientCardProps) {
+  const catConfig = categoriaConfig[grupo.categoria || ""] || {
+    color: "bg-muted",
+    icon: "📁",
+  };
   const temMensagens = grupo.total_mensagens > 0;
   const a = grupo.analytics;
   const sent = a ? sentimentConfig[a.sentiment] : null;
   const SentIcon = sent?.icon || Minus;
   const isPriorityMax = a?.priority_level === "maxima";
 
+  const [showWorkspace, setShowWorkspace] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -108,21 +173,11 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
     setSummaryContent("");
 
     try {
-      const resp = await fetch(SUMMARY_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ type: "summary", groupId: grupo.group_id }),
+      const { data, error } = await supabase.functions.invoke("ai-analyze", {
+        body: { type: "summary", groupId: grupo.group_id },
       });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || "Erro ao gerar resumo");
-      }
-
-      const data = await resp.json();
+      if (error || data?.error)
+        throw new Error(data?.error || "Não foi possível gerar o resumo.");
       setSummaryContent(data.summary || "Sem resumo disponível.");
     } catch (err: any) {
       toast.error(err.message || "Erro ao gerar resumo");
@@ -135,34 +190,57 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
 
   return (
     <>
+      <ClientWorkspaceDialog
+        clientId={showWorkspace ? grupo.id : null}
+        onClose={() => setShowWorkspace(false)}
+      />
       <Card
         onClick={() => onClick(grupo)}
+        role="article"
+        aria-label={grupo.nome}
         className={cn(
-          "cursor-pointer transition-all duration-300 hover:scale-[1.02] border-2",
+          "cursor-pointer transition-colors duration-200 border",
           "bg-card/80 backdrop-blur-sm",
           isPriorityMax
-            ? "border-red-500 ring-2 ring-red-500/30 shadow-red-500/20 shadow-xl animate-pulse"
+            ? "border-red-500/60 shadow-sm"
             : isSlaViolated
               ? "border-red-500/60 ring-1 ring-red-500/20 shadow-red-500/10 shadow-lg"
               : temMensagens
                 ? "border-border/50 hover:border-primary/30"
                 : "border-border/20 opacity-70 hover:opacity-100",
-          compact && "text-sm"
+          compact && "text-sm",
         )}
       >
         <CardHeader className={cn("pb-2", compact ? "p-3" : "p-4")}>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className={cn("truncate flex items-center gap-1.5", compact ? "text-sm" : "text-base")}>
+            <CardTitle
+              className={cn(
+                "truncate flex items-center gap-1.5",
+                compact ? "text-sm" : "text-base",
+              )}
+            >
               <span className="shrink-0">{catConfig.icon}</span>
-              <span className="truncate">{grupo.nome}</span>
+              <button
+                className="truncate text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                aria-label={`Abrir cliente ${grupo.nome}`}
+              >
+                {grupo.nome}
+              </button>
               {(() => {
-                const vals = [grupo.estrelas_dificuldade, grupo.estrelas_financeiro, grupo.estrelas_temperamento].filter((v): v is number => v != null && v > 0);
+                const vals = [
+                  grupo.estrelas_dificuldade,
+                  grupo.estrelas_financeiro,
+                  grupo.estrelas_temperamento,
+                ].filter((v): v is number => v != null && v > 0);
                 if (vals.length === 0) return null;
                 const rawAvg = vals.reduce((a, b) => a + b, 0) / vals.length; // 1-3
-                const scaled = (((rawAvg - 1) / 2) * 9 + 1); // map 1-3 → 1-10
+                const scaled = ((rawAvg - 1) / 2) * 9 + 1; // map 1-3 → 1-10
                 const avg = scaled.toFixed(1).replace(".", ",");
                 return (
-                  <span className="shrink-0 text-[11px] font-semibold text-amber-500" title="Média: Dificuldade | Financeiro | Temperamento">
+                  <span
+                    className="shrink-0 text-[11px] font-semibold text-amber-500"
+                    title="Média: Dificuldade | Financeiro | Temperamento"
+                  >
                     {avg}⭐
                   </span>
                 );
@@ -175,7 +253,9 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
               {a && a.churn_risk >= 60 && !isPriorityMax && (
                 <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
               )}
-              <div className={cn("w-3 h-3 rounded-full shrink-0", catConfig.color)} />
+              <div
+                className={cn("w-3 h-3 rounded-full shrink-0", catConfig.color)}
+              />
             </div>
           </div>
           {isPriorityMax && a?.priority_reason && (
@@ -184,12 +264,41 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
             </p>
           )}
         </CardHeader>
-        <CardContent className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}>
+        <CardContent
+          className={cn("space-y-2", compact ? "p-3 pt-0" : "p-4 pt-0")}
+        >
+          <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Equipe / contratado
+            </p>
+            <p className="mt-1 truncate text-xs">
+              {grupo.gestor_responsavel || "Gestor não vinculado"}
+            </p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-medium">
+                {grupo.plano || "Escopo não detalhado"}
+              </p>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto shrink-0 p-0 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowWorkspace(true);
+                }}
+              >
+                Ver contratado
+              </Button>
+            </div>
+          </div>
           {/* SLA Violation Banner */}
           {isSlaViolated && (
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-500 bg-red-500/10 rounded px-2 py-1 border border-red-500/20 animate-pulse">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-500 bg-red-500/10 rounded px-2 py-1 border border-red-500/20">
               <PhoneOff className="w-3.5 h-3.5 shrink-0" />
-              <span>Silêncio da Equipe — {formatDelay(liveSla.elapsedMinutes)} sem resposta</span>
+              <span>
+                Silêncio da Equipe — {formatDelay(liveSla.elapsedMinutes)} sem
+                resposta
+              </span>
             </div>
           )}
 
@@ -210,7 +319,6 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
                   toast.error("Erro ao alterar categoria");
                 } else {
                   toast.success(`Categoria alterada para ${newCat}`);
-                  window.location.reload();
                 }
               }}
             >
@@ -222,7 +330,9 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
               </SelectTrigger>
               <SelectContent>
                 {CARD_CATEGORIAS.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -255,7 +365,8 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
               <div className="flex items-center gap-1.5">
                 <CalendarDays className="w-3.5 h-3.5 text-emerald-500" />
                 <span className="truncate" title="Data de Ciclo de Ads">
-                  Ciclo: {new Date(grupo.data_ciclo_ads).toLocaleDateString("pt-BR")}
+                  Ciclo:{" "}
+                  {new Date(grupo.data_ciclo_ads).toLocaleDateString("pt-BR")}
                 </span>
               </div>
             )}
@@ -263,72 +374,114 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
 
           {/* Analytics badges */}
           {a && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {/* Sentiment + Trend */}
-              <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", sent?.bg, sent?.color)}>
-                <SentIcon className="w-3 h-3" />
-                {sent?.label}
-                <TrendArrow trend={a.sentiment_trend} />
-              </span>
-              {/* FRT */}
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                ⏱ {formatFrt(a.avg_frt_minutes)}
-              </span>
-              {/* Churn */}
-              <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", churnBg(a.churn_risk), churnColor(a.churn_risk))}>
-                🔥 {a.churn_risk}/100 {a.churn_risk_label}
-              </span>
-              {/* Pending */}
-              {a.has_pending_demands && (() => {
-                const details = a.pending_demand_details || [];
-                const urgentes = details.filter(d => d.category === "confirmada" && d.priority === "urgente");
-                const normais = details.filter(d => d.category === "confirmada" && d.priority !== "urgente");
-                const possiveis = details.filter(d => d.category === "possivel");
-                return (
-                  <>
-                    {urgentes.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500">
-                        <AlertCircle className="w-3 h-3" />
-                        {urgentes.length} Urgente{urgentes.length > 1 ? "s" : ""}
-                      </span>
-                    )}
-                    {normais.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
-                        <AlertCircle className="w-3 h-3" />
-                        {normais.length} Pendente{normais.length > 1 ? "s" : ""}
-                      </span>
-                    )}
-                    {possiveis.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground">
-                        <AlertCircle className="w-3 h-3" />
-                        {possiveis.length} Possível
-                      </span>
-                    )}
-                  </>
-                );
-              })()}
-              {/* Critical Terms */}
-              {a.critical_terms && a.critical_terms.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-600 border border-red-600/30">
-                  ⚠️ {a.critical_terms.length} termo{a.critical_terms.length > 1 ? "s" : ""} crítico{a.critical_terms.length > 1 ? "s" : ""}
+            <details
+              className="rounded-lg border border-border/50 p-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <summary className="cursor-pointer text-xs text-muted-foreground">
+                Indicadores inferidos do grupo
+              </summary>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {/* Sentiment + Trend */}
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+                    sent?.bg,
+                    sent?.color,
+                  )}
+                >
+                  <SentIcon className="w-3 h-3" />
+                  {sent?.label}
+                  <TrendArrow trend={a.sentiment_trend} />
                 </span>
-              )}
-              {/* Intent */}
-              {a.intent && intentConfig[a.intent] && (
-                <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full", intentConfig[a.intent].bg, intentConfig[a.intent].color)}>
-                  {intentConfig[a.intent].emoji} {a.intent}
+                {/* FRT */}
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  ⏱ {formatFrt(a.avg_frt_minutes)}
                 </span>
-              )}
-              {/* NPS Score */}
-              <ClientHealthBadge group={grupo} />
-            </div>
+                {/* Churn */}
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+                    churnBg(a.churn_risk),
+                    churnColor(a.churn_risk),
+                  )}
+                >
+                  🔥 {a.churn_risk}/100 {a.churn_risk_label}
+                </span>
+                {/* Pending */}
+                {a.has_pending_demands &&
+                  (() => {
+                    const details = a.pending_demand_details || [];
+                    const urgentes = details.filter(
+                      (d) =>
+                        d.category === "confirmada" && d.priority === "urgente",
+                    );
+                    const normais = details.filter(
+                      (d) =>
+                        d.category === "confirmada" && d.priority !== "urgente",
+                    );
+                    const possiveis = details.filter(
+                      (d) => d.category === "possivel",
+                    );
+                    return (
+                      <>
+                        {urgentes.length > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500">
+                            <AlertCircle className="w-3 h-3" />
+                            {urgentes.length} Urgente
+                            {urgentes.length > 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {normais.length > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
+                            <AlertCircle className="w-3 h-3" />
+                            {normais.length} Pendente
+                            {normais.length > 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {possiveis.length > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground">
+                            <AlertCircle className="w-3 h-3" />
+                            {possiveis.length} Possível
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
+                {/* Critical Terms */}
+                {a.critical_terms && a.critical_terms.length > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-600/15 text-red-600 border border-red-600/30">
+                    ⚠️ {a.critical_terms.length} termo
+                    {a.critical_terms.length > 1 ? "s" : ""} crítico
+                    {a.critical_terms.length > 1 ? "s" : ""}
+                  </span>
+                )}
+                {/* Intent */}
+                {a.intent && intentConfig[a.intent] && (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+                      intentConfig[a.intent].bg,
+                      intentConfig[a.intent].color,
+                    )}
+                  >
+                    {intentConfig[a.intent].emoji} {a.intent}
+                  </span>
+                )}
+                {/* NPS Score */}
+              </div>
+            </details>
           )}
+          <div className="py-1">
+            <ClientHealthBadge group={grupo} />
+          </div>
 
           {/* Motivo pendência resumido */}
           {a?.has_pending_demands && !compact && (
             <div className="space-y-1">
-              {(a.pending_demand_details || []).slice(0, 2).map((d, i) => {
-                const isPossivel = d.category === "possivel" || d.confidence === "media";
+              {(a.pending_demand_details || []).slice(0, 1).map((d, i) => {
+                const isPossivel =
+                  d.category === "possivel" || d.confidence === "media";
                 const isUrgente = d.priority === "urgente" && !isPossivel;
                 return (
                   <div
@@ -339,15 +492,25 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
                         ? "text-muted-foreground bg-muted/30 border border-dashed border-muted-foreground/30"
                         : isUrgente
                           ? "text-red-400 bg-red-500/5 border border-red-500/20"
-                          : "text-orange-400 bg-orange-500/5 border border-orange-500/20"
+                          : "text-orange-400 bg-orange-500/5 border border-orange-500/20",
                     )}
                   >
                     <div>
                       <span className="font-semibold">
-                        {isPossivel ? "Possível: " : isUrgente ? "🔴 Urgente: " : "Pendência: "}
+                        {isPossivel
+                          ? "Possível: "
+                          : isUrgente
+                            ? "🔴 Urgente: "
+                            : "Pendência: "}
                       </span>
-                      {d.message_excerpt ? `"${d.message_excerpt.slice(0, 80)}"` : d.term}
-                      {d.hours_waiting > 0 && <span className="ml-1 opacity-70">({d.hours_waiting}h)</span>}
+                      {d.message_excerpt
+                        ? `"${d.message_excerpt.slice(0, 80)}"`
+                        : d.term}
+                      {d.hours_waiting > 0 && (
+                        <span className="ml-1 opacity-70">
+                          ({d.hours_waiting}h)
+                        </span>
+                      )}
                     </div>
                     {d.suggested_solution && !isPossivel && (
                       <div className="text-emerald-400">
@@ -395,7 +558,9 @@ export function ClientCard({ grupo, onClick, isMaster, messageStatsReady = true,
             {summaryLoading ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Vox está analisando o cliente...</p>
+                <p className="text-sm text-muted-foreground">
+                  Vox está analisando o cliente...
+                </p>
               </div>
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none px-1">

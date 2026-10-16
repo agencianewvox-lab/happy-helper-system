@@ -61,7 +61,7 @@ describe("report configuration UI", () => {
     expect(
       screen.getByRole("button", { name: "Salvar configuração" }),
     ).toBeEnabled();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "5. Prévia" }), {
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "5. Revisão" }), {
       button: 0,
       ctrlKey: false,
     });
@@ -122,6 +122,7 @@ describe("report configuration UI", () => {
       master: true,
       profiles: [{ user_id: userId, full_name: "Master" }],
     });
+    fireEvent.change(screen.getByLabelText("Fontes do relatório"), {target:{value:"crm_meta"}});
     const confirm = screen.getByRole("button", {
       name: "Confirmar vínculo seguro",
     });
@@ -146,6 +147,7 @@ describe("report configuration UI", () => {
   it("managers cannot replace source accounts", () => {
     vi.mocked(reportsApi).mockResolvedValue({ pipelines: [], stages: [] });
     view({ source: undefined });
+    fireEvent.change(screen.getByLabelText("Fontes do relatório"), {target:{value:"crm_meta"}});
     expect(
       screen.queryByLabelText("Conta principal no Voxi"),
     ).not.toBeInTheDocument();

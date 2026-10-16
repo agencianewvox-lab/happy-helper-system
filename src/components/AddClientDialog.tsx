@@ -15,13 +15,13 @@ import { ArrowLeft, ArrowRight, Check, Loader2, MessageSquare, Plus, RefreshCw, 
 import { toast } from "sonner";
 
 const CATEGORIAS = ["Clientes / Operação", "Clínicas", "Internos / Gestão"];
-const GESTORES = ["Murilo Araújo", "Netto Monge"];
-const EMPTY_FORM = { nome: "", group_id: "", categoria: "", gestor_responsavel: "" };
+const EMPTY_FORM = { nome: "", group_id: "", categoria: "", manager_user_id: "" };
 const dateLabel = (value: string) => new Date(value).toLocaleDateString("pt-BR");
 
 export function AddClientDialog() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const roster = useQuery({queryKey:["manager-roster"],queryFn:async()=>{const r=await supabase.from("profiles").select("user_id,full_name,role").in("role",["admin","gestor"]).order("full_name");if(r.error)throw r.error;return r.data;}});
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState("whatsapp");
@@ -76,7 +76,8 @@ export function AddClientDialog() {
         nome: form.nome.trim(),
         group_id: finalGroupId,
         categoria: form.categoria || null,
-        gestor_responsavel: form.gestor_responsavel || null,
+        manager_user_id: form.manager_user_id || null,
+        gestor_responsavel: roster.data?.find(p=>p.user_id===form.manager_user_id)?.full_name || null,
       });
       if (error?.code === "23505") {
         toast.error("Esse grupo acabou de ser cadastrado. Não foi criado um duplicado.");
@@ -213,9 +214,9 @@ export function AddClientDialog() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-client-manager">Gestor responsável</Label>
-                <Select value={form.gestor_responsavel} disabled={saving} onValueChange={(value) => setForm({ ...form, gestor_responsavel: value })}>
+                <Select value={form.manager_user_id} disabled={saving} onValueChange={(value) => setForm({ ...form, manager_user_id: value })}>
                   <SelectTrigger id="new-client-manager"><SelectValue placeholder="Selecionar gestor" /></SelectTrigger>
-                  <SelectContent>{GESTORES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
+                  <SelectContent>{(roster.data || []).map(p => <SelectItem key={p.user_id} value={p.user_id}>{p.full_name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>

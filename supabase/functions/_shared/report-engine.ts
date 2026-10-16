@@ -1,4 +1,5 @@
 import { VoxiReader, inIds, deriveScope } from "./voxi-reader.ts";
+import { closedSales, verifiedSalesTotals } from "./report-sales.ts";
 import { ReportSettings, reportPeriod } from "./report-model.ts";
 export function aggregateCommercial(
   leads: any[],
@@ -59,9 +60,9 @@ export function aggregateCommercial(
   };
   const leadAds = new Map(selected.map((l) => [l.id, l.ad_id]));
   for (const l of entered) if (l.ad_id) ad(l.ad_id).leads.add(identity(l.id));
-  const won = opportunities.filter(
+  const won = [...new Map(opportunities.map(o => [o.id,o])).values()].filter(
     (o) =>
-      inPeriod(o.won_at) &&
+      o.status === "won" && inPeriod(o.won_at) &&
       (!s.pipelines.length || s.pipelines.includes(o.pipeline_id)),
   );
   for (const o of won) {
@@ -188,7 +189,7 @@ async function metaRead(
   const info = await fetch(
     "https://graph.facebook.com/v21.0/" +
       account +
-      "?fields=currency,timezone_name",
+      "?fields=name,currency,timezone_name",
     { headers, signal: AbortSignal.timeout(20000) },
   );
   const accountData = await info.json();
@@ -238,6 +239,9 @@ export async function collectReport(
 ) {
   const period = reportPeriod(s, now);
   const metaOnly = s.dataMode === "meta";
+  const needsSales = !metaOnly && s.metrics.some(m => m === "sales" || m === "revenue");
+  let saleData: ReturnType<typeof closedSales> | null = null;
+  let saleError: string | null = null;
   let commercial: any = {
     metrics: {
       leads: null,
@@ -266,10 +270,7 @@ export async function collectReport(
       reader.read("leads", filters),
       reader.read("lead_identity_links", filters),
       reader.read("contacts", filters),
-      reader.read("opportunities", {
-        ...filters,
-        won_at: "gte." + period.start,
-      }),
+      needsSales ? reader.read("opportunities", { ...filters, won_at: "gte." + period.start }) : [],
       reader.read("journey_stages", filters),
     ]);
     let history: any[] = [];
@@ -284,6 +285,13 @@ export async function collectReport(
             changed_at: "gte." + period.start,
           })),
         );
+    }
+    if (needsSales) {
+      try {
+        const [connections, events] = await Promise.all([reader.read("clinicorp_connections",filters),reader.read("acquisition_events",filters)]);
+        const budgets = connections.length ? await reader.read("clinicorp_budget_opportunities",filters) : [];
+        saleData=closedSales({instances:source.instance_ids,connections,budgets,opportunities:opps,leads,events,pipelines:s.pipelines,period,now});
+      } catch { saleError="Fonte comercial indisponível. Vendas não foram convertidas em zero."; }
     }
     commercial = aggregateCommercial(
       leads,
@@ -309,11 +317,19 @@ export async function collectReport(
       cpm: null,
     },
     ads: [],
-    warnings: commercial.warnings,
+    warnings: [...commercial.warnings, ...(saleData?.warnings || []), ...(saleError ? [saleError] : [])],
+    blockingReasons: saleError ? [saleError] : [],
+    salesSource: saleData?.source || null,
+    salesAudit: saleData ? {excludedAttribution:saleData.excludedAttribution,excludedPipeline:saleData.excludedPipeline,missingDate:saleData.missingDate} : null,
   };
+  // The legacy aggregate is used for lead/stage counts, never for sales totals.
+  result.metrics.sales = null; result.metrics.revenue = null;
+  for (const ad of commercial.ads) ad.sales = 0;
+  if(needsSales && saleData && !saleData.available) result.blockingReasons.push("Revise a sincronização/datas do Clinicorp antes de enviar vendas.");
   try {
     if (!account) throw new Error("Conta de anúncios ainda não vinculada.");
     const meta = await metaRead(account, period, metaKey, s.campaignIds || []);
+    result.metaAccountName = meta.name || null;
     if (meta.currency !== "BRL")
       throw new Error(
         "Conta Meta não está em BRL; valores de moedas diferentes não serão somados.",
@@ -334,7 +350,26 @@ export async function collectReport(
         : null,
     });
     const sameZone = meta.timezone_name === s.timezone;
-    const verified = new Map(meta.data.map((a: any) => [a.ad_id, a]));
+    const verified = new Map<string, any>(meta.data.map((a: any) => [a.ad_id, a]));
+    // Ownership is checked independently of period spend, so historical ads remain eligible.
+    const details = await metaAdDetails([...new Set<string>([
+      ...(saleData?.sales.map(x=>x.adId)||[]),
+      ...commercial.ads.map((x:any)=>x.id),
+      ...(s.includeAds ? meta.data.map((x:any)=>x.ad_id) : []),
+    ])], metaKey);
+    const accountId = account.replace(/^act_/,"");
+    const belongs = (ad:any) => ad.account_id === accountId && (!s.campaignIds?.length || s.campaignIds.includes(ad.campaign_id));
+    for(const [id,ad] of details) if(belongs(ad)) verified.set(id,{ad_id:id,ad_name:ad.name,campaign_id:ad.campaign_id,spend:0,impressions:0,inline_link_clicks:0,...verified.get(id),url:ad.url});
+    if(needsSales && saleData?.available) {
+      const totals = verifiedSalesTotals(saleData.sales,details,account,s.campaignIds||[]);
+      result.metrics.sales=totals.sales; result.metrics.revenue=totals.revenue;
+      Object.assign(result.salesAudit,{excludedAccount:totals.excludedAccount,excludedCampaign:totals.excludedCampaign});
+      if(totals.excludedAccount) result.warnings.push(totals.excludedAccount+" venda(s) excluída(s): anúncio sem pertencimento comprovado à conta Meta.");
+      for(const a of totals.byAd) {
+        const existing=commercial.ads.find((x:any)=>x.id===a.id);
+        if(existing) existing.sales=a.sales; else commercial.ads.push({id:a.id,leads:0,sales:a.sales});
+      }
+    }
     const actualMetaLeads = new Set(
       commercial.attributedEntries
         .filter((l: any) => verified.has(l.adId))
@@ -361,7 +396,7 @@ export async function collectReport(
       .filter(
         (a: any) =>
           verified.has(a.id) &&
-          (metaOnly || metaRanking || a.leads >= s.minLeads),
+          (metaOnly || metaRanking || s.ranking === "sales" ? (s.ranking !== "sales" || a.sales > 0) : a.leads >= s.minLeads),
       )
       .map((a: any) => {
         const m: any = verified.get(a.id);
@@ -378,7 +413,7 @@ export async function collectReport(
             ? Number(m.spend || 0) / Number(m.inline_link_clicks)
             : null,
           cpl: sameZone && a.leads ? Number(m.spend || 0) / a.leads : null,
-          url: null,
+          url: m.url || details.get(a.id)?.url || null,
         };
       })
       .filter(
@@ -394,6 +429,7 @@ export async function collectReport(
           : b[s.ranking] - a[s.ranking] || a.id.localeCompare(b.id),
       )
       .slice(0, s.top);
+    if(s.includeAds && result.ads.some((a:any)=>!a.url)) result.warnings.push("A Meta não disponibilizou link válido para um ou mais destaques. O nome e o resultado serão enviados sem link.");
     const campaigns = new Map<string, any>();
     for (const row of meta.data) {
       const c = campaigns.get(row.campaign_id) || {
@@ -412,12 +448,36 @@ export async function collectReport(
       .map((c) => ({
         ...c,
         ctr: c.impressions ? (100 * c.clicks) / c.impressions : 0,
+        cpc: c.clicks ? c.spend/c.clicks : null,
+        cpm: c.impressions ? 1000*c.spend/c.impressions : null,
       }))
       .sort((a, b) => b.spend - a.spend);
   } catch (e) {
-    if (metaOnly || s.campaignIds?.length) throw e;
+    result.metrics.sales = null; result.metrics.revenue = null;
+    result.blockingReasons.push("Consulta Meta incompleta. Atualize a prévia antes de enviar.");
     result.warnings.push(e instanceof Error ? e.message : "Meta indisponível.");
   }
+  if(needsSales && (result.metrics.sales === null || (s.metrics.includes("revenue") && result.metrics.revenue === null))) result.blockingReasons.push("Vendas ou valores indisponíveis. Revise os avisos internos.");
   result.dataMode = metaOnly ? "meta" : "crm_meta";
   return result;
+}
+export async function metaAdDetails(ids:string[],key:string): Promise<Map<string,any>> {
+  const unique=[...new Set(ids)].filter(id=>/^\d{1,30}$/.test(id));
+  const out=new Map<string,any>();
+  for(let i=0;i<unique.length;i+=50) {
+    const url=new URL("https://graph.facebook.com/v21.0/");
+    url.searchParams.set("ids",unique.slice(i,i+50).join(","));
+    url.searchParams.set("fields","id,name,account_id,campaign_id,preview_shareable_link,creative{instagram_permalink_url}");
+    const response=await fetch(url,{headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(20000)});
+    const body=await response.json();
+    if(!response.ok || body.error) throw new Error("Não foi possível verificar os anúncios na Meta.");
+    for(const id of unique.slice(i,i+50)) {
+      const ad=body[id];if(!ad || ad.error || ad.id!==id || !ad.account_id)continue;
+      const link=[ad.creative?.instagram_permalink_url,ad.preview_shareable_link].find(value=>{
+        try{const u=new URL(value);return u.protocol==="https:" && ["facebook.com","www.facebook.com","fb.me","instagram.com","www.instagram.com"].includes(u.hostname);}catch{return false;}
+      });
+      out.set(id,{...ad,url:link || null});
+    }
+  }
+  return out;
 }

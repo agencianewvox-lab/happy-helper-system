@@ -1,13 +1,20 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { requireStaff, authCors, authFailure } from "../_shared/staff-auth.ts";
 import { VoxiReader, deriveScope, inIds } from "../_shared/voxi-reader.ts";
-import { validateSettings, renderReport } from "../_shared/report-model.ts";
+import { processReportRuns } from "../_shared/report-worker.ts";
+import {
+  validateSettings,
+  renderReport,
+  nextExecutions,
+} from "../_shared/report-model.ts";
 import {
   collectReport,
   metaCampaignCatalog,
 } from "../_shared/report-engine.ts";
 import {
   connectionState,
+  connectionIdentity,
+  EvolutionError,
   evolutionReport,
   reportInstance,
   verifyReportGroup,
@@ -20,7 +27,10 @@ const admin = () =>
   );
 const reader = () => new VoxiReader(Deno.env.get("VOXI_READ_KEY") || "");
 const reply = (data: unknown, status = 200) =>
-  Response.json(data, { status, headers: authCors });
+  Response.json(data, {
+    status,
+    headers: { ...authCors, "Cache-Control": "private, no-store" },
+  });
 async function digest(value: unknown) {
   const bytes = await crypto.subtle.digest(
     "SHA-256",
@@ -75,6 +85,11 @@ Deno.serve(async (req) => {
   try {
     const ctx = await requireStaff(req),
       service = admin();
+    if (!ctx.isMaster && ctx.profile.role !== "gestor")
+      return reply(
+        { error: "Relatórios disponíveis apenas ao Master e aos gestores." },
+        403,
+      );
     const raw = await req.text();
     if (raw.length > 64000)
       return reply({ error: "Solicitação muito grande." }, 413);
@@ -85,6 +100,7 @@ Deno.serve(async (req) => {
           ctx.db
             .from("whatsapp_grupos")
             .select("id,nome,group_id,gestor_responsavel,ad_account_id")
+            .is("archived_at", null)
             .order("nome"),
           ctx.db.from("report_configs").select("*"),
           ctx.db.from("report_sources").select("*"),
@@ -99,7 +115,10 @@ Deno.serve(async (req) => {
             .order("created_at", { ascending: false })
             .limit(100),
           ctx.isMaster
-            ? ctx.db.from("profiles").select("user_id,full_name")
+            ? ctx.db
+                .from("profiles")
+                .select("user_id,full_name")
+                .in("role", ["admin", "gestor"])
             : Promise.resolve({ data: [], error: null }),
         ]);
       if (
@@ -110,12 +129,31 @@ Deno.serve(async (req) => {
         throw new Error("Não foi possível carregar a central.");
       return reply({
         clients: clients.data,
-        configs: configs.data,
+        configs: configs.data?.map((c) => ({
+          ...c,
+          nextExecutions:
+            c.enabled && !c.review_required ? nextExecutions(c.settings) : [],
+        })),
         sources: sources.data,
         connection: connection.data,
         runs: runs.data,
         profiles: profiles.data,
       });
+    }
+    if (body.action === "run-status") {
+      if (
+        typeof body.runId !== "string" ||
+        !/^[-a-f0-9]{36}$/i.test(body.runId)
+      )
+        throw new Error("Execução inválida.");
+      const { data, error } = await ctx.db
+        .from("report_runs")
+        .select("id,client_id,status,created_at,finished_at,message,error")
+        .eq("id", body.runId)
+        .single();
+      if (error || !data)
+        return reply({ error: "Execução não autorizada." }, 403);
+      return reply(data);
     }
     if (body.action === "catalog") {
       if (!ctx.isMaster) return reply({ error: "Exclusivo do Master." }, 403);
@@ -161,44 +199,74 @@ Deno.serve(async (req) => {
           .eq("owner_user_id", ctx.user.id);
         return reply({ status: "disconnected" });
       }
-      if (body.action === "connection-status") {
-        try {
-          const state = await connectionState(ctx.user.id);
-          await service
-            .from("report_connections")
-            .update({ ...state, updated_at: new Date().toISOString() })
-            .eq("user_id", ctx.user.id);
-          return reply(state);
-        } catch {
-          return reply({ status: "disconnected" });
-        }
-      }
-      // Never reuse, modify or disconnect the central inbound instance.
       const { data: existing } = await service
         .from("report_connections")
         .select("*")
         .eq("user_id", ctx.user.id)
         .maybeSingle();
-      let qr: any;
-      if (!existing) {
-        const { error } = await service
-          .from("report_connections")
-          .insert({ user_id: ctx.user.id, instance_name: instance });
-        if (error) throw new Error("Conexão em configuração; tente novamente.");
+      if (body.action === "connection-status") {
+        const checkedAt = new Date().toISOString();
+        if (!existing)
+          return reply({ status: "disconnected", checkedAt, phone: null });
         try {
-          qr = await evolutionReport("/instance/create", "POST", {
-            instanceName: instance,
-            integration: "WHATSAPP-BAILEYS",
-            qrcode: true,
-          });
-        } catch {
+          const state = await connectionState(ctx.user.id);
+          const phone =
+            state.status === "open"
+              ? await connectionIdentity(ctx.user.id)
+              : null;
           await service
             .from("report_connections")
-            .delete()
+            .update({
+              ...state,
+              phone,
+              last_checked_at: checkedAt,
+              last_error: null,
+              updated_at: checkedAt,
+            })
             .eq("user_id", ctx.user.id);
-          throw new Error("Não foi possível criar a conexão de relatórios.");
+          return reply({ ...state, phone, checkedAt });
+        } catch (e) {
+          const status =
+            e instanceof EvolutionError && e.status === 404
+              ? "disconnected"
+              : "unknown";
+          const error =
+            status === "unknown"
+              ? "Não foi possível consultar a Evolution. Isso não confirma desconexão. Atualize ou verifique o servidor."
+              : "Conexão não encontrada. Use reconectar para gerar um QR.";
+          await service
+            .from("report_connections")
+            .update({ status, last_checked_at: checkedAt, last_error: error })
+            .eq("user_id", ctx.user.id);
+          return reply({ status, checkedAt, error });
         }
       }
+      // Stable per-user instance. A failed create may have succeeded remotely; keep its binding.
+      let providerExists = false;
+      try {
+        await connectionState(ctx.user.id);
+        providerExists = true;
+      } catch (e) {
+        if (!(e instanceof EvolutionError && e.status === 404)) throw e;
+      }
+      const registered = await service.from("report_connections").upsert(
+        {
+          user_id: ctx.user.id,
+          instance_name: instance,
+          status: "connecting",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+      if (registered.error)
+        throw new Error("Não foi possível registrar a conexão.");
+      let qr: any;
+      if (!providerExists)
+        qr = await evolutionReport("/instance/create", "POST", {
+          instanceName: instance,
+          integration: "WHATSAPP-BAILEYS",
+          qrcode: true,
+        });
       await evolutionReport("/webhook/set/" + instance, "POST", {
         webhook: {
           enabled: false,
@@ -209,7 +277,20 @@ Deno.serve(async (req) => {
         },
       });
       const state = await connectionState(ctx.user.id);
-      if (state.status === "open") return reply(state);
+      if (state.status === "open") {
+        const phone = await connectionIdentity(ctx.user.id),
+          checkedAt = new Date().toISOString();
+        await service
+          .from("report_connections")
+          .update({
+            status: "open",
+            phone,
+            last_checked_at: checkedAt,
+            last_error: null,
+          })
+          .eq("user_id", ctx.user.id);
+        return reply({ ...state, phone, checkedAt });
+      }
       if (!qr?.qrcode?.base64)
         qr = await evolutionReport("/instance/connect/" + instance);
       const base64 = qr.qrcode?.base64 || qr.base64;
@@ -229,6 +310,7 @@ Deno.serve(async (req) => {
     const { data: client, error: clientError } = await ctx.db
       .from("whatsapp_grupos")
       .select("id,nome,group_id,ad_account_id,gestor_responsavel")
+      .is("archived_at", null)
       .eq("id", body.clientId)
       .single();
     if (clientError || !client)
@@ -353,10 +435,32 @@ Deno.serve(async (req) => {
         Deno.env.get("META_ADS_ACCESS_TOKEN") || "",
       );
       const message = renderReport(client.nome, s, result);
-      // Sign both config and rendered snapshot: manual sends preserve the reviewed content.
+      const issues = [...(result.blockingReasons || [])];
+      const { data: sender } = await service
+        .from("report_connections")
+        .select("phone")
+        .eq("user_id", owner)
+        .maybeSingle();
+      let senderPhone: string | null = null;
+      if (!sender)
+        issues.push(
+          "O remetente precisa conectar seu WhatsApp em Meu WhatsApp.",
+        );
+      else
+        try {
+          await verifyReportGroup(owner, client.group_id);
+          senderPhone = await connectionIdentity(owner);
+          if (!senderPhone)
+            issues.push(
+              "Não foi possível identificar o número do remetente. Reconecte seu WhatsApp.",
+            );
+        } catch (e) {
+          issues.push(e instanceof Error ? e.message : "Conexão indisponível.");
+        }
       const previewData = {
         result,
         message,
+        senderPhone,
         createdAt: new Date().toISOString(),
       };
       const signature = await digest({
@@ -364,7 +468,16 @@ Deno.serve(async (req) => {
         previewData,
         secret: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
       });
-      return reply({ result, message, previewData, previewToken: signature });
+      return reply({
+        result,
+        message,
+        previewData,
+        previewToken: signature,
+        readiness: { ready: issues.length === 0, issues },
+        sender: { name: ownerProfile.full_name, phone: senderPhone },
+        destination: { name: client.nome, id: client.group_id },
+        nextExecutions: nextExecutions(s),
+      });
     }
     const signature = await digest({
       hash,
@@ -379,13 +492,19 @@ Deno.serve(async (req) => {
       previewAge < 10 * 60000;
     if (body.action === "save") {
       if (body.enabled === true) {
+        if (!nextExecutions(s).length) throw new Error("A agenda não tem uma próxima execução válida. Revise a data, o intervalo e os dias selecionados.");
         if (s.period === "custom" && s.frequency !== "once")
           throw new Error(
             "Datas fixas exigem envio único. Use 7/30 dias para agendas recorrentes.",
           );
-        if (!validPreview && config?.preview_hash !== hash)
+        if (!validPreview)
           throw new Error("Gere a prévia desta configuração antes de ativar.");
+        if (body.previewData?.result?.blockingReasons?.length)
+          throw new Error("Resolva os bloqueios da revisão antes de ativar.");
         await verifyReportGroup(owner, client.group_id);
+        const phone = await connectionIdentity(owner);
+        if (!phone || phone !== body.previewData.senderPhone)
+          throw new Error("Confirme o número do remetente em uma nova prévia.");
       }
       const row = {
         client_id: client.id,
@@ -393,6 +512,10 @@ Deno.serve(async (req) => {
         enabled: body.enabled === true,
         version: (config?.version || 0) + 1,
         settings: s,
+        review_required: validPreview
+          ? false
+          : (config?.review_required ?? true),
+        last_evaluated_at: new Date().toISOString(),
         preview_hash: validPreview
           ? hash
           : config?.preview_hash === hash
@@ -429,25 +552,70 @@ Deno.serve(async (req) => {
         !/^[-a-f0-9]{36}$/i.test(body.requestId)
       )
         throw new Error("Identificador de envio inválido.");
+      if (body.previewData?.result?.blockingReasons?.length)
+        throw new Error("Resolva os bloqueios da revisão antes de enviar.");
+      const { data: connection } = await service
+        .from("report_connections")
+        .select("user_id")
+        .eq("user_id", owner)
+        .maybeSingle();
+      if (!connection)
+        throw new Error("Conecte o WhatsApp do remetente em Meu WhatsApp.");
       await verifyReportGroup(owner, client.group_id);
-      const { error } = await service.from("report_runs").insert({
-        client_id: client.id,
-        owner_user_id: owner,
-        idempotency_key: "manual:" + client.id + ":" + body.requestId,
-        snapshot: {
-          settings: s,
-          source,
-          groupId: client.group_id,
-          account: client.ad_account_id,
-          name: client.nome,
-          now: body.previewData.createdAt,
-          manual: true,
-          prepared: body.previewData,
-        },
-      });
+      const phone = await connectionIdentity(owner);
+      if (!phone || phone !== body.previewData.senderPhone)
+        throw new Error(
+          "O número do remetente mudou ou não pôde ser confirmado. Gere uma nova prévia.",
+        );
+      // Same signed preview = same execution even if a double click creates another request UUID.
+      const idempotencyKey = "manual:" + client.id + ":" + body.previewToken;
+      const { data: inserted, error } = await service
+        .from("report_runs")
+        .insert({
+          client_id: client.id,
+          owner_user_id: owner,
+          idempotency_key: idempotencyKey,
+          expires_at: new Date(Date.now() + 15 * 60000).toISOString(),
+          snapshot: {
+            settings: s,
+            source,
+            groupId: client.group_id,
+            account: client.ad_account_id,
+            name: client.nome,
+            now: body.previewData.createdAt,
+            manual: true,
+            prepared: body.previewData,
+          },
+        })
+        .select("id,status")
+        .single();
       if (error && error.code !== "23505")
-        throw new Error("Não foi possível agendar o envio.");
-      return reply({ ok: true, status: "queued" });
+        throw new Error("Não foi possível registrar o envio.");
+      const run =
+        inserted ||
+        (
+          await service
+            .from("report_runs")
+            .select("id,status")
+            .eq("idempotency_key", idempotencyKey)
+            .single()
+        ).data;
+      if (!run) throw new Error("Não foi possível recuperar a execução.");
+      if (run.status === "queued") {
+        const task = processReportRuns(service, {
+          targetRunId: run.id,
+          crmKey: Deno.env.get("VOXI_READ_KEY") || "",
+          metaKey: Deno.env.get("META_ADS_ACCESS_TOKEN") || "",
+        }).catch(() => undefined);
+        const runtime = (
+          globalThis as typeof globalThis & {
+            EdgeRuntime?: { waitUntil(p: Promise<unknown>): void };
+          }
+        ).EdgeRuntime;
+        if (runtime) runtime.waitUntil(task);
+        else await task;
+      }
+      return reply({ ok: true, status: run.status, runId: run.id });
     }
     return reply({ error: "Ação inválida." }, 400);
   } catch (error) {

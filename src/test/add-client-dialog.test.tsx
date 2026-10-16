@@ -12,7 +12,7 @@ vi.mock("sonner", () => ({ toast: mocks.toast }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: () => ({
     insert: mocks.insert,
-    select: () => ({ eq: () => ({ maybeSingle: mocks.maybeSingle }) }),
+    select: () => ({ in: () => ({order: async () => ({data:[],error:null})}), eq: () => ({ maybeSingle: mocks.maybeSingle }) }),
   }) },
 }));
 const renderDialog = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AddClientDialog /></QueryClientProvider>);
@@ -42,7 +42,7 @@ describe("Simple client registration", () => {
     expect(mocks.insert).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Nome no painel *"), { target: { value: "Meu cliente" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirmar cadastro" }));
-    await waitFor(() => expect(mocks.insert).toHaveBeenCalledWith({ nome: "Meu cliente", group_id: "456@g.us", categoria: null, gestor_responsavel: null }));
+    await waitFor(() => expect(mocks.insert).toHaveBeenCalledWith({ nome: "Meu cliente", group_id: "456@g.us", categoria: null, gestor_responsavel: null, manager_user_id: null }));
     expect(mocks.toast.success).toHaveBeenCalled();
   });
   it("searches without requiring accents and keeps older groups accessible", async () => {
@@ -94,7 +94,7 @@ describe("Simple client registration", () => {
     fireEvent.change(screen.getByLabelText("Nome no painel *"), { target: { value: "Grupo manual" } });
     fireEvent.click(screen.getByRole("button", { name: "Confirmar cadastro" }));
     await waitFor(() => expect(mocks.insert).toHaveBeenCalledWith({
-      nome: "Grupo manual", group_id: expect.stringMatching(/^placeholder-grupo-manual-/), categoria: null, gestor_responsavel: null,
+      nome: "Grupo manual", group_id: expect.stringMatching(/^placeholder-grupo-manual-/), categoria: null, gestor_responsavel: null, manager_user_id: null,
     }));
   });
 });

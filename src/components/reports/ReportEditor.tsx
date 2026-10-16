@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { WhatsAppPreview } from "./WhatsAppPreview";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -21,6 +21,12 @@ import {
   unknownTokens,
   reportPeriod,
   crmMetrics,
+  nextExecutions,
+  rankingDescriptions,
+  rankingMetric,
+  templateMetrics,
+  runLabels,
+  ReportRun,
   reportsApi,
   ReportSettings,
   Metric,
@@ -35,6 +41,7 @@ type Props = {
   master: boolean;
   userId: string;
   profiles: { user_id: string; full_name: string }[];
+  initialTab?: string;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -60,6 +67,7 @@ export function ReportEditor({
   userId,
   profiles,
   onClose,
+  initialTab,
   onSaved,
 }: Props) {
   const [settings, setSettings] = useState<ReportSettings>(() =>
@@ -83,7 +91,7 @@ export function ReportEditor({
   const [enabled, setEnabled] = useState(config?.enabled || false),
     [owner, setOwner] = useState(config?.owner_user_id || userId);
   const [version, setVersion] = useState(config?.version || 0),
-    [tab, setTab] = useState(source ? "metrics" : "sources");
+    [tab, setTab] = useState(initialTab || "sources");
   const [account, setAccount] = useState(source?.crm_account_id || ""),
     [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false),
@@ -91,12 +99,38 @@ export function ReportEditor({
       message: string;
       previewToken: string;
       previewData: unknown;
+      readiness?: { ready: boolean; issues: string[] };
+      result?: {
+        warnings?: string[];
+        salesSource?: string | null;
+        salesAudit?: Record<string, number>;
+        metaAccountName?: string;
+      };
+      sender?: { name: string; phone: string | null };
+      destination?: { name: string; id: string };
     } | null>(null);
   const [sendConfirm, setSendConfirm] = useState(false);
+  const [recipientConfirmed, setRecipientConfirmed] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+  const modeDrafts = useRef<
+    Partial<Record<"meta" | "crm_meta", ReportSettings>>
+  >({});
+  const run = useQuery({
+    queryKey: ["report-run", userId, runId],
+    enabled: !!runId,
+    queryFn: () => reportsApi<ReportRun>({ action: "run-status", runId }),
+    refetchInterval: (q) =>
+      ["queued", "processing", "sending"].includes(
+        q.state.data?.status || "queued",
+      )
+        ? 2000
+        : false,
+  });
+
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const catalogue = useQuery({
     queryKey: ["report-source-catalog", userId],
-    enabled: master && tab === "sources",
+    enabled: master && !metaOnly && tab === "sources",
     queryFn: () =>
       reportsApi<{
         accounts: { id: string; name: string }[];
@@ -106,7 +140,7 @@ export function ReportEditor({
   });
   const funnels = useQuery({
     queryKey: ["report-client-catalog", userId, client.id, source?.version],
-    enabled: !!source,
+    enabled: !!source && !metaOnly,
     queryFn: () =>
       reportsApi<Catalog>({ action: "client-catalog", clientId: client.id }),
     staleTime: 60000,
@@ -126,15 +160,36 @@ export function ReportEditor({
     staleTime: 60000,
   });
   const update = (values: Partial<ReportSettings>) => {
-    setSettings((s) => ({ ...s, ...values }));
+    setSettings((s) => ({ ...s, ...values, schemaVersion: 2 }));
     setPreview(null);
+    setRunId(null);
   };
-  const toggleMetric = (m: Metric) =>
+  const toggleMetric = (m: Metric) => {
+    const removing = settings.metrics.includes(m);
+    let template = settings.template;
+    if (removing && template && templateMetrics(template).includes(m)) {
+      if (
+        !window.confirm(
+          "Esta métrica aparece na mensagem personalizada. Remover também as linhas que usam essa variável?",
+        )
+      )
+        return;
+      template = template
+        .split("\n")
+        .filter((line) => !templateMetrics(line).includes(m))
+        .join("\n");
+    }
     update({
-      metrics: settings.metrics.includes(m)
+      metrics: removing
         ? settings.metrics.filter((x) => x !== m)
         : [...settings.metrics, m],
+      template,
+      includeAds:
+        removing && rankingMetric(settings.ranking) === m
+          ? false
+          : settings.includeAds,
     });
+  };
   const toggleStage = (kind: "scheduled" | "attended", id: string) =>
     update({
       stages: {
@@ -163,7 +218,13 @@ export function ReportEditor({
     previewData: preview?.previewData,
   };
   const template = settings.template ?? "";
-  const tokenErrors = unknownTokens(template);
+  const tokenErrors = [
+    ...unknownTokens(template),
+    ...templateMetrics(template)
+      .filter((m) => !settings.metrics.includes(m))
+      .map((m) => metricLabels[m] + " (métrica desmarcada)"),
+  ];
+  const nextDates = nextExecutions(settings);
   let periodLabel = "Selecione as datas";
   try {
     const p = reportPeriod(settings);
@@ -174,6 +235,22 @@ export function ReportEditor({
   } catch {
     /* incomplete editing state */
   }
+  const autoPreview = useRef(false);
+  useEffect(() => {
+    if (initialTab !== "preview" || autoPreview.current || !canConfigure)
+      return;
+    autoPreview.current = true;
+    void execute(async () =>
+      setPreview(
+        await reportsApi({
+          action: "preview",
+          clientId: client.id,
+          settings,
+          ownerUserId: owner,
+        }),
+      ),
+    );
+  }, [initialTab, canConfigure, client.id, owner, settings]);
   const insertToken = (token: string) => {
     const text = settings.template || templateFromSettings(settings);
     const start = settings.template
@@ -220,22 +297,34 @@ export function ReportEditor({
               value={settings.dataMode || "crm_meta"}
               onChange={(e) => {
                 const mode = e.target.value as "meta" | "crm_meta";
-                update({
-                  dataMode: mode,
-                  metrics:
-                    mode === "meta"
-                      ? settings.metrics.filter((m) => !crmMetrics.includes(m))
-                          .length
-                        ? settings.metrics.filter(
-                            (m) => !crmMetrics.includes(m),
-                          )
-                        : ["spend", "clicks", "impressions"]
-                      : defaultSettings.metrics,
-                  ranking: mode === "meta" ? "clicks" : "leads",
-                  pipelines: [],
-                  stages: { scheduled: [], attended: [] },
-                  template: "",
-                });
+                modeDrafts.current[settings.dataMode || "crm_meta"] =
+                  structuredClone(settings);
+                const prior = modeDrafts.current[mode];
+                const metrics =
+                  mode === "meta"
+                    ? settings.metrics.filter((m) => !crmMetrics.includes(m))
+                    : defaultSettings.metrics;
+                update(
+                  prior || {
+                    ...settings,
+                    dataMode: mode,
+                    metrics: metrics.length ? metrics : ["spend", "clicks"],
+                    ranking: mode === "meta" ? "clicks" : "leads",
+                    pipelines: [],
+                    stages: { scheduled: [], attended: [] },
+                    includeAds: false,
+                    template:
+                      settings.template
+                        ?.split("\n")
+                        .filter(
+                          (line) =>
+                            !templateMetrics(line).some(
+                              (m) => mode === "meta" && crmMetrics.includes(m),
+                            ),
+                        )
+                        .join("\n") || "",
+                  },
+                );
               }}
             >
               <option value="crm_meta">Meta Ads + comercial do Voxi</option>
@@ -245,17 +334,24 @@ export function ReportEditor({
           <p className="max-w-sm text-xs text-muted-foreground">
             {metaOnly
               ? "Não exige vínculo com o Voxi. Cliques não são leads reais."
-              : "Leads reais e vendas vêm do CRM. A regra comercial atual está mantida."}{" "}
-            Ao mudar a fonte, o modelo personalizado é reiniciado.
+              : "Leads reais e vendas fechadas vêm do Voxi; recebimentos não entram."}{" "}
+            Rascunhos por fonte são preservados durante esta edição.
           </p>
         </div>
+        {config?.review_required && (
+          <p className="mx-6 mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+            As regras evoluíram. Gere uma nova prévia e salve para revisar esta
+            agenda. O estado anterior foi preservado, mas envios automáticos
+            aguardam sua revisão.
+          </p>
+        )}
         <Tabs value={tab} onValueChange={setTab} className="px-6">
           <TabsList className="w-full justify-start overflow-x-auto my-4">
             <TabsTrigger value="sources">1. Fontes</TabsTrigger>
-            <TabsTrigger value="metrics">2. Métricas e campanhas</TabsTrigger>
+            <TabsTrigger value="metrics">2. Conteúdo</TabsTrigger>
             <TabsTrigger value="message">3. Mensagem</TabsTrigger>
             <TabsTrigger value="schedule">4. Agenda</TabsTrigger>
-            <TabsTrigger value="preview">5. Prévia</TabsTrigger>
+            <TabsTrigger value="preview">5. Revisão</TabsTrigger>
           </TabsList>
           <TabsContent value="sources" className="space-y-5 pb-5">
             <div className="rounded-2xl border p-4 bg-muted/30">
@@ -269,85 +365,95 @@ export function ReportEditor({
               </p>
             </div>
             <p className="text-sm">
-              Conta Meta do card:{" "}
+              Fonte de mídia:{" "}
               <strong>
-                {client.ad_account_id ||
-                  "Ainda não vinculada — configure na área Anúncios"}
+                {preview?.result?.metaAccountName ||
+                  (client.ad_account_id
+                    ? "Conta Meta vinculada"
+                    : "Ainda não vinculada — configure na área Anúncios")}
               </strong>
             </p>
-            <p className="text-sm text-muted-foreground break-all">
+            <div className="text-sm text-muted-foreground break-all">
               Destino:{" "}
               {client.group_id.endsWith("@g.us")
-                ? client.group_id
+                ? client.nome
                 : "Grupo ainda não vinculado ao WhatsApp"}
-            </p>
-            {master ? (
-              <>
-                <label className="block space-y-2">
-                  <span className="text-sm font-medium">
-                    Conta principal no Voxi
-                  </span>
-                  <select
-                    className={fieldClass}
-                    value={account}
-                    onChange={(e) => {
-                      setAccount(e.target.value);
-                      setConfirmed(false);
-                    }}
-                    disabled={busy || catalogue.isPending}
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer">
+                  Identificadores técnicos
+                </summary>
+                <p>Meta: {client.ad_account_id || "Não vinculada"}</p>
+                <p>Grupo: {client.group_id}</p>
+              </details>
+            </div>
+            {!metaOnly &&
+              (master ? (
+                <>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">
+                      Conta principal no Voxi
+                    </span>
+                    <select
+                      className={fieldClass}
+                      value={account}
+                      onChange={(e) => {
+                        setAccount(e.target.value);
+                        setConfirmed(false);
+                      }}
+                      disabled={busy || catalogue.isPending}
+                    >
+                      <option value="">Selecione a empresa no CRM</option>
+                      {catalogue.data?.accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} · {a.id.slice(0, 8)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {catalogue.error && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {catalogue.error.message}
+                    </p>
+                  )}
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={confirmed}
+                      onChange={(e) => setConfirmed(e.target.checked)}
+                    />
+                    <span>
+                      Conferi que esta conta CRM e a conta Meta acima pertencem
+                      a {client.nome}.
+                    </span>
+                  </label>
+                  <Button
+                    disabled={!account || !confirmed || busy}
+                    onClick={() =>
+                      execute(async () => {
+                        await reportsApi({
+                          action: "bind-source",
+                          clientId: client.id,
+                          accountId: account,
+                          confirm: true,
+                        });
+                        toast.success(
+                          "Vínculo confirmado. Reabra para configurar o relatório.",
+                        );
+                        onSaved();
+                        onClose();
+                      })
+                    }
                   >
-                    <option value="">Selecione a empresa no CRM</option>
-                    {catalogue.data?.accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} · {a.id.slice(0, 8)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {catalogue.error && (
-                  <p role="alert" className="text-sm text-destructive">
-                    {catalogue.error.message}
-                  </p>
-                )}
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    onChange={(e) => setConfirmed(e.target.checked)}
-                  />
-                  <span>
-                    Conferi que esta conta CRM e a conta Meta acima pertencem a{" "}
-                    {client.nome}.
-                  </span>
-                </label>
-                <Button
-                  disabled={!account || !confirmed || busy}
-                  onClick={() =>
-                    execute(async () => {
-                      await reportsApi({
-                        action: "bind-source",
-                        clientId: client.id,
-                        accountId: account,
-                        confirm: true,
-                      });
-                      toast.success(
-                        "Vínculo confirmado. Reabra para configurar o relatório.",
-                      );
-                      onSaved();
-                      onClose();
-                    })
-                  }
-                >
-                  Confirmar vínculo seguro
-                </Button>
-              </>
-            ) : (
-              <p className="text-sm">
-                {source
-                  ? "Conta CRM vinculada pelo Master."
-                  : "Solicite ao Master o vínculo da conta CRM para liberar a configuração."}
-              </p>
-            )}
+                    Confirmar vínculo seguro
+                  </Button>
+                </>
+              ) : (
+                <p className="text-sm">
+                  {source
+                    ? "Conta CRM vinculada pelo Master."
+                    : "Solicite ao Master o vínculo da conta CRM para liberar a configuração."}
+                </p>
+              ))}
           </TabsContent>
           <TabsContent value="metrics" className="space-y-6 pb-5">
             <label className="block space-y-2">
@@ -657,9 +763,10 @@ export function ReportEditor({
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Vendas permanecem na regra atual de oportunidades ganhas. A
-                  conciliação com o dashboard/Clinicorp ficou pendente para uma
-                  próxima revisão.
+                  Vendas Meta fechadas: orçamentos Clinicorp aprovados, quando
+                  configurado; caso contrário, oportunidades ganhas. Data de
+                  aprovação/fechamento, nunca de recebimento. Só entram com
+                  atribuição comprovada.
                 </p>
               </div>
             ) : null}
@@ -714,9 +821,8 @@ export function ReportEditor({
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(metricTokens)
-                    .filter(
-                      ([metric]) =>
-                        !metaOnly || !crmMetrics.includes(metric as Metric),
+                    .filter(([metric]) =>
+                      settings.metrics.includes(metric as Metric),
                     )
                     .map(([metric, token]) => (
                       <Button
@@ -787,26 +893,56 @@ export function ReportEditor({
               <input
                 type="checkbox"
                 checked={settings.includeAds}
-                onChange={(e) => update({ includeAds: e.target.checked })}
+                onChange={(e) =>
+                  update({
+                    includeAds: e.target.checked,
+                    metrics: e.target.checked
+                      ? [
+                          ...new Set([
+                            ...settings.metrics,
+                            rankingMetric(settings.ranking),
+                          ]),
+                        ]
+                      : settings.metrics,
+                  })
+                }
               />
-              Incluir melhores anúncios do período
+              Incluir destaques dos anúncios
             </label>
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+              <strong>Como o destaque é escolhido</strong>
+              <p className="mt-1 text-muted-foreground">
+                {rankingDescriptions[settings.ranking]}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Cada posição contém nome, resultado do critério e link
+                disponibilizado pela Meta. Sem anexos automáticos.
+              </p>
+            </div>
             <div className="grid sm:grid-cols-3 gap-4">
               <label className="block space-y-2">
-                <span className="text-sm">Critério do ranking</span>
+                <span className="text-sm">Ordenar destaques por</span>
                 <select
                   className={fieldClass}
                   value={settings.ranking}
                   onChange={(e) =>
                     update({
                       ranking: e.target.value as ReportSettings["ranking"],
+                      metrics: [
+                        ...new Set([
+                          ...settings.metrics,
+                          rankingMetric(
+                            e.target.value as ReportSettings["ranking"],
+                          ),
+                        ]),
+                      ],
                     })
                   }
                 >
                   {!metaOnly ? (
                     <>
                       <option value="leads">Mais leads reais</option>
-                      <option value="sales">Mais vendas</option>
+                      <option value="sales">Mais vendas fechadas</option>
                       <option value="cpl">Menor custo por lead real</option>
                     </>
                   ) : null}
@@ -990,8 +1126,27 @@ export function ReportEditor({
               </p>
               <p className="text-muted-foreground">
                 Período do relatório: {periodLabel}. No máximo um envio
-                automático por cliente/dia.
+                automático por cliente/dia. Atraso máximo: 15 minutos; depois,
+                expira sem envio tardio.
               </p>
+              <div className="mt-3 border-t pt-3">
+                <p className="font-medium">
+                  Próximas execuções · {settings.timezone}
+                </p>
+                <ol className="mt-2 space-y-1">
+                  {nextDates.map((date, i) => (
+                    <li key={date}>
+                      {i + 1}.{" "}
+                      {new Date(date).toLocaleString("pt-BR", {
+                        timeZone: settings.timezone,
+                      })}
+                    </li>
+                  ))}
+                </ol>
+                {!nextDates.length && (
+                  <p>Nenhuma execução futura. Confira as datas.</p>
+                )}
+              </div>
               {settings.period === "custom" ? (
                 <p className="text-amber-600 dark:text-amber-300">
                   Datas fixas: envio manual ou agenda de uma única vez, para não
@@ -1078,12 +1233,67 @@ export function ReportEditor({
                   <WhatsAppPreview
                     name={client.nome}
                     message={preview.message}
+                    sender={[preview.sender?.name, preview.sender?.phone]
+                      .filter(Boolean)
+                      .join(" · ")}
                   />
                 </div>
+                {preview.result?.warnings?.length ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+                    <strong>
+                      Revisão interna · não será enviada ao cliente
+                    </strong>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {preview.result.warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {preview.readiness?.issues.length ? (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-destructive/30 p-4 text-sm"
+                  >
+                    <strong>Antes de enviar</strong>
+                    <ul className="mt-2 list-disc pl-5">
+                      {preview.readiness.issues.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {runId && (
+                  <div
+                    role="status"
+                    className="rounded-xl border bg-primary/5 p-4"
+                  >
+                    <p className="font-semibold">
+                      {run.data
+                        ? runLabels[run.data.status]
+                        : "Acompanhando execução…"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Execução: {runId}
+                    </p>
+                    {run.data?.error && (
+                      <p className="mt-2 text-sm">{run.data.error}</p>
+                    )}
+                    <p className="mt-2 text-xs">
+                      Aceito pela Evolution não significa entrega ou leitura
+                      confirmada.
+                    </p>
+                  </div>
+                )}
                 <Button
                   variant="outline"
-                  disabled={busy}
-                  onClick={() => setSendConfirm(true)}
+                  disabled={
+                    busy || !!runId || preview.readiness?.ready === false
+                  }
+                  onClick={() => {
+                    setRecipientConfirmed(false);
+                    setSendConfirm(true);
+                  }}
                 >
                   Enviar agora para o grupo
                 </Button>
@@ -1165,6 +1375,30 @@ export function ReportEditor({
                 WhatsApp escolhido. Confira a prévia antes de confirmar.
               </DialogDescription>
             </DialogHeader>
+            <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+              <p>
+                <strong>Grupo:</strong>{" "}
+                {preview?.destination?.name || client.nome}
+              </p>
+              <p className="mt-2">
+                <strong>Remetente:</strong>{" "}
+                {preview?.sender?.name ||
+                  profiles.find((p) => p.user_id === owner)?.full_name ||
+                  "Seu WhatsApp"}{" "}
+                {preview?.sender?.phone}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                O envio manual não ativa nem altera sua agenda.
+              </p>
+            </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={recipientConfirmed}
+                onChange={(e) => setRecipientConfirmed(e.target.checked)}
+              />
+              Conferi o grupo, o remetente e o conteúdo da prévia.
+            </label>
             <div className="flex justify-end gap-3">
               <Button
                 variant="outline"
@@ -1174,18 +1408,21 @@ export function ReportEditor({
                 Cancelar
               </Button>
               <Button
-                disabled={busy}
+                disabled={busy || !recipientConfirmed}
                 onClick={() =>
                   execute(async () => {
-                    await reportsApi({
+                    const sent = await reportsApi<{ runId: string }>({
                       action: "send",
                       ...payload,
                       requestId,
                       confirm: true,
                     });
                     setSendConfirm(false);
+                    setRunId(sent.runId);
                     setRequestId(crypto.randomUUID());
-                    toast.success("Relatório na fila. Acompanhe o histórico.");
+                    toast.success(
+                      "Envio registrado. Acompanhe o andamento nesta revisão.",
+                    );
                     onSaved();
                   })
                 }

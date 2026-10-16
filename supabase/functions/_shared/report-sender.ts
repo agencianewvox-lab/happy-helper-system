@@ -1,7 +1,9 @@
 const base = "https://bot-evolution-api.1lxz8u.easypanel.host";
+declare const Deno: { env: { get(name: string): string | undefined } };
+export class EvolutionError extends Error { constructor(public status: number) { super("Evolution indisponível ("+status+"). Verifique o servidor e tente atualizar."); } }
 export function reportInstance(userId: string) {
   if (!/^[a-f0-9-]{36}$/i.test(userId)) throw new Error("Usuário inválido.");
-  return "painel_relatorios_" + userId.replaceAll("-", "");
+  return "painel_relatorios_" + userId.replace(/-/g, "");
 }
 export async function evolutionReport(
   path: string,
@@ -22,13 +24,21 @@ export async function evolutionReport(
   } catch {
     throw new Error("Resposta inválida da Evolution.");
   }
-  if (!r.ok) throw new Error("Evolution indisponível (" + r.status + ").");
+  if (!r.ok) throw new EvolutionError(r.status);
   return data;
 }
 export async function connectionState(userId: string) {
   const instance = reportInstance(userId),
     data = await evolutionReport("/instance/connectionState/" + instance);
-  return { status: data.instance?.state === "open" ? "open" : "disconnected" };
+  if (!data.instance || typeof data.instance.state !== "string") throw new Error("Estado da Evolution não reconhecido.");
+  return { status: data.instance.state === "open" ? "open" : data.instance.state === "connecting" ? "connecting" : "disconnected" };
+}
+export async function connectionIdentity(userId: string) {
+  const name=reportInstance(userId);
+  const list=await evolutionReport("/instance/fetchInstances?instanceName="+encodeURIComponent(name));
+  const row=Array.isArray(list)?list.find(x=>(x.name || x.instance?.instanceName)===name):null;
+  const raw=row?.ownerJid || row?.instance?.ownerJid || row?.number;
+  return typeof raw==="string" ? raw.split("@")[0].replace(/\D/g,"") || null : null;
 }
 export async function verifyReportGroup(userId: string, groupId: string) {
   if (!/^\d+(?:-\d+)?@g\.us$/.test(groupId))
@@ -48,8 +58,9 @@ export async function dispatchReport(
   userId: string,
   groupId: string,
   text: string,
+  verified = false,
 ) {
-  await verifyReportGroup(userId, groupId);
+  if (!verified) await verifyReportGroup(userId, groupId);
   // No automatic retry after starting the provider request: timeouts may hide a successful send.
   try {
     const data = await evolutionReport(

@@ -12,7 +12,11 @@ export const voxiColumns = {
     "id,whatsapp_instance_id,contact_id,lead_id,pipeline_id,status,value,won_at",
   stage_history: "id,lead_id,to_stage,changed_at",
   acquisition_events:
-    "id,whatsapp_instance_id,lead_id,contact_id,ad_id,occurred_at",
+    "id,whatsapp_instance_id,lead_id,contact_id,opportunity_id,ad_id,occurred_at,provider,attribution_status",
+  clinicorp_connections:
+    "id,whatsapp_instance_id,enabled,last_synced_at,last_status,integration_mode,last_webhook_at",
+  clinicorp_budget_opportunities:
+    "id,whatsapp_instance_id,connection_id,clinicorp_budget_id,lead_id,approved_at,budget_amount,closed_at,clinicorp_budget_status",
 } as const;
 type Table = keyof typeof voxiColumns;
 export class VoxiReader {

@@ -127,17 +127,19 @@ describe("commercial semantics", () => {
     expect(r.metrics.leads).toBe(1);
     expect(r.warnings.join(" ")).toContain("sem funil");
   });
-  it("counts sales by actual won_at, not current position; no mapping stays N/D", () => {
+  it("counts sales by actual won_at, not current position; no mapping stays Indisponível", () => {
     const opps = [
       {
         id: id(40),
         lead_id: id(1),
+        status: "won",
         won_at: "2026-10-05T12:00:00Z",
         value: 500,
       },
       {
         id: id(41),
         lead_id: id(2),
+        status: "won",
         won_at: "2026-09-01T00:00:00Z",
         value: 100,
       },
@@ -201,7 +203,7 @@ describe("closed periods and safe schedules", () => {
       "2026-02-28",
     );
     expect(
-      scheduleSlot({ ...s, time: "08:30" }, new Date("2026-02-28T12:00:00Z")),
+      scheduleSlot({ ...s, time: "08:45" }, new Date("2026-02-28T12:00:00Z")),
     ).toBe("2026-02-28");
     expect(scheduleSlot(s, new Date("2026-02-28T16:00:00Z"))).toBeNull();
   });
@@ -216,13 +218,13 @@ describe("closed periods and safe schedules", () => {
       validateSettings({ ...defaultSettings, pipelines: ["other-client"] }),
     ).toThrow();
   });
-  it("shows missing data as N/D, not zero", () => {
-    const text = renderReport("Client", defaultSettings, {
+  it("shows missing data as Indisponível, not zero", () => {
+    const text = renderReport("Client", {...defaultSettings, metrics:["leads","scheduled"]}, {
       period: { startDate: "2026-10-01", endDate: "2026-10-07" },
       metrics: { leads: 10, scheduled: null },
       warnings: [],
     });
-    expect(text).toContain("agendamento: N/D");
+    expect(text).toContain("agendamento: Indisponível");
     expect(text).toContain("Leads reais · CRM: 10");
   });
 });

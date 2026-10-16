@@ -92,3 +92,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.create-team-users]
 verify_jwt = false
+[functions.client-workspace]
+verify_jwt = false

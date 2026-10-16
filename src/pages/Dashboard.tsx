@@ -20,13 +20,14 @@ import { useProfile } from "@/hooks/useProfile";
 import { AddClientDialog } from "@/components/AddClientDialog";
 import { BirthdayAlerts } from "@/components/BirthdayAlerts";
 import { calculateSlaStatus } from "@/lib/clientMonitoring";
+import { ArchivedClients } from "@/components/ArchivedClients";
 import { WorkspaceLoading } from "@/components/WorkspaceLoading";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { grupos, allGrupos, categorias, lastUpdate, categoriaFilter, setCategoriaFilter, loading: clientsLoading, messagesLoading, hasMessageStats, error: clientsError } = useClientData();
   const { signOut } = useAuth();
-  const { isAdmin, isMaster, gestorFilter, loading: profileLoading, profile } = useProfile();
+  const { isAdmin, isMaster, loading: profileLoading, profile } = useProfile();
   const [selectedGrupo, setSelectedGrupo] = useState<Grupo | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
@@ -49,21 +50,21 @@ export default function Dashboard() {
 
   const roleGrupos = useMemo(() => {
     if (profileLoading) return [];
-    let base = isAdmin ? grupos : (!gestorFilter ? [] : grupos.filter(g => g.gestor_responsavel === gestorFilter));
+    let base = grupos; // Server RLS scopes the portfolio by user ID.
     if (isAdmin && gestorFilterOverride) {
       base = base.filter(g => g.gestor_responsavel === gestorFilterOverride);
     }
     return base;
-  }, [grupos, isAdmin, gestorFilter, gestorFilterOverride, profileLoading]);
+  }, [grupos, isAdmin, gestorFilterOverride, profileLoading]);
 
   const roleAllGrupos = useMemo(() => {
     if (profileLoading) return [];
-    let base = isAdmin ? allGrupos : (!gestorFilter ? [] : allGrupos.filter(g => g.gestor_responsavel === gestorFilter));
+    let base = allGrupos;
     if (isAdmin && gestorFilterOverride) {
       base = base.filter(g => g.gestor_responsavel === gestorFilterOverride);
     }
     return base;
-  }, [allGrupos, isAdmin, gestorFilter, gestorFilterOverride, profileLoading]);
+  }, [allGrupos, isAdmin, gestorFilterOverride, profileLoading]);
 
   // Sound alert for pending demands
   const pendingCount = useMemo(
@@ -206,6 +207,7 @@ export default function Dashboard() {
                     {messagesLoading ? "Sincronizando em segundo plano" : "AO VIVO"}
                   </div>
                   <TVModeButton onClick={() => setTvMode(true)} />
+                  {isMaster && <ArchivedClients />}
                   <AddClientDialog />
                   
                 </div>

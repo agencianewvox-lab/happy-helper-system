@@ -30,9 +30,10 @@ describe("useClientData", () => {
     const groupsRequest = new Promise((resolve) => { resolveGroups = resolve; });
     const messagesRequest = new Promise((resolve) => { resolveMessages = resolve; });
     mocks.from.mockImplementation((table: string) => table === "whatsapp_grupos"
-      ? { select: () => ({ order: () => groupsRequest }) }
+      ? { select: () => ({ is: () => ({order: () => groupsRequest}) }) }
       : { select: () => ({ order: () => ({ range: () => messagesRequest }) }) });
 
+    mocks.invoke.mockImplementation((name:string)=>name==="client-workspace"?messagesRequest:Promise.resolve({data:{analytics:{}},error:null}));
     const { result } = renderHook(() => useClientData());
     expect(result.current.loading).toBe(true);
 
@@ -42,8 +43,9 @@ describe("useClientData", () => {
     expect(result.current.messagesLoading).toBe(true);
     expect(result.current.hasMessageStats).toBe(false);
 
-    act(() => resolveMessages({ data: [], count: 0, error: null }));
+    act(() => resolveMessages({ data: {}, error: null }));
     await waitFor(() => expect(result.current.hasMessageStats).toBe(true));
     expect(result.current.messagesLoading).toBe(false);
+    expect(mocks.from.mock.calls.every(([table])=>table==="whatsapp_grupos")).toBe(true);
   });
 });

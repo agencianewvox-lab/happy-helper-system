@@ -31,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientWorkspaceDialog } from "@/components/ClientWorkspace";
 import { SocialEditor } from "@/components/social/SocialEditor";
 import { EditorialCalendar } from "@/components/social/EditorialCalendar";
 import { InstagramAccounts } from "@/components/social/InstagramAccounts";
@@ -52,6 +53,7 @@ export default function Social() {
   const { user, signOut } = useAuth(),
     { isAdmin, isMaster, loading } = useProfile(),
     qc = useQueryClient();
+  const [workspaceClient, setWorkspaceClient] = useState<string | null>(null);
   const [tab, setTab] = useState(() =>
       new URLSearchParams(window.location.search).get("aba") === "accounts"
         ? "accounts"
@@ -326,6 +328,8 @@ export default function Social() {
                   </select>
                 </div>
               ) : null}
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4"><p className="text-sm text-muted-foreground">Consulte escopo, responsáveis e acessos sem abrir dados comerciais.</p><Button variant="outline" disabled={clientId === "all"} onClick={() => setWorkspaceClient(clientId)}>Ficha do cliente {clientId === "all" ? "· selecione um cliente" : ""}</Button></div>
+              <ClientWorkspaceDialog clientId={workspaceClient} onClose={() => setWorkspaceClient(null)} />
               <TabsContent value="calendar" className="space-y-4">
                 <div className="flex justify-between items-center gap-3">
                   <div>

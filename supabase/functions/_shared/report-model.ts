@@ -2,8 +2,8 @@ export const metricLabels = {
   leads: "Leads reais · CRM",
   scheduled: "Pessoas que avançaram para agendamento",
   attended: "Pessoas que avançaram para comparecimento",
-  sales: "Vendas registradas · CRM",
-  revenue: "Valor vendido · CRM",
+  sales: "Vendas fechadas · Meta / Voxi",
+  revenue: "Valor vendido · Meta / Voxi",
   spend: "Investimento · Meta",
   impressions: "Impressões · Meta",
   clicks: "Cliques no link · Meta",
@@ -14,6 +14,7 @@ export const metricLabels = {
 };
 export type Metric = keyof typeof metricLabels;
 export type ReportSettings = {
+  schemaVersion?: number;
   title: string;
   intro: string;
   metrics: Metric[];
@@ -46,7 +47,8 @@ export type ReportSettings = {
 export const defaultSettings: ReportSettings = {
   title: "Seu resultado com a Newvox",
   intro: "Olá, equipe! Confira o acompanhamento do período.",
-  metrics: ["leads", "scheduled", "attended", "sales", "spend", "cpl"],
+  schemaVersion: 2,
+  metrics: ["leads", "spend", "cpl"],
   pipelines: [],
   stages: { scheduled: [], attended: [] },
   period: "last7",
@@ -154,7 +156,10 @@ export function validateSettings(value: unknown): ReportSettings {
     (typeof s.template !== "string" || s.template.length > 7000)
   )
     throw new Error("Mensagem deve ter até 7.000 caracteres.");
+  if (s.includeAds && !s.metrics.includes(rankingMetric(s.ranking))) throw new Error("Selecione a métrica do critério de destaque ou desative os destaques.");
   if (s.template?.trim()) {
+    const unselected = templateMetrics(s.template).filter(m => !s.metrics.includes(m));
+    if (unselected.length) throw new Error("Variáveis de métricas não selecionadas: " + unselected.map(m => metricLabels[m]).join(", "));
     const unknown = unknownTokens(s.template);
     if (unknown.length)
       throw new Error("Variáveis não reconhecidas: " + unknown.join(", "));
@@ -186,6 +191,7 @@ export function validateSettings(value: unknown): ReportSettings {
   if (s.frequency === "once" && !validDate(s.onceDate))
     throw new Error("Escolha a data do envio único.");
   return {
+    schemaVersion: 2,
     title: s.title.trim(),
     intro: s.intro.trim(),
     metrics: s.metrics,
@@ -312,6 +318,7 @@ export function reportPeriod(s: ReportSettings, now = new Date()) {
 export function scheduleSlot(
   s: ReportSettings,
   now = new Date(),
+  allowLate = false,
 ): string | null {
   const p = localParts(now, s.timezone),
     d = new Date(p.date + "T12:00:00Z");
@@ -331,7 +338,7 @@ export function scheduleSlot(
   if (s.period === "custom" && s.frequency !== "once") return null;
   const [h, m] = s.time.split(":").map(Number),
     diff = p.minutes - h * 60 - m;
-  if (diff < 0 || diff > 180) return null;
+  if (diff < 0 || (!allowLate && diff > 15)) return null;
   if (s.frequency === "weekly" && !s.weekdays.includes(d.getUTCDay()))
     return null;
   const last = new Date(
@@ -345,103 +352,72 @@ export function scheduleSlot(
   // No version/hour in key: edits cannot duplicate an already dispatched local day.
   return p.date;
 }
-export function renderReport(
-  name: string,
-  s: ReportSettings,
-  result: any,
-): string {
-  const brl = (n: number) =>
-    new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(n);
-  const lines = [
-    "*NEWVOX | " + s.title + "*",
-    "*" + name.replace(/[\r\n]/g, " ") + "*",
-    result.period.startDate +
-      " a " +
-      result.period.endDate +
-      " · " +
-      s.timezone,
-    "",
-    s.intro,
-    "",
-  ];
-  for (const metric of s.metrics) {
-    const n = result.metrics[metric];
-    lines.push(
-      "• " +
-        metricLabels[metric] +
-        ": " +
-        (n === null || n === undefined
-          ? "N/D"
-          : ["revenue", "spend", "cpl", "cpc", "cpm"].includes(metric)
-            ? brl(n)
-            : metric === "ctr"
-              ? n.toFixed(2) + "%"
-              : n.toLocaleString("pt-BR")),
-    );
+export const rankingDescriptions: Record<ReportSettings["ranking"], string> = {
+  leads: "Mais pessoas com entrada real atribuída ao anúncio no Voxi. Não são leads estimados pela Meta.",
+  sales: "Mais vendas fechadas com atribuição Meta comprovada. A data é de aprovação/fechamento, não de recebimento.",
+  cpl: "Menor investimento por lead real atribuído. Anúncios sem amostra mínima não entram.",
+  clicks: "Mais cliques no link. Cliques não equivalem a leads ou vendas.",
+  spend: "Maior investimento no período. Mais gasto não comprova melhor desempenho.",
+  ctr: "Maior taxa de cliques no link, respeitando o mínimo de impressões.",
+  cpc: "Menor custo por clique no link, respeitando o mínimo de cliques.",
+};
+export const rankingLabels: Record<ReportSettings["ranking"], string> = {
+  leads: "Mais leads reais", sales: "Mais vendas fechadas", cpl: "Menor CPL real", clicks: "Mais cliques no link",
+  spend: "Maior investimento", ctr: "Maior CTR de link", cpc: "Menor CPC de link",
+};
+export function rankingMetric(ranking: ReportSettings["ranking"]): Metric { return ranking; }
+export function nextExecutions(s: ReportSettings, now = new Date(), count = 3): string[] {
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(s.time) || !Number.isFinite(+now)) return [];
+  try { new Intl.DateTimeFormat("en", { timeZone: s.timezone }); } catch { return []; }
+  const output: string[] = [];
+  const today = localParts(now, s.timezone).date;
+  const [h,m] = s.time.split(":").map(Number);
+  for (let day=0; day<1100 && output.length<count; day++) {
+    const date = shift(today, day);
+    const at = new Date(Date.parse(zonedMidnight(date,s.timezone))+(h*60+m)*60000);
+    if (at > now && scheduleSlot(s,at)) output.push(at.toISOString());
+    if(s.frequency==="once" && date >= (s.onceDate || today)) break;
   }
-  if (s.includeAds && result.ads?.length) {
-    lines.push("", "*Destaques dos anúncios*");
-    for (const [i, ad] of result.ads.entries()) {
-      lines.push(
-        i +
-          1 +
-          ". " +
-          ad.name +
-          " · " +
-          (s.dataMode === "meta"
-            ? ad.clicks + " cliques · " + brl(ad.spend) + " investidos"
-            : ad.leads +
-              " leads reais · " +
-              ad.sales +
-              " vendas" +
-              (ad.cpl !== null ? " · CPL " + brl(ad.cpl) : "")),
-      );
-      if (ad.url) lines.push(ad.url);
-    }
+  return output;
+}
+export function scheduleOccurrences(s: ReportSettings, from: Date, to: Date): {slot: string; at: string; expired: boolean}[] {
+  const out: {slot:string;at:string;expired:boolean}[] = [];
+  const start = localParts(from,s.timezone).date, end = localParts(to,s.timezone).date;
+  const [h,m]=s.time.split(":").map(Number);
+  for(let day=0; day<1100; day++) {
+    const date=shift(start,day); if(date>end) break;
+    const at=new Date(Date.parse(zonedMidnight(date,s.timezone))+(h*60+m)*60000);
+    if(at>=from && at<=to && scheduleSlot(s,at)) out.push({slot:date,at:at.toISOString(),expired:+to-+at>15*60000});
   }
-  if (s.includeCampaigns && result.campaigns?.length)
-    lines.push("", "*Campanhas do período*", campaignText(result.campaigns));
-  if (result.warnings?.length)
-    lines.push(
-      "",
-      "*Observações*",
-      ...result.warnings.map((w: string) => "• " + w),
-    );
-  const body = s.template?.trim()
-    ? renderTemplate(s.template, name, s, result)
-    : lines.join("\n");
-  const footer = [
-    "",
-    s.dataMode === "meta"
-      ? "Fonte: Meta Ads · Sem dados de CRM"
-      : "Dados comerciais: Voxi · Mídia: Meta",
-    s.dataMode === "meta"
-      ? "Cliques e impressões não equivalem a leads reais ou vendas."
-      : "Vendas: oportunidades ganhas no CRM. Etapas mostram avanço no período, não a posição atual.",
-  ];
-  if (s.template?.trim() && result.warnings?.length)
-    footer.unshift(
-      "",
-      "*Observações*",
-      ...result.warnings.map((w: string) => "• " + w),
-    );
-  if (s.campaignIds?.length)
-    footer.push(
-      "Mídia limitada a " +
-        s.campaignIds.length +
-        " campanha(s) selecionada(s)." +
-        (s.dataMode === "meta"
-          ? ""
-          : " Dados comerciais são da conta CRM inteira, salvo filtro de funil."),
-    );
-  const message = body + "\n" + footer.join("\n");
-  if (message.length > 12000)
-    throw new Error(
-      "Relatório excede 12.000 caracteres. Reduza o texto ou a quantidade de campanhas.",
-    );
+  return out;
+}
+export function metricValue(metric: Metric, value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "Indisponível";
+  if (["revenue","spend","cpl","cpc","cpm"].includes(metric)) return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(value);
+  return metric==="ctr" ? value.toFixed(2)+"%" : value.toLocaleString("pt-BR");
+}
+export function adHighlights(s: ReportSettings, result: any): string {
+  if(!s.includeAds || !s.metrics.includes(rankingMetric(s.ranking))) return "";
+  if(!result.ads?.length) return "*Destaques dos anúncios*\nNenhum anúncio atende ao critério e à amostra mínima.";
+  return "*Destaques dos anúncios*\nCritério: "+rankingLabels[s.ranking]+(s.ranking==="spend"?" (gasto, não eficiência)":"")+"\n"+
+    result.ads.map((ad:any,i:number) => (i+1)+". "+String(ad.name).replace(/[\r\n]/g," ")+" · "+
+      metricLabels[rankingMetric(s.ranking)]+": "+metricValue(rankingMetric(s.ranking),ad[s.ranking])+
+      (typeof ad.url==="string" && /^https:\/\//.test(ad.url) ? "\n"+ad.url : "")).join("\n");
+}
+export function renderReport(name:string,s:ReportSettings,result:any):string {
+  const body=s.template?.trim()?renderTemplate(s.template,name,s,result):[
+    "*NEWVOX | "+s.title+"*","*"+name.replace(/[\r\n]/g," ")+"*",
+    result.period.startDate+" a "+result.period.endDate+" · "+s.timezone,"",s.intro,"",
+    ...s.metrics.map(m=>"• "+metricLabels[m]+": "+metricValue(m,result.metrics[m])),
+    ...(s.includeAds?["",adHighlights(s,result)]:[]),
+    ...(s.includeCampaigns && result.campaigns?.length?["","*Campanhas do período*",campaignText(result.campaigns,s)]:[]),
+  ].join("\n");
+  // Diagnostic warnings belong only to the internal review, never to the customer's message.
+  const footer=[s.dataMode==="meta"?"Fonte: Meta Ads · Sem dados de CRM":"Fontes: Voxi (comercial) · Meta (mídia)"];
+  if(s.dataMode!=="meta" && s.metrics.some(m=>m==="sales"||m==="revenue")) footer.push("Vendas Meta fechadas por "+(result.salesSource==="clinicorp"?"aprovação de orçamento Clinicorp":"fechamento no CRM")+". Não são recebimentos.");
+  if(s.campaignIds?.length) footer.push("Recorte: campanhas selecionadas pelo gestor.");
+  const message=body+"\n\n"+footer.join("\n");
+  if(message.length>12000)throw new Error("Relatório excede 12.000 caracteres. Reduza o texto ou a quantidade de campanhas.");
   return message;
 }
 function validDate(date: unknown): date is string {
@@ -519,68 +495,17 @@ export function templateFromSettings(s: ReportSettings) {
     (s.includeAds ? "\n\n{{melhores_anuncios}}" : "")
   );
 }
-export function renderTemplate(
-  template: string,
-  name: string,
-  s: ReportSettings,
-  result: any,
-) {
-  const money = (n: number) =>
-    new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(n);
-  const values: Record<string, string> = {
-    cliente: name.replace(/[\r\n]/g, " "),
-    periodo:
-      result.period.startDate +
-      " a " +
-      result.period.endDate +
-      " · " +
-      s.timezone,
-    titulo: s.title,
-    abertura: s.intro,
-    campanhas:
-      s.includeCampaigns && result.campaigns?.length
-        ? "*Campanhas do período*\n" + campaignText(result.campaigns)
-        : "",
-    melhores_anuncios:
-      s.includeAds && result.ads?.length
-        ? "*Destaques dos anúncios*\n" +
-          result.ads
-            .map(
-              (ad: any, i: number) =>
-                i +
-                1 +
-                ". " +
-                ad.name +
-                " · " +
-                (s.dataMode === "meta"
-                  ? ad.clicks + " cliques · " + money(ad.spend) + " investidos"
-                  : ad.leads +
-                    " leads reais · " +
-                    ad.sales +
-                    " vendas" +
-                    (ad.cpl != null ? " · CPL " + money(ad.cpl) : "")),
-            )
-            .join("\n")
-        : "",
+export function renderTemplate(template:string,name:string,s:ReportSettings,result:any) {
+  const unselected=templateMetrics(template).filter(m=>!s.metrics.includes(m));
+  if(unselected.length) throw new Error("A mensagem contém métricas desmarcadas. Revise as variáveis.");
+  const values:Record<string,string>={
+    cliente:name.replace(/[\r\n]/g," "),periodo:result.period.startDate+" a "+result.period.endDate+" · "+s.timezone,
+    titulo:s.title,abertura:s.intro,
+    campanhas:s.includeCampaigns&&result.campaigns?.length?"*Campanhas do período*\n"+campaignText(result.campaigns,s):"",
+    melhores_anuncios:adHighlights(s,result),
   };
-  for (const [metric, token] of Object.entries(metricTokens)) {
-    const n = result.metrics[metric];
-    values[token] =
-      n == null || !Number.isFinite(n)
-        ? "N/D"
-        : ["revenue", "spend", "cpl", "cpc", "cpm"].includes(metric)
-          ? money(n)
-          : metric === "ctr"
-            ? n.toFixed(2) + "%"
-            : n.toLocaleString("pt-BR");
-  }
-  return template.replace(
-    /{{\s*([^{}]+)\s*}}/g,
-    (_, key) => values[tokenName(key)] ?? "N/D",
-  );
+  for(const metric of s.metrics) values[metricTokens[metric]]=metricValue(metric,result.metrics[metric]);
+  return template.replace(/{{\s*([^{}]+)\s*}}/g,(_,key)=>values[tokenName(key)]??"Indisponível");
 }
 export function templateMetrics(template: string): Metric[] {
   const tokens = new Set(
@@ -590,26 +515,7 @@ export function templateMetrics(template: string): Metric[] {
     tokens.has(metricTokens[m]),
   );
 }
-function campaignText(campaigns: any[]) {
-  const money = (n: number) =>
-    new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(n);
-  return campaigns
-    .map(
-      (c: any) =>
-        "• " +
-        c.name +
-        "\n  Investimento: " +
-        money(c.spend) +
-        " · Cliques: " +
-        c.clicks.toLocaleString("pt-BR") +
-        " · Impressões: " +
-        c.impressions.toLocaleString("pt-BR") +
-        " · CTR: " +
-        c.ctr.toFixed(2) +
-        "%",
-    )
-    .join("\n");
+function campaignText(campaigns:any[],s:ReportSettings) {
+  const metrics=s.metrics.filter(m=>["spend","clicks","impressions","ctr","cpc","cpm"].includes(m));
+  return campaigns.map(c=>"• "+c.name+"\n  "+metrics.map(m=>metricLabels[m]+": "+metricValue(m,c[m])).join(" · ")).join("\n");
 }

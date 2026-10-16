@@ -1,12 +1,15 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientDetailModal } from "@/components/ClientDetailModal";
 import type { Grupo } from "@/types/client";
 
 const mocks = vi.hoisted(() => ({
-  remove: vi.fn(), toast: { success: vi.fn(), error: vi.fn() },
+  remove: vi.fn(), workspace: vi.fn(), toast: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "operator" } }) }));
+vi.mock("@/hooks/useProfile", () => ({ useProfile: () => ({isMaster: true}) }));
+vi.mock("@/components/ClientWorkspace", () => ({ClientWorkspace: () => null}));
+vi.mock("@/lib/client-workspace", () => ({clientWorkspace: mocks.workspace}));
 vi.mock("sonner", () => ({ toast: mocks.toast }));
 vi.mock("@/components/MetaAdsTab", () => ({ MetaAdsTab: () => null }));
 vi.mock("@/components/NpsSurveyTab", () => ({ NpsSurveyTab: () => null }));
@@ -41,17 +44,18 @@ const client: Grupo = {
   gestor_responsavel: null, estrelas_dificuldade: null, estrelas_financeiro: null,
   estrelas_temperamento: null,
 };
-const openWarning = () => fireEvent.click(screen.getByRole("button", { name: "Excluir cliente" }));
+const openWarning = () => fireEvent.click(screen.getByRole("button", { name: "Arquivar cliente" }));
 const confirm = () => {
-  fireEvent.change(screen.getByLabelText("Digite EXCLUIR para confirmar"), { target: { value: "EXCLUIR" } });
-  fireEvent.click(screen.getByRole("button", { name: "Excluir definitivamente" }));
+  fireEvent.change(screen.getByLabelText("Digite ARQUIVAR para confirmar"), { target: { value: "ARQUIVAR" } });
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Arquivar cliente" }));
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.workspace.mockResolvedValue({ok:true});
   mocks.remove.mockResolvedValue({ error: null, data: [{ id: "client-a" }] });
 });
 
-describe("Client card deletion integration (mock database only)", () => {
+describe("Client card archive integration (mock database only)", () => {
   it("opening and cancelling the warning issues no delete request", async () => {
     render(<ClientDetailModal grupo={client} open onClose={vi.fn()} />);
     openWarning();
@@ -62,35 +66,31 @@ describe("Client card deletion integration (mock database only)", () => {
     expect(mocks.remove).not.toHaveBeenCalled();
   });
 
-  it("deletes only the selected client's rows after explicit confirmation", async () => {
+  it("archives only the selected client after explicit confirmation", async () => {
     const close = vi.fn();
     render(<ClientDetailModal grupo={client} open onClose={close} />);
     openWarning();
     confirm();
     await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
-    expect(mocks.remove).toHaveBeenCalledTimes(12);
-    for (const [table, column, value] of mocks.remove.mock.calls) {
-      expect(column).toBe(table === "whatsapp_grupos" ? "id" : "group_id");
-      expect(value).toBe(table === "whatsapp_grupos" ? client.id : client.group_id);
-    }
-    expect(mocks.remove.mock.calls.at(-1)?.[0]).toBe("whatsapp_grupos");
+    expect(mocks.workspace).toHaveBeenCalledWith("archive",client.id);
+    expect(mocks.remove).not.toHaveBeenCalled();
     expect(mocks.toast.success).toHaveBeenCalledTimes(1);
   });
 
   it("does not remove the card or report success when a related deletion fails", async () => {
-    mocks.remove.mockImplementation(async (table: string) => ({ error: table === "tasks" ? { message: "denied" } : null }));
+    mocks.workspace.mockRejectedValue(new Error("denied"));
     const close = vi.fn();
     render(<ClientDetailModal grupo={client} open onClose={close} />);
     openWarning();
     confirm();
-    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível concluir");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível confirmar");
     expect(mocks.remove.mock.calls.some(([table]) => table === "whatsapp_grupos")).toBe(false);
     expect(close).not.toHaveBeenCalled();
     expect(mocks.toast.success).not.toHaveBeenCalled();
   });
 
   it("does not claim success if the database did not confirm removal of the card", async () => {
-    mocks.remove.mockResolvedValue({ error: null, data: [] });
+    mocks.workspace.mockResolvedValue({ok:false});
     render(<ClientDetailModal grupo={client} open onClose={vi.fn()} />);
     openWarning();
     confirm();
@@ -102,14 +102,14 @@ describe("Client card deletion integration (mock database only)", () => {
     const close = vi.fn();
     const { rerender } = render(<ClientDetailModal grupo={client} open onClose={close} />);
     openWarning();
-    fireEvent.change(screen.getByLabelText("Digite EXCLUIR para confirmar"), { target: { value: "EXCLUIR" } });
+    fireEvent.change(screen.getByLabelText("Digite ARQUIVAR para confirmar"), { target: { value: "ARQUIVAR" } });
     await act(async () => {
       rerender(<ClientDetailModal grupo={{ ...client, id: "client-b", group_id: "group-b@g.us", nome: "Outro cliente" }} open onClose={close} />);
     });
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     await act(async () => openWarning());
     expect(screen.getByRole("alertdialog")).toHaveTextContent("Outro cliente");
-    expect(screen.getByRole("button", { name: "Excluir definitivamente" })).toBeDisabled();
+    expect(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Arquivar cliente" })).toBeDisabled();
     expect(mocks.remove).not.toHaveBeenCalled();
   });
 });

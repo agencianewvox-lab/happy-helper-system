@@ -1,7 +1,6 @@
 import { Fragment } from "react";
 import {
   MessageCircle,
-  CheckCheck,
   MoreVertical,
   ArrowLeft,
 } from "lucide-react";
@@ -9,9 +8,9 @@ function MessageText({ text }: { text: string }) {
   return (
     <>
       {text
-        .split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|{{[^{}]+}})/g)
+        .split(/(https?:\/\/[^\s]+|\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|{{[^{}]+}})/g)
         .map((part, i) =>
-          part.startsWith("{{") ? (
+          /^https?:\/\//.test(part) ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-sky-300 underline break-all">{part}</a> : part.startsWith("{{") ? (
             <span key={i} className="rounded bg-sky-500/15 px-1 text-sky-300">
               {part}
             </span>
@@ -32,10 +31,12 @@ export function WhatsAppPreview({
   name,
   message,
   draft = false,
+  sender,
 }: {
   name: string;
   message: string;
   draft?: boolean;
+  sender?: string;
 }) {
   return (
     <section
@@ -75,10 +76,7 @@ export function WhatsAppPreview({
           <div className="whitespace-pre-wrap break-words">
             <MessageText text={message} />
           </div>
-          <div className="mt-2 flex justify-end items-center gap-1 text-[10px] text-[#b1d5ca]">
-            <span>09:00</span>
-            <CheckCheck size={15} aria-hidden />
-          </div>
+          {sender && <p className="mt-3 border-t border-white/10 pt-2 text-[10px] text-[#b1d5ca]">Remetente: {sender}</p>}
         </div>
       </div>
     </section>

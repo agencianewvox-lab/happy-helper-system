@@ -7,6 +7,11 @@ export {
   unknownTokens,
   reportPeriod,
   crmMetrics,
+  nextExecutions,
+  rankingLabels,
+  rankingDescriptions,
+  rankingMetric,
+  templateMetrics,
 } from "../../supabase/functions/_shared/report-model";
 export type {
   ReportSettings,
@@ -24,6 +29,9 @@ export type ReportConfig = {
   owner_user_id: string;
   enabled: boolean;
   version: number;
+  review_required?: boolean;
+  preview_hash?: string | null;
+  nextExecutions?: string[];
   settings: import("../../supabase/functions/_shared/report-model").ReportSettings;
 };
 export type ReportSource = {
@@ -45,7 +53,7 @@ export type ReportBootstrap = {
   clients: ReportClient[];
   configs: ReportConfig[];
   sources: ReportSource[];
-  connection: { status: string } | null;
+  connection: { status: string; phone?: string; last_checked_at?: string; last_error?: string } | null;
   runs: ReportRun[];
   profiles: { user_id: string; full_name: string }[];
 };
@@ -71,8 +79,10 @@ export async function reportsApi<T = Record<string, unknown>>(
 export const runLabels: Record<string, string> = {
   queued: "Na fila",
   processing: "Preparando",
+  sending: "Enviando",
+  expired: "Expirou · não enviado",
   accepted: "Aceito pela Evolution",
   failed: "Falhou",
-  uncertain: "Conferir no grupo",
+  uncertain: "Confirmação incerta · conferir no grupo",
   skipped: "Cancelado / expirado",
 };

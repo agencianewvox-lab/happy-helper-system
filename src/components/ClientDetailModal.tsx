@@ -32,6 +32,9 @@ import { OnboardingTab } from "@/components/OnboardingTab";
 import { OnboardingSendDialog } from "@/components/OnboardingSendDialog";
 import { ClientHealthPanel } from "./ClientHealth";
 import { deduplicateMessages } from "@/lib/message-deduplication";
+import { ClientWorkspace } from "@/components/ClientWorkspace";
+import { clientWorkspace } from "@/lib/client-workspace";
+import { useProfile } from "@/hooks/useProfile";
 import { DeleteClientDialog } from "@/components/DeleteClientDialog";
 
 interface Conversa {
@@ -85,6 +88,8 @@ function trendLabel(trend?: string) {
 
 export function ClientDetailModal({ grupo, open, onClose }: Props) {
   const { user } = useAuth();
+  const { isMaster } = useProfile();
+  const [activeTab, setActiveTab] = useState("indicadores");
   const [resolutions, setResolutions] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -92,7 +97,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   const [loadingConversas, setLoadingConversas] = useState(false);
   const [clientInfo, setClientInfo] = useState({
     plano: "", investimento_ads: "", investimento_google_ads: "", plataforma_ads: "", data_entrada: "", data_ciclo_ads: "",
-    aniversario_cliente: "", aniversario_empresa: "", acessos_cliente: "",
+    aniversario_cliente: "", aniversario_empresa: "",
     gestor_responsavel: "", briefing: "", estrelas_dificuldade: "", estrelas_financeiro: "", estrelas_temperamento: "",
     responsavel_master: "", responsavel_socio: "",
   });
@@ -149,7 +154,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
   const fetchClientInfo = useCallback(async () => {
     if (!grupo?.id) return;
     const { data } = await supabase.from("whatsapp_grupos")
-      .select("plano, investimento_ads, investimento_google_ads, plataforma_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, acessos_cliente, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, responsavel_master, responsavel_socio")
+      .select("plano, investimento_ads, investimento_google_ads, plataforma_ads, data_entrada, data_ciclo_ads, aniversario_cliente, aniversario_empresa, gestor_responsavel, briefing, estrelas_dificuldade, estrelas_financeiro, estrelas_temperamento, responsavel_master, responsavel_socio")
       .eq("id", grupo.id).single();
     if (data) {
       setClientInfo({
@@ -161,7 +166,6 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
         data_ciclo_ads: (data as any).data_ciclo_ads || "",
         aniversario_cliente: (data as any).aniversario_cliente || "",
         aniversario_empresa: (data as any).aniversario_empresa || "",
-        acessos_cliente: (data as any).acessos_cliente || "",
         gestor_responsavel: (data as any).gestor_responsavel || "",
         briefing: (data as any).briefing || "",
         estrelas_dificuldade: (data as any).estrelas_dificuldade != null ? String((data as any).estrelas_dificuldade) : "",
@@ -178,7 +182,6 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     setSavingInfo(true);
     setInfoSaved(false);
     const { error } = await supabase.from("whatsapp_grupos").update({
-      plano: clientInfo.plano || null,
       investimento_ads: clientInfo.investimento_ads ? Number(clientInfo.investimento_ads) : null,
       investimento_google_ads: clientInfo.investimento_google_ads ? Number(clientInfo.investimento_google_ads) : null,
       plataforma_ads: clientInfo.plataforma_ads || null,
@@ -186,23 +189,21 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
       data_ciclo_ads: clientInfo.data_ciclo_ads || null,
       aniversario_cliente: clientInfo.aniversario_cliente || null,
       aniversario_empresa: clientInfo.aniversario_empresa || null,
-      acessos_cliente: clientInfo.acessos_cliente || null,
-      gestor_responsavel: clientInfo.gestor_responsavel || null,
       briefing: clientInfo.briefing || null,
       estrelas_dificuldade: clientInfo.estrelas_dificuldade ? Number(clientInfo.estrelas_dificuldade) : null,
       estrelas_financeiro: clientInfo.estrelas_financeiro ? Number(clientInfo.estrelas_financeiro) : null,
       estrelas_temperamento: clientInfo.estrelas_temperamento ? Number(clientInfo.estrelas_temperamento) : null,
-      responsavel_master: clientInfo.responsavel_master || null,
-      responsavel_socio: clientInfo.responsavel_socio || null,
     } as any).eq("id", grupo.id);
     setSavingInfo(false);
+    if (error) { toast.error("Não foi possível salvar as informações."); return; }
     if (!error) { setInfoSaved(true); setTimeout(() => setInfoSaved(false), 2000); }
   }, [grupo?.id, clientInfo]);
 
   useEffect(() => {
-    if (open) { fetchResolutions(); fetchConversas(); fetchClientInfo(); }
+    if (open) { fetchResolutions(); fetchClientInfo(); }
+    if (open && activeTab === "conversas") void fetchConversas();
     return () => { conversationRequest.current++; };
-  }, [open, fetchResolutions, fetchConversas, fetchClientInfo]);
+  }, [open, activeTab, fetchResolutions, fetchConversas, fetchClientInfo]);
 
   const conversasByDate = useMemo(() => {
     const groups: Record<string, Conversa[]> = {};
@@ -237,29 +238,9 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
     if (!grupo?.id || !grupo?.group_id || deleting) throw new Error("Cliente indisponível para exclusão");
     setDeleting(true);
     try {
-      const gid = grupo.group_id;
-      // Delete all related data in parallel
-      const relatedResults = await Promise.all([
-        supabase.from("whatsapp_conversas").delete().eq("group_id", gid),
-        supabase.from("client_notes").delete().eq("group_id", gid),
-        supabase.from("pending_demand_resolutions").delete().eq("group_id", gid),
-        supabase.from("nps_surveys").delete().eq("group_id", gid),
-        supabase.from("nps_predictions").delete().eq("group_id", gid),
-        supabase.from("nps_prediction_history").delete().eq("group_id", gid),
-        supabase.from("onboarding_responses").delete().eq("group_id", gid),
-
-        supabase.from("calendar_events").delete().eq("group_id", gid),
-        supabase.from("master_notifications").delete().eq("group_id", gid),
-        supabase.from("team_feedback_log").delete().eq("group_id", gid),
-        supabase.from("tasks").delete().eq("group_id", gid),
-      ]);
-      const relatedError = relatedResults.find((result) => result.error)?.error;
-      if (relatedError) throw relatedError;
-      // Finally delete the group itself
-      const { data, error } = await supabase.from("whatsapp_grupos").delete().eq("id", grupo.id).select("id");
-      if (error) throw error;
-      if (data?.length !== 1) throw new Error("A exclusão do cliente não foi confirmada pelo banco");
-      toast.success("Cliente e todos os dados relacionados foram excluídos!");
+    const result = await clientWorkspace<{ok:boolean}>("archive", grupo.id);
+    if (!result?.ok) throw new Error("Arquivamento não confirmado.");
+      toast.success("Cliente arquivado. O histórico foi preservado e os relatórios foram bloqueados.");
       onClose();
     } finally {
       setDeleting(false);
@@ -303,19 +284,21 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                 </Badge>
               )}
             </div>
-            <DeleteClientDialog key={`${grupo.id}:${open}`} clientName={grupo.nome} onConfirm={handleDelete} />
+            {isMaster && <DeleteClientDialog key={`${grupo.id}:${open}`} clientName={grupo.nome} onConfirm={handleDelete} />}
           </div>
           {isPriorityMax && a?.priority_reason && (
             <p className="text-xs text-red-500 font-semibold mt-1">🚨 {a.priority_reason}</p>
           )}
         </DialogHeader>
 
-        <Tabs defaultValue="indicadores" className="mt-2" onValueChange={(val) => {
+        <Tabs value={activeTab} className="mt-2" onValueChange={(val) => {
+          setActiveTab(val);
           if (val === "conversas") setTimeout(() => conversasEndRef.current?.scrollIntoView({ behavior: "auto" }), 100);
         }}>
           <div className="max-w-full overflow-x-auto pb-1"><TabsList className="w-full min-w-max">
             <TabsTrigger value="indicadores" className="flex-1">Indicadores</TabsTrigger>
             <TabsTrigger value="conversas" className="flex-1">Conversas ({conversas.length})</TabsTrigger>
+            <TabsTrigger value="ficha" className="flex-1">Ficha do cliente</TabsTrigger>
             <TabsTrigger value="info" className="flex-1">Informações</TabsTrigger>
             <TabsTrigger value="meta-ads" className="flex-1 gap-1"><Megaphone className="w-3 h-3" /> Ads</TabsTrigger>
             <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
@@ -590,6 +573,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
           </TabsContent>
 
           {/* Tab: Informações */}
+          <TabsContent value="ficha" className="mt-4"><ClientWorkspace key={grupo.id} clientId={grupo.id} /></TabsContent>
           <TabsContent value="info" className="space-y-4 mt-4">
             {basicItems.map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
@@ -614,13 +598,6 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
             <div className="border-t border-border/40 pt-4">
               <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3">📌 Dados do Cliente</p>
               <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
-                  <Briefcase className="w-4 h-4 mt-2 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <Label className="text-xs text-muted-foreground font-medium">Plano</Label>
-                    <Input value={clientInfo.plano} onChange={(e) => setClientInfo(prev => ({ ...prev, plano: e.target.value }))} placeholder="Ex: SM + Tráfego Pago" className="mt-1 h-8 text-sm bg-background/50" />
-                  </div>
-                </div>
                 {/* Plataforma de Ads */}
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
                   <Megaphone className="w-4 h-4 mt-2 text-blue-500 shrink-0" />
@@ -696,36 +673,6 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
-                    <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <Label className="text-xs text-muted-foreground font-medium">Responsável Master</Label>
-                      <Input value={clientInfo.responsavel_master} onChange={(e) => setClientInfo(prev => ({ ...prev, responsavel_master: e.target.value }))} placeholder="Nome do responsável master" className="mt-1 h-8 text-sm bg-background/50" />
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
-                    <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <Label className="text-xs text-muted-foreground font-medium">Responsável Sócio/Supervisor</Label>
-                      <Input value={clientInfo.responsavel_socio} onChange={(e) => setClientInfo(prev => ({ ...prev, responsavel_socio: e.target.value }))} placeholder="Nome do sócio/supervisor" className="mt-1 h-8 text-sm bg-background/50" />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                  <UserCheck className="w-4 h-4 mt-2 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <Label className="text-xs text-muted-foreground font-medium">Gestor Responsável</Label>
-                    <Select value={clientInfo.gestor_responsavel} onValueChange={(val) => setClientInfo(prev => ({ ...prev, gestor_responsavel: val }))}>
-                      <SelectTrigger className="mt-1 h-8 text-sm bg-background/50"><SelectValue placeholder="Selecione o gestor" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Netto Monge">Netto Monge</SelectItem>
-                        <SelectItem value="Murilo Araújo">Murilo Araújo</SelectItem>
-
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
                 {/* Classificação por Categorias */}
                 <div className="space-y-3">
                   {/* Dificuldade de Gerar Resultado */}
@@ -793,13 +740,6 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
                         ))}
                       </div>
                     </div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">
-                  <KeyRound className="w-4 h-4 mt-2 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <Label className="text-xs text-muted-foreground font-medium">Acessos do Cliente</Label>
-                    <Textarea value={clientInfo.acessos_cliente} onChange={(e) => setClientInfo(prev => ({ ...prev, acessos_cliente: e.target.value }))} placeholder="Logins, senhas, links de acesso..." className="mt-1 text-sm bg-background/50 min-h-[60px]" />
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">

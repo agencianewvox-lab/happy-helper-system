@@ -30,7 +30,7 @@ export function DeleteClientDialog({ clientName, onConfirm }: Props) {
   }
 
   async function confirmDeletion() {
-    if (!open || confirmation !== "EXCLUIR" || inFlight.current) return;
+    if (!open || confirmation !== "ARQUIVAR" || inFlight.current) return;
     inFlight.current = true;
     setPending(true);
     setError(null);
@@ -40,7 +40,7 @@ export function DeleteClientDialog({ clientName, onConfirm }: Props) {
       setConfirmation("");
     } catch {
       setConfirmation("");
-      setError("Não foi possível concluir a exclusão. Alguns registros podem ter sido removidos. Atualize o painel e confira o cliente antes de tentar novamente.");
+      setError("Não foi possível confirmar o arquivamento. Nenhum histórico foi apagado. Atualize e confira antes de tentar novamente.");
     } finally {
       inFlight.current = false;
       setPending(false);
@@ -50,8 +50,8 @@ export function DeleteClientDialog({ clientName, onConfirm }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={changeOpen}>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" aria-label="Excluir cliente"
-          title="Excluir cliente" className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        <Button type="button" variant="ghost" size="icon" aria-label="Arquivar cliente"
+          title="Arquivar cliente" className="text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={(event) => event.stopPropagation()}>
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </Button>
@@ -59,25 +59,24 @@ export function DeleteClientDialog({ clientName, onConfirm }: Props) {
       <AlertDialogContent className="w-[calc(100%-2rem)] rounded-xl" aria-busy={pending}
         onEscapeKeyDown={(event) => { if (inFlight.current) event.preventDefault(); }}>
         <AlertDialogHeader>
-          <AlertDialogTitle>Tem certeza que deseja excluir este cliente?</AlertDialogTitle>
+          <AlertDialogTitle>Tem certeza que deseja arquivar este cliente?</AlertDialogTitle>
           <AlertDialogDescription>
-            Você está prestes a excluir <strong className="font-semibold text-foreground">{clientName}</strong>.
-            {" "}O cadastro, as conversas, o onboarding, as notas, as tarefas e os indicadores relacionados
-            serão apagados permanentemente. Esta ação não pode ser desfeita pelo painel.
+            Você está prestes a arquivar <strong className="font-semibold text-foreground">{clientName}</strong>.
+            {" "}O cliente sairá da carteira ativa e não receberá novos relatórios. Conversas, onboarding, notas e histórico serão preservados. O Master poderá restaurá-lo.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-2">
-          <Label htmlFor={inputId}>Digite EXCLUIR para confirmar</Label>
+          <Label htmlFor={inputId}>Digite ARQUIVAR para confirmar</Label>
           <Input id={inputId} value={confirmation} onChange={(event) => setConfirmation(event.target.value)}
-            disabled={pending} autoComplete="off" spellCheck={false} placeholder="EXCLUIR" />
+            disabled={pending} autoComplete="off" spellCheck={false} placeholder="ARQUIVAR" />
         </div>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancelar, manter cliente</AlertDialogCancel>
-          <Button type="button" variant="destructive" disabled={confirmation !== "EXCLUIR" || pending}
+          <Button type="button" variant="destructive" disabled={confirmation !== "ARQUIVAR" || pending}
             onClick={confirmDeletion}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-            {pending ? "Excluindo…" : "Excluir definitivamente"}
+            {pending ? "Arquivando…" : "Arquivar cliente"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

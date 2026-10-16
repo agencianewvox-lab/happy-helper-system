@@ -85,6 +85,8 @@ export const COACH_TYPE_LABELS: Record<string, string> = {
 };
 
 export interface Grupo {
+  plano?: string | null;
+  manager_user_id?: string | null;
   id: string;
   group_id: string;
   nome: string;

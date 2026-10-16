@@ -1026,6 +1026,9 @@ export type Database = {
       }
       whatsapp_grupos: {
         Row: {
+          manager_user_id: string | null
+          archived_at: string | null
+          archived_by: string | null
           acessos_cliente: string | null
           ad_account_id: string | null
           aniversario_cliente: string | null
@@ -1050,6 +1053,9 @@ export type Database = {
           responsavel_socio: string | null
         }
         Insert: {
+          manager_user_id?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           acessos_cliente?: string | null
           ad_account_id?: string | null
           aniversario_cliente?: string | null
@@ -1074,6 +1080,9 @@ export type Database = {
           responsavel_socio?: string | null
         }
         Update: {
+          manager_user_id?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           acessos_cliente?: string | null
           ad_account_id?: string | null
           aniversario_cliente?: string | null

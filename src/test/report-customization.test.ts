@@ -24,6 +24,7 @@ describe("custom report content and period", () => {
   it("supports aliases and exact custom message order", () => {
     const s = {
       ...defaultSettings,
+      metrics: [...defaultSettings.metrics, "sales" as const],
       template:
         "Leads: {{Leads reais voxi}}\nValor investido: {{meta ads}}\nVendas: {{vendas}}",
     };
@@ -33,7 +34,7 @@ describe("custom report content and period", () => {
       warnings: [],
     });
     expect(text).toMatch(/^Leads: 12\nValor investido: R\$/);
-    expect(text).toContain("Vendas: N/D");
+    expect(text).toContain("Vendas: Indisponível");
     expect(text).not.toContain("{{");
   });
   it("rejects unknown or malformed placeholders", () => {
@@ -139,6 +140,7 @@ describe("Meta only dataflow", () => {
           ],
         }),
       );
+    fetcher.mockResolvedValueOnce(Response.json({"1":{id:"1",name:"Ad A",account_id:"123",campaign_id:"100",preview_shareable_link:"https://www.facebook.com/ads/1"}}));
     vi.stubGlobal("fetch", fetcher);
     const transport = vi.fn();
     const result = await collectReport(
@@ -178,16 +180,16 @@ describe("Meta only dataflow", () => {
           Response.json({ data: [{ id: "200", name: "Other" }] }),
         ),
     );
-    await expect(
-      collectReport(
+    const result = await collectReport(
         new VoxiReader(""),
         null,
         { ...settings(), campaignIds: ["100"] },
         "123",
         new Date(),
         "key",
-      ),
-    ).rejects.toThrow(/não pertence/);
+      );
+    expect(result.blockingReasons.length).toBeGreaterThan(0);
+    expect(result.warnings.join(" ")).toMatch(/não pertence/);
   });
   it("fails instead of sending a misleading zero report if Meta is unavailable", async () => {
     vi.stubGlobal(
@@ -196,15 +198,16 @@ describe("Meta only dataflow", () => {
         .fn()
         .mockResolvedValueOnce(Response.json({ error: {} }, { status: 401 })),
     );
-    await expect(
-      collectReport(
+    const result = await collectReport(
         new VoxiReader(""),
         null,
         settings(),
         "123",
         new Date(),
         "key",
-      ),
-    ).rejects.toThrow(/indisponível/);
+      );
+    expect(result.blockingReasons.length).toBeGreaterThan(0);
+    expect(result.warnings.join(" ")).toMatch(/indisponível/);
+    expect(result.metrics.spend).toBeNull();
   });
 });
