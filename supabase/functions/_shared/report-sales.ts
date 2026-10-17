@@ -39,7 +39,11 @@ export function closedSales(input: {
   });
   if (unavailable)
     warnings.push(
-      "Clinicorp sem sincronização suficiente ou com erro. Vendas e valor vendido estão indisponíveis; não foram substituídos por oportunidades.",
+      "Clinicorp sem sincronização suficiente ou com erro. Última sincronização: " +
+        connections
+          .map((c) => c.last_synced_at || c.last_webhook_at || "não informada")
+          .join(", ") +
+        ". Vendas e valor vendido estão indisponíveis; o zero exibido por uma tela não comprova ausência de vendas. Não foram substituídos por oportunidades.",
     );
   const leadMap = new Map(
     input.leads

@@ -105,6 +105,19 @@ export function ReportEditor({
         salesSource?: string | null;
         salesAudit?: Record<string, number>;
         metaAccountName?: string;
+        measurement?: {
+          leadOrigin: string;
+          stageSource: string;
+          attributedMetaLeads?: number;
+          metaTimezone?: string;
+          sameCalendarWindow?: boolean;
+        };
+        reconciliation?: {
+          liveSpend: number;
+          cachedSpend: number | null;
+          difference: number | null;
+          missingDays: string[];
+        };
       };
       sender?: { name: string; phone: string | null };
       destination?: { name: string; id: string };
@@ -585,7 +598,8 @@ export function ReportEditor({
                   <h3 className="font-semibold">Campanhas incluídas</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Sem seleção: toda a conta Meta. O filtro limita mídia, custo
-                    por lead e ranking; não altera os totais comerciais do CRM.
+                    por lead e ranking. No modo CRM, também filtra os resultados
+                    comerciais com anúncio comprovado na campanha selecionada.
                   </p>
                 </div>
                 <Button
@@ -681,6 +695,65 @@ export function ReportEditor({
             </div>
             {!metaOnly ? (
               <div className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-5 rounded-xl border p-4">
+                  <label className="space-y-2 text-sm">
+                    <span className="block font-medium">
+                      Origem dos leads e da agenda
+                    </span>
+                    <select
+                      aria-label="Origem dos leads e da agenda"
+                      className={fieldClass}
+                      value={settings.leadOrigin || "all"}
+                      onChange={(e) =>
+                        update({ leadOrigin: e.target.value as "meta" | "all" })
+                      }
+                    >
+                      <option value="meta">
+                        Meta Ads · mesmo filtro do Dashboard Voxi
+                      </option>
+                      <option value="all">Todas as origens do CRM</option>
+                    </select>
+                    <span className="block text-xs text-muted-foreground">
+                      O total não vem da Meta: são registros do Voxi. CPL e
+                      destaques usam somente leads com anúncio comprovado;
+                      vendas continuam exigindo atribuição Meta.
+                    </span>
+                  </label>
+                  <label className="space-y-2 text-sm">
+                    <span className="block font-medium">
+                      Origem dos agendamentos e comparecimentos
+                    </span>
+                    <select
+                      aria-label="Origem dos agendamentos e comparecimentos"
+                      className={fieldClass}
+                      value={
+                        settings.stageMode ||
+                        (settings.stages.scheduled.length ||
+                        settings.stages.attended.length
+                          ? "custom"
+                          : "auto")
+                      }
+                      onChange={(e) =>
+                        update({
+                          stageMode: e.target.value as "auto" | "custom",
+                        })
+                      }
+                    >
+                      <option value="auto">
+                        Agenda Clinicorp no Voxi · automático
+                      </option>
+                      <option value="custom">
+                        Etapas personalizadas do funil
+                      </option>
+                    </select>
+                    <span className="block text-xs text-muted-foreground">
+                      Agenda: agendamentos pela criação original;
+                      comparecimentos pela data da consulta. Inclui leads
+                      antigos, como o Dashboard. Não usa os resultados de coorte
+                      da tela Ads e Vendas.
+                    </span>
+                  </label>
+                </div>
                 <div>
                   <h3 className="font-medium mb-2">Funis incluídos</h3>
                   <p className="text-xs text-muted-foreground mb-3">
@@ -718,50 +791,55 @@ export function ReportEditor({
                     ))}
                   </div>
                 </div>
-                <div className="grid md:grid-cols-2 gap-5">
-                  {(["scheduled", "attended"] as const).map((kind) => (
-                    <div key={kind} className="rounded-xl border p-4">
-                      <h3 className="font-medium mb-3">
-                        {kind === "scheduled"
-                          ? "Etapas de agendamento"
-                          : "Etapas de comparecimento"}
-                      </h3>
-                      <div className="space-y-3">
-                        {funnels.data?.stages
-                          .filter(
-                            (s) =>
-                              !settings.pipelines.length ||
-                              settings.pipelines.includes(s.pipeline_id),
-                          )
-                          .map((stage) => (
-                            <label
-                              key={stage.id}
-                              className="flex gap-2 text-sm"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={settings.stages[kind].includes(
-                                  stage.id,
-                                )}
-                                onChange={() => toggleStage(kind, stage.id)}
-                              />
-                              {stage.name}
-                              <span className="text-muted-foreground">
-                                ·{" "}
-                                {funnels.data.pipelines.find(
-                                  (p) => p.id === stage.pipeline_id,
-                                )?.name || "Funil legado"}
-                              </span>
-                            </label>
-                          ))}
+                {(settings.stageMode === "custom" ||
+                  (!settings.stageMode &&
+                    (settings.stages.scheduled.length > 0 ||
+                      settings.stages.attended.length > 0))) && (
+                  <div className="grid md:grid-cols-2 gap-5">
+                    {(["scheduled", "attended"] as const).map((kind) => (
+                      <div key={kind} className="rounded-xl border p-4">
+                        <h3 className="font-medium mb-3">
+                          {kind === "scheduled"
+                            ? "Etapas de agendamento"
+                            : "Etapas de comparecimento"}
+                        </h3>
+                        <div className="space-y-3">
+                          {funnels.data?.stages
+                            .filter(
+                              (s) =>
+                                !settings.pipelines.length ||
+                                settings.pipelines.includes(s.pipeline_id),
+                            )
+                            .map((stage) => (
+                              <label
+                                key={stage.id}
+                                className="flex gap-2 text-sm"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={settings.stages[kind].includes(
+                                    stage.id,
+                                  )}
+                                  onChange={() => toggleStage(kind, stage.id)}
+                                />
+                                {stage.name}
+                                <span className="text-muted-foreground">
+                                  ·{" "}
+                                  {funnels.data.pipelines.find(
+                                    (p) => p.id === stage.pipeline_id,
+                                  )?.name || "Funil legado"}
+                                </span>
+                              </label>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          Avanços registrados no período, por pessoa. Sem
+                          mapeamento: N/D.
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-3">
-                        Avanços registrados no período, por pessoa. Sem
-                        mapeamento: N/D.
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Vendas Meta fechadas: orçamentos Clinicorp aprovados, quando
                   configurado; caso contrário, oportunidades ganhas. Data de
@@ -1229,6 +1307,55 @@ export function ReportEditor({
             )}
             {preview ? (
               <>
+                {preview.result?.measurement && !metaOnly && (
+                  <div
+                    className="rounded-xl border bg-muted/20 p-4 text-sm space-y-2"
+                    aria-label="Critérios desta prévia"
+                  >
+                    <strong>Critérios desta prévia · revisão interna</strong>
+                    <p>
+                      Leads e agenda:{" "}
+                      {preview.result.measurement.leadOrigin === "meta"
+                        ? "origem Meta Ads no Voxi"
+                        : "todas as origens do Voxi"}
+                      . Agenda:{" "}
+                      {preview.result.measurement.stageSource === "clinicorp"
+                        ? "eventos Clinicorp, incluindo leads antigos"
+                        : "etapas personalizadas"}
+                      .
+                    </p>
+                    {settings.metrics.includes("cpl") && (
+                      <p>
+                        Base do CPL:{" "}
+                        {preview.result.measurement.attributedMetaLeads ??
+                          "não conferida"}{" "}
+                        leads com anúncio comprovado. Fuso Meta:{" "}
+                        {preview.result.measurement.metaTimezone ||
+                          "não informado"}
+                        .
+                      </p>
+                    )}
+                    {preview.result.reconciliation && (
+                      <p>
+                        Investimento direto da Meta:{" "}
+                        {preview.result.reconciliation.liveSpend.toLocaleString(
+                          "pt-BR",
+                          { style: "currency", currency: "BRL" },
+                        )}{" "}
+                        · Histórico no vínculo Voxi autorizado:{" "}
+                        {preview.result.reconciliation.cachedSpend == null
+                          ? "sem registros neste período (não é zero)"
+                          : preview.result.reconciliation.cachedSpend.toLocaleString(
+                              "pt-BR",
+                              { style: "currency", currency: "BRL" },
+                            )}
+                        .{" "}
+                        {preview.result.reconciliation.missingDays.length > 0 &&
+                          "Há dias com gasto ainda ausentes no histórico do Voxi; veja os avisos abaixo."}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="max-w-2xl mx-auto">
                   <WhatsAppPreview
                     name={client.nome}

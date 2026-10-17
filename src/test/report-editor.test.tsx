@@ -156,4 +156,29 @@ describe("report configuration UI", () => {
       screen.getByRole("button", { name: "Salvar configuração" }),
     ).toBeDisabled();
   });
+  it("sends explicit origin and agenda criteria in previews and keeps missing cache internal", async () => {
+    vi.mocked(reportsApi).mockImplementation(async (request: any) => {
+      if (request.action === "preview") return {
+        message: "Leads: 52",
+        previewToken: "test",
+        result: {
+          measurement: { leadOrigin: "meta", stageSource: "clinicorp", attributedMetaLeads: 52 },
+          reconciliation: { liveSpend: 2312.44, cachedSpend: null, difference: null, missingDays: ["2026-10-10"] },
+        },
+      } as any;
+      return { pipelines: [], stages: [], campaigns: [] } as any;
+    });
+    view({ client: { ...client, ad_account_id: "123" } });
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "2. Conteúdo" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByLabelText("Origem dos leads e da agenda")).toHaveValue("meta");
+    expect(screen.getByLabelText("Origem dos agendamentos e comparecimentos")).toHaveValue("auto");
+    fireEvent.change(screen.getByLabelText("Origem dos agendamentos e comparecimentos"), { target: { value: "auto" } });
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "5. Revisão" }), { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole("button", { name: "Gerar prévia com dados reais" }));
+    await waitFor(() => expect(reportsApi).toHaveBeenCalledWith(expect.objectContaining({
+      action: "preview", clientId: client.id, settings: expect.objectContaining({ leadOrigin: "meta", stageMode: "auto" }),
+    })));
+    expect(await screen.findByLabelText("Critérios desta prévia")).toHaveTextContent("sem registros neste período (não é zero)");
+    expect(vi.mocked(reportsApi).mock.calls.some(c => c[0].action === "send")).toBe(false);
+  });
 });

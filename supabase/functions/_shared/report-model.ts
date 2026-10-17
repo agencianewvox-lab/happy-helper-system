@@ -1,7 +1,7 @@
 export const metricLabels = {
   leads: "Leads reais · CRM",
-  scheduled: "Pessoas que avançaram para agendamento",
-  attended: "Pessoas que avançaram para comparecimento",
+  scheduled: "Pessoas com agendamento no período",
+  attended: "Pessoas com comparecimento no período",
   sales: "Vendas fechadas · Meta / Voxi",
   revenue: "Valor vendido · Meta / Voxi",
   spend: "Investimento · Meta",
@@ -31,6 +31,8 @@ export type ReportSettings = {
   onceDate?: string;
   skipWeekends?: boolean;
   dataMode?: "crm_meta" | "meta";
+  leadOrigin?: "all" | "meta";
+  stageMode?: "auto" | "custom";
   campaignIds?: string[];
   includeCampaigns?: boolean;
   minClicks?: number;
@@ -48,6 +50,7 @@ export const defaultSettings: ReportSettings = {
   title: "Seu resultado com a Newvox",
   intro: "Olá, equipe! Confira o acompanhamento do período.",
   schemaVersion: 2,
+  leadOrigin: "meta",
   metrics: ["leads", "spend", "cpl"],
   pipelines: [],
   stages: { scheduled: [], attended: [] },
@@ -118,6 +121,10 @@ export function validateSettings(value: unknown): ReportSettings {
     throw new Error("Revise os campos do relatório.");
   if (s.dataMode !== undefined && !["crm_meta", "meta"].includes(s.dataMode))
     throw new Error("Fonte inválida.");
+  if (s.leadOrigin !== undefined && !["all", "meta"].includes(s.leadOrigin))
+    throw new Error("Origem de leads inválida.");
+  if (s.stageMode !== undefined && !["auto", "custom"].includes(s.stageMode))
+    throw new Error("Origem das etapas inválida.");
   if (
     s.campaignIds !== undefined &&
     (!Array.isArray(s.campaignIds) ||
@@ -156,10 +163,19 @@ export function validateSettings(value: unknown): ReportSettings {
     (typeof s.template !== "string" || s.template.length > 7000)
   )
     throw new Error("Mensagem deve ter até 7.000 caracteres.");
-  if (s.includeAds && !s.metrics.includes(rankingMetric(s.ranking))) throw new Error("Selecione a métrica do critério de destaque ou desative os destaques.");
+  if (s.includeAds && !s.metrics.includes(rankingMetric(s.ranking)))
+    throw new Error(
+      "Selecione a métrica do critério de destaque ou desative os destaques.",
+    );
   if (s.template?.trim()) {
-    const unselected = templateMetrics(s.template).filter(m => !s.metrics.includes(m));
-    if (unselected.length) throw new Error("Variáveis de métricas não selecionadas: " + unselected.map(m => metricLabels[m]).join(", "));
+    const unselected = templateMetrics(s.template).filter(
+      (m) => !s.metrics.includes(m),
+    );
+    if (unselected.length)
+      throw new Error(
+        "Variáveis de métricas não selecionadas: " +
+          unselected.map((m) => metricLabels[m]).join(", "),
+      );
     const unknown = unknownTokens(s.template);
     if (unknown.length)
       throw new Error("Variáveis não reconhecidas: " + unknown.join(", "));
@@ -216,6 +232,13 @@ export function validateSettings(value: unknown): ReportSettings {
     onceDate: s.onceDate || "",
     skipWeekends: s.skipWeekends || false,
     dataMode: s.dataMode || "crm_meta",
+    // Existing scheduled configurations keep their all-origin definition until reviewed.
+    leadOrigin: s.leadOrigin || "all",
+    stageMode:
+      s.stageMode ||
+      (s.stages.scheduled.length || s.stages.attended.length
+        ? "custom"
+        : "auto"),
     campaignIds: s.campaignIds || [],
     includeCampaigns: s.includeCampaigns || false,
     minClicks: s.minClicks || 0,
@@ -353,71 +376,184 @@ export function scheduleSlot(
   return p.date;
 }
 export const rankingDescriptions: Record<ReportSettings["ranking"], string> = {
-  leads: "Mais pessoas com entrada real atribuída ao anúncio no Voxi. Não são leads estimados pela Meta.",
-  sales: "Mais vendas fechadas com atribuição Meta comprovada. A data é de aprovação/fechamento, não de recebimento.",
+  leads:
+    "Mais pessoas com entrada real atribuída ao anúncio no Voxi. Não são leads estimados pela Meta.",
+  sales:
+    "Mais vendas fechadas com atribuição Meta comprovada. A data é de aprovação/fechamento, não de recebimento.",
   cpl: "Menor investimento por lead real atribuído. Anúncios sem amostra mínima não entram.",
   clicks: "Mais cliques no link. Cliques não equivalem a leads ou vendas.",
-  spend: "Maior investimento no período. Mais gasto não comprova melhor desempenho.",
+  spend:
+    "Maior investimento no período. Mais gasto não comprova melhor desempenho.",
   ctr: "Maior taxa de cliques no link, respeitando o mínimo de impressões.",
   cpc: "Menor custo por clique no link, respeitando o mínimo de cliques.",
 };
 export const rankingLabels: Record<ReportSettings["ranking"], string> = {
-  leads: "Mais leads reais", sales: "Mais vendas fechadas", cpl: "Menor CPL real", clicks: "Mais cliques no link",
-  spend: "Maior investimento", ctr: "Maior CTR de link", cpc: "Menor CPC de link",
+  leads: "Mais leads reais",
+  sales: "Mais vendas fechadas",
+  cpl: "Menor CPL real",
+  clicks: "Mais cliques no link",
+  spend: "Maior investimento",
+  ctr: "Maior CTR de link",
+  cpc: "Menor CPC de link",
 };
-export function rankingMetric(ranking: ReportSettings["ranking"]): Metric { return ranking; }
-export function nextExecutions(s: ReportSettings, now = new Date(), count = 3): string[] {
-  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(s.time) || !Number.isFinite(+now)) return [];
-  try { new Intl.DateTimeFormat("en", { timeZone: s.timezone }); } catch { return []; }
+export function rankingMetric(ranking: ReportSettings["ranking"]): Metric {
+  return ranking;
+}
+export function nextExecutions(
+  s: ReportSettings,
+  now = new Date(),
+  count = 3,
+): string[] {
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(s.time) || !Number.isFinite(+now))
+    return [];
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: s.timezone });
+  } catch {
+    return [];
+  }
   const output: string[] = [];
   const today = localParts(now, s.timezone).date;
-  const [h,m] = s.time.split(":").map(Number);
-  for (let day=0; day<1100 && output.length<count; day++) {
+  const [h, m] = s.time.split(":").map(Number);
+  for (let day = 0; day < 1100 && output.length < count; day++) {
     const date = shift(today, day);
-    const at = new Date(Date.parse(zonedMidnight(date,s.timezone))+(h*60+m)*60000);
-    if (at > now && scheduleSlot(s,at)) output.push(at.toISOString());
-    if(s.frequency==="once" && date >= (s.onceDate || today)) break;
+    const at = new Date(
+      Date.parse(zonedMidnight(date, s.timezone)) + (h * 60 + m) * 60000,
+    );
+    if (at > now && scheduleSlot(s, at)) output.push(at.toISOString());
+    if (s.frequency === "once" && date >= (s.onceDate || today)) break;
   }
   return output;
 }
-export function scheduleOccurrences(s: ReportSettings, from: Date, to: Date): {slot: string; at: string; expired: boolean}[] {
-  const out: {slot:string;at:string;expired:boolean}[] = [];
-  const start = localParts(from,s.timezone).date, end = localParts(to,s.timezone).date;
-  const [h,m]=s.time.split(":").map(Number);
-  for(let day=0; day<1100; day++) {
-    const date=shift(start,day); if(date>end) break;
-    const at=new Date(Date.parse(zonedMidnight(date,s.timezone))+(h*60+m)*60000);
-    if(at>=from && at<=to && scheduleSlot(s,at)) out.push({slot:date,at:at.toISOString(),expired:+to-+at>15*60000});
+export function scheduleOccurrences(
+  s: ReportSettings,
+  from: Date,
+  to: Date,
+): { slot: string; at: string; expired: boolean }[] {
+  const out: { slot: string; at: string; expired: boolean }[] = [];
+  const start = localParts(from, s.timezone).date,
+    end = localParts(to, s.timezone).date;
+  const [h, m] = s.time.split(":").map(Number);
+  for (let day = 0; day < 1100; day++) {
+    const date = shift(start, day);
+    if (date > end) break;
+    const at = new Date(
+      Date.parse(zonedMidnight(date, s.timezone)) + (h * 60 + m) * 60000,
+    );
+    if (at >= from && at <= to && scheduleSlot(s, at))
+      out.push({
+        slot: date,
+        at: at.toISOString(),
+        expired: +to - +at > 15 * 60000,
+      });
   }
   return out;
 }
 export function metricValue(metric: Metric, value: unknown): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "Indisponível";
-  if (["revenue","spend","cpl","cpc","cpm"].includes(metric)) return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(value);
-  return metric==="ctr" ? value.toFixed(2)+"%" : value.toLocaleString("pt-BR");
+  if (typeof value !== "number" || !Number.isFinite(value))
+    return "Indisponível";
+  if (["revenue", "spend", "cpl", "cpc", "cpm"].includes(metric))
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  return metric === "ctr"
+    ? value.toFixed(2) + "%"
+    : value.toLocaleString("pt-BR");
 }
 export function adHighlights(s: ReportSettings, result: any): string {
-  if(!s.includeAds || !s.metrics.includes(rankingMetric(s.ranking))) return "";
-  if(!result.ads?.length) return "*Destaques dos anúncios*\nNenhum anúncio atende ao critério e à amostra mínima.";
-  return "*Destaques dos anúncios*\nCritério: "+rankingLabels[s.ranking]+(s.ranking==="spend"?" (gasto, não eficiência)":"")+"\n"+
-    result.ads.map((ad:any,i:number) => (i+1)+". "+String(ad.name).replace(/[\r\n]/g," ")+" · "+
-      metricLabels[rankingMetric(s.ranking)]+": "+metricValue(rankingMetric(s.ranking),ad[s.ranking])+
-      (typeof ad.url==="string" && /^https:\/\//.test(ad.url) ? "\n"+ad.url : "")).join("\n");
+  if (!s.includeAds || !s.metrics.includes(rankingMetric(s.ranking))) return "";
+  if (!result.ads?.length)
+    return "*Destaques dos anúncios*\nNenhum anúncio atende ao critério e à amostra mínima.";
+  return (
+    "*Destaques dos anúncios*\nCritério: " +
+    rankingLabels[s.ranking] +
+    (s.ranking === "spend" ? " (gasto, não eficiência)" : "") +
+    "\n" +
+    result.ads
+      .map(
+        (ad: any, i: number) =>
+          i +
+          1 +
+          ". " +
+          String(ad.name).replace(/[\r\n]/g, " ") +
+          " · " +
+          metricLabels[rankingMetric(s.ranking)] +
+          ": " +
+          metricValue(rankingMetric(s.ranking), ad[s.ranking]) +
+          (typeof ad.url === "string" && /^https:\/\//.test(ad.url)
+            ? "\n" + ad.url
+            : ""),
+      )
+      .join("\n")
+  );
 }
-export function renderReport(name:string,s:ReportSettings,result:any):string {
-  const body=s.template?.trim()?renderTemplate(s.template,name,s,result):[
-    "*NEWVOX | "+s.title+"*","*"+name.replace(/[\r\n]/g," ")+"*",
-    result.period.startDate+" a "+result.period.endDate+" · "+s.timezone,"",s.intro,"",
-    ...s.metrics.map(m=>"• "+metricLabels[m]+": "+metricValue(m,result.metrics[m])),
-    ...(s.includeAds?["",adHighlights(s,result)]:[]),
-    ...(s.includeCampaigns && result.campaigns?.length?["","*Campanhas do período*",campaignText(result.campaigns,s)]:[]),
-  ].join("\n");
+export function renderReport(
+  name: string,
+  s: ReportSettings,
+  result: any,
+): string {
+  const body = s.template?.trim()
+    ? renderTemplate(s.template, name, s, result)
+    : [
+        "*NEWVOX | " + s.title + "*",
+        "*" + name.replace(/[\r\n]/g, " ") + "*",
+        result.period.startDate +
+          " a " +
+          result.period.endDate +
+          " · " +
+          s.timezone,
+        "",
+        s.intro,
+        "",
+        ...s.metrics.map(
+          (m) =>
+            "• " + metricLabels[m] + ": " + metricValue(m, result.metrics[m]),
+        ),
+        ...(s.includeAds ? ["", adHighlights(s, result)] : []),
+        ...(s.includeCampaigns && result.campaigns?.length
+          ? ["", "*Campanhas do período*", campaignText(result.campaigns, s)]
+          : []),
+      ].join("\n");
   // Diagnostic warnings belong only to the internal review, never to the customer's message.
-  const footer=[s.dataMode==="meta"?"Fonte: Meta Ads · Sem dados de CRM":"Fontes: Voxi (comercial) · Meta (mídia)"];
-  if(s.dataMode!=="meta" && s.metrics.some(m=>m==="sales"||m==="revenue")) footer.push("Vendas Meta fechadas por "+(result.salesSource==="clinicorp"?"aprovação de orçamento Clinicorp":"fechamento no CRM")+". Não são recebimentos.");
-  if(s.campaignIds?.length) footer.push("Recorte: campanhas selecionadas pelo gestor.");
-  const message=body+"\n\n"+footer.join("\n");
-  if(message.length>12000)throw new Error("Relatório excede 12.000 caracteres. Reduza o texto ou a quantidade de campanhas.");
+  const footer = [
+    s.dataMode === "meta"
+      ? "Fonte: Meta Ads · Sem dados de CRM"
+      : "Fontes: Voxi (comercial) · Meta (mídia)",
+  ];
+  if (
+    s.dataMode !== "meta" &&
+    s.metrics.some((m) => ["leads", "scheduled", "attended"].includes(m))
+  )
+    footer.push(
+      "Leads e agenda: " +
+        (s.leadOrigin === "meta"
+          ? "origem Meta Ads no Voxi"
+          : "todas as origens do Voxi") +
+        ".",
+    );
+  if (
+    result.measurement?.stageSource === "clinicorp" &&
+    s.metrics.some((m) => m === "scheduled" || m === "attended")
+  )
+    footer.push("Agenda por data do evento, incluindo leads antigos.");
+  if (
+    s.dataMode !== "meta" &&
+    s.metrics.some((m) => m === "sales" || m === "revenue")
+  )
+    footer.push(
+      "Vendas Meta fechadas por " +
+        (result.salesSource === "clinicorp"
+          ? "aprovação de orçamento Clinicorp"
+          : "fechamento no CRM") +
+        ". Não são recebimentos.",
+    );
+  if (s.campaignIds?.length)
+    footer.push("Recorte: campanhas selecionadas pelo gestor.");
+  const message = body + "\n\n" + footer.join("\n");
+  if (message.length > 12000)
+    throw new Error(
+      "Relatório excede 12.000 caracteres. Reduza o texto ou a quantidade de campanhas.",
+    );
   return message;
 }
 function validDate(date: unknown): date is string {
@@ -495,17 +631,41 @@ export function templateFromSettings(s: ReportSettings) {
     (s.includeAds ? "\n\n{{melhores_anuncios}}" : "")
   );
 }
-export function renderTemplate(template:string,name:string,s:ReportSettings,result:any) {
-  const unselected=templateMetrics(template).filter(m=>!s.metrics.includes(m));
-  if(unselected.length) throw new Error("A mensagem contém métricas desmarcadas. Revise as variáveis.");
-  const values:Record<string,string>={
-    cliente:name.replace(/[\r\n]/g," "),periodo:result.period.startDate+" a "+result.period.endDate+" · "+s.timezone,
-    titulo:s.title,abertura:s.intro,
-    campanhas:s.includeCampaigns&&result.campaigns?.length?"*Campanhas do período*\n"+campaignText(result.campaigns,s):"",
-    melhores_anuncios:adHighlights(s,result),
+export function renderTemplate(
+  template: string,
+  name: string,
+  s: ReportSettings,
+  result: any,
+) {
+  const unselected = templateMetrics(template).filter(
+    (m) => !s.metrics.includes(m),
+  );
+  if (unselected.length)
+    throw new Error(
+      "A mensagem contém métricas desmarcadas. Revise as variáveis.",
+    );
+  const values: Record<string, string> = {
+    cliente: name.replace(/[\r\n]/g, " "),
+    periodo:
+      result.period.startDate +
+      " a " +
+      result.period.endDate +
+      " · " +
+      s.timezone,
+    titulo: s.title,
+    abertura: s.intro,
+    campanhas:
+      s.includeCampaigns && result.campaigns?.length
+        ? "*Campanhas do período*\n" + campaignText(result.campaigns, s)
+        : "",
+    melhores_anuncios: adHighlights(s, result),
   };
-  for(const metric of s.metrics) values[metricTokens[metric]]=metricValue(metric,result.metrics[metric]);
-  return template.replace(/{{\s*([^{}]+)\s*}}/g,(_,key)=>values[tokenName(key)]??"Indisponível");
+  for (const metric of s.metrics)
+    values[metricTokens[metric]] = metricValue(metric, result.metrics[metric]);
+  return template.replace(
+    /{{\s*([^{}]+)\s*}}/g,
+    (_, key) => values[tokenName(key)] ?? "Indisponível",
+  );
 }
 export function templateMetrics(template: string): Metric[] {
   const tokens = new Set(
@@ -515,7 +675,19 @@ export function templateMetrics(template: string): Metric[] {
     tokens.has(metricTokens[m]),
   );
 }
-function campaignText(campaigns:any[],s:ReportSettings) {
-  const metrics=s.metrics.filter(m=>["spend","clicks","impressions","ctr","cpc","cpm"].includes(m));
-  return campaigns.map(c=>"• "+c.name+"\n  "+metrics.map(m=>metricLabels[m]+": "+metricValue(m,c[m])).join(" · ")).join("\n");
+function campaignText(campaigns: any[], s: ReportSettings) {
+  const metrics = s.metrics.filter((m) =>
+    ["spend", "clicks", "impressions", "ctr", "cpc", "cpm"].includes(m),
+  );
+  return campaigns
+    .map(
+      (c) =>
+        "• " +
+        c.name +
+        "\n  " +
+        metrics
+          .map((m) => metricLabels[m] + ": " + metricValue(m, c[m]))
+          .join(" · "),
+    )
+    .join("\n");
 }

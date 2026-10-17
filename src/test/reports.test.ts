@@ -224,7 +224,7 @@ describe("closed periods and safe schedules", () => {
       metrics: { leads: 10, scheduled: null },
       warnings: [],
     });
-    expect(text).toContain("agendamento: Indisponível");
+    expect(text).toContain("agendamento no período: Indisponível");
     expect(text).toContain("Leads reais · CRM: 10");
   });
 });

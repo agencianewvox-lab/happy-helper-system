@@ -5,7 +5,7 @@ export const voxiColumns = {
   pipelines: "id,account_root_id,name",
   journey_stages: "id,name,pipeline_id,whatsapp_instance_id",
   leads:
-    "id,whatsapp_instance_id,pipeline_id,lead_entered_at,ad_id,source,stage_id",
+    "id,whatsapp_instance_id,pipeline_id,lead_entered_at,created_at,ad_id,campaign_id,source,stage_id,clinicorp_patient_id,crm_enrolled_at",
   lead_identity_links: "id,whatsapp_instance_id,contact_id,lead_id",
   contacts: "id,whatsapp_instance_id,merged_into_id",
   opportunities:
@@ -17,6 +17,10 @@ export const voxiColumns = {
     "id,whatsapp_instance_id,enabled,last_synced_at,last_status,integration_mode,last_webhook_at",
   clinicorp_budget_opportunities:
     "id,whatsapp_instance_id,connection_id,clinicorp_budget_id,lead_id,approved_at,budget_amount,closed_at,clinicorp_budget_status",
+  clinicorp_appointments:
+    "id,connection_id,whatsapp_instance_id,lead_id,clinicorp_patient_id,scheduled_at,original_created_at:raw->>CreateDate,created_at,source,status_type",
+  meta_ads_insights:
+    "id,whatsapp_instance_id,meta_ad_account_id,date,ad_id,campaign_id,spend,updated_at",
 } as const;
 type Table = keyof typeof voxiColumns;
 export class VoxiReader {

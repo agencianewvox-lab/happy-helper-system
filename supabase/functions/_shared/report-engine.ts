@@ -1,6 +1,12 @@
 import { VoxiReader, inIds, deriveScope } from "./voxi-reader.ts";
 import { closedSales, verifiedSalesTotals } from "./report-sales.ts";
 import { ReportSettings, reportPeriod } from "./report-model.ts";
+import {
+  clinicorpStages,
+  matchesLeadOrigin,
+  reconcileMedia,
+  sameCalendarWindow,
+} from "./report-reconciliation.ts";
 export function aggregateCommercial(
   leads: any[],
   links: any[],
@@ -60,9 +66,10 @@ export function aggregateCommercial(
   };
   const leadAds = new Map(selected.map((l) => [l.id, l.ad_id]));
   for (const l of entered) if (l.ad_id) ad(l.ad_id).leads.add(identity(l.id));
-  const won = [...new Map(opportunities.map(o => [o.id,o])).values()].filter(
+  const won = [...new Map(opportunities.map((o) => [o.id, o])).values()].filter(
     (o) =>
-      o.status === "won" && inPeriod(o.won_at) &&
+      o.status === "won" &&
+      inPeriod(o.won_at) &&
       (!s.pipelines.length || s.pipelines.includes(o.pipeline_id)),
   );
   for (const o of won) {
@@ -205,6 +212,7 @@ async function metaRead(
       "ad_id,ad_name,campaign_id,campaign_name,spend,impressions,inline_link_clicks",
     );
     u.searchParams.set("level", "ad");
+    u.searchParams.set("time_increment", "1");
     u.searchParams.set("limit", "500");
     if (campaignIds.length)
       u.searchParams.set(
@@ -223,7 +231,21 @@ async function metaRead(
     if (!r.ok || !Array.isArray(b.data))
       throw new Error("Não foi possível consultar os anúncios.");
     data.push(...b.data);
-    if (!b.paging?.next) return { data, ...accountData };
+    if (!b.paging?.next) {
+      const ads = new Map<string, any>();
+      for (const row of data) {
+        const ad = ads.get(row.ad_id) || {
+          ...row,
+          spend: 0,
+          impressions: 0,
+          inline_link_clicks: 0,
+        };
+        for (const metric of ["spend", "impressions", "inline_link_clicks"])
+          ad[metric] += Number(row[metric] || 0);
+        ads.set(row.ad_id, ad);
+      }
+      return { ...accountData, daily: data, data: [...ads.values()] };
+    }
     after = b.paging?.cursors?.after;
     if (!after) throw new Error("Paginação Meta incompleta.");
   }
@@ -239,9 +261,51 @@ export async function collectReport(
 ) {
   const period = reportPeriod(s, now);
   const metaOnly = s.dataMode === "meta";
-  const needsSales = !metaOnly && s.metrics.some(m => m === "sales" || m === "revenue");
+  const needsSales =
+    !metaOnly && s.metrics.some((m) => m === "sales" || m === "revenue");
   let saleData: ReturnType<typeof closedSales> | null = null;
   let saleError: string | null = null;
+  let crm: any = null;
+  let stageError: string | null = null;
+  const useAgenda =
+    s.stageMode === "auto" ||
+    (!s.stageMode && !s.stages.scheduled.length && !s.stages.attended.length);
+  const needsStages =
+    !metaOnly && s.metrics.some((m) => m === "scheduled" || m === "attended");
+  const commercialFor = (leads: any[]) => {
+    const c = aggregateCommercial(
+      leads,
+      crm.links,
+      crm.contacts,
+      crm.opps,
+      crm.history,
+      crm.stages,
+      s,
+      period,
+    );
+    if (needsStages && useAgenda && crm.connections.length) {
+      if (stageError) {
+        c.metrics.scheduled = null;
+        c.metrics.attended = null;
+      } else {
+        const agenda = clinicorpStages(
+          leads.filter(
+            (l) => !s.pipelines.length || s.pipelines.includes(l.pipeline_id),
+          ),
+          crm.appointments,
+          crm.connections,
+          period,
+        );
+        c.metrics.scheduled = agenda.scheduled;
+        c.metrics.attended = agenda.attended;
+        if (agenda.missingBookingDates)
+          c.warnings.push(
+            `${agenda.missingBookingDates} registro(s) de agenda sem data original de criação. A data de importação não foi usada como agendamento.`,
+          );
+      }
+    }
+    return c;
+  };
   let commercial: any = {
     metrics: {
       leads: null,
@@ -270,14 +334,38 @@ export async function collectReport(
       reader.read("leads", filters),
       reader.read("lead_identity_links", filters),
       reader.read("contacts", filters),
-      needsSales ? reader.read("opportunities", { ...filters, won_at: "gte." + period.start }) : [],
+      needsSales
+        ? reader.read("opportunities", {
+            ...filters,
+            won_at: "gte." + period.start,
+          })
+        : [],
       reader.read("journey_stages", filters),
     ]);
     let history: any[] = [];
-    if (
-      s.metrics.some((m) => m === "scheduled" || m === "attended") ||
-      /{{\s*(agendamentos|comparecimentos)\s*}}/i.test(s.template || "")
-    ) {
+    let connections: any[] = [],
+      appointments: any[] = [];
+    if (needsSales || (needsStages && useAgenda)) {
+      try {
+        connections = await reader.read("clinicorp_connections", filters);
+      } catch {
+        if (needsSales)
+          saleError = "Não foi possível identificar a fonte comercial no Voxi.";
+        if (needsStages)
+          stageError = "Não foi possível identificar a agenda no Voxi.";
+      }
+    }
+    if (needsStages && useAgenda && connections.length) {
+      try {
+        appointments = await reader.read("clinicorp_appointments", {
+          connection_id: inIds(connections.map((c) => c.id)),
+        });
+      } catch {
+        stageError =
+          "Não foi possível consultar os eventos de agenda do Clinicorp no Voxi.";
+      }
+    }
+    if (needsStages && !(useAgenda && connections.length)) {
       for (let i = 0; i < leads.length; i += 150)
         history.push(
           ...(await reader.read("stage_history", {
@@ -286,23 +374,47 @@ export async function collectReport(
           })),
         );
     }
-    if (needsSales) {
+    if (needsSales && !saleError) {
       try {
-        const [connections, events] = await Promise.all([reader.read("clinicorp_connections",filters),reader.read("acquisition_events",filters)]);
-        const budgets = connections.length ? await reader.read("clinicorp_budget_opportunities",filters) : [];
-        saleData=closedSales({instances:source.instance_ids,connections,budgets,opportunities:opps,leads,events,pipelines:s.pipelines,period,now});
-      } catch { saleError="Fonte comercial indisponível. Vendas não foram convertidas em zero."; }
+        const events = await reader.read("acquisition_events", filters);
+        const budgets = connections.length
+          ? await reader.read("clinicorp_budget_opportunities", filters)
+          : [];
+        saleData = closedSales({
+          instances: source.instance_ids,
+          connections,
+          budgets,
+          opportunities: opps,
+          leads,
+          events,
+          pipelines: s.pipelines,
+          period,
+          now,
+        });
+      } catch {
+        saleError =
+          "Fonte comercial indisponível. Vendas não foram convertidas em zero.";
+      }
     }
-    commercial = aggregateCommercial(
-      leads,
+    crm = {
+      leads: leads.filter((l) => matchesLeadOrigin(l, s.leadOrigin)),
       links,
       contacts,
       opps,
       history,
       stages,
-      s,
-      period,
-    );
+      connections,
+      appointments,
+    };
+    commercial = commercialFor(crm.leads);
+    if (
+      needsStages &&
+      useAgenda &&
+      connections.some((c) => !c.enabled || c.last_status === "error")
+    )
+      commercial.warnings.push(
+        "A agenda reflete os registros já disponíveis no Voxi. A integração Clinicorp está desativada ou com erro; confira a sincronização para garantir que todos os eventos chegaram.",
+      );
   }
   const result: any = {
     period,
@@ -317,15 +429,36 @@ export async function collectReport(
       cpm: null,
     },
     ads: [],
-    warnings: [...commercial.warnings, ...(saleData?.warnings || []), ...(saleError ? [saleError] : [])],
-    blockingReasons: saleError ? [saleError] : [],
+    warnings: [
+      ...commercial.warnings,
+      ...(saleData?.warnings || []),
+      ...(saleError ? [saleError] : []),
+      ...(stageError ? [stageError] : []),
+    ],
+    blockingReasons: [saleError, stageError].filter(Boolean),
+    measurement: {
+      leadOrigin: s.leadOrigin || "all",
+      stageSource:
+        useAgenda && crm?.connections.length ? "clinicorp" : "stages",
+      clinicorpLastSync: crm?.connections[0]?.last_synced_at || null,
+    },
     salesSource: saleData?.source || null,
-    salesAudit: saleData ? {excludedAttribution:saleData.excludedAttribution,excludedPipeline:saleData.excludedPipeline,missingDate:saleData.missingDate} : null,
+    salesAudit: saleData
+      ? {
+          excludedAttribution: saleData.excludedAttribution,
+          excludedPipeline: saleData.excludedPipeline,
+          missingDate: saleData.missingDate,
+        }
+      : null,
   };
   // The legacy aggregate is used for lead/stage counts, never for sales totals.
-  result.metrics.sales = null; result.metrics.revenue = null;
+  result.metrics.sales = null;
+  result.metrics.revenue = null;
   for (const ad of commercial.ads) ad.sales = 0;
-  if(needsSales && saleData && !saleData.available) result.blockingReasons.push("Revise a sincronização/datas do Clinicorp antes de enviar vendas.");
+  if (needsSales && saleData && !saleData.available)
+    result.blockingReasons.push(
+      "Revise a sincronização/datas do Clinicorp antes de enviar vendas.",
+    );
   try {
     if (!account) throw new Error("Conta de anúncios ainda não vinculada.");
     const meta = await metaRead(account, period, metaKey, s.campaignIds || []);
@@ -349,25 +482,98 @@ export async function collectReport(
         ? (1000 * totals.spend) / totals.impressions
         : null,
     });
-    const sameZone = meta.timezone_name === s.timezone;
-    const verified = new Map<string, any>(meta.data.map((a: any) => [a.ad_id, a]));
+    const sameZone = sameCalendarWindow(period, meta.timezone_name);
+    result.measurement.metaTimezone = meta.timezone_name || null;
+    result.measurement.sameCalendarWindow = sameZone;
+    const verified = new Map<string, any>(
+      meta.data.map((a: any) => [a.ad_id, a]),
+    );
     // Ownership is checked independently of period spend, so historical ads remain eligible.
-    const details = await metaAdDetails([...new Set<string>([
-      ...(saleData?.sales.map(x=>x.adId)||[]),
-      ...commercial.ads.map((x:any)=>x.id),
-      ...(s.includeAds ? meta.data.map((x:any)=>x.ad_id) : []),
-    ])], metaKey);
-    const accountId = account.replace(/^act_/,"");
-    const belongs = (ad:any) => ad.account_id === accountId && (!s.campaignIds?.length || s.campaignIds.includes(ad.campaign_id));
-    for(const [id,ad] of details) if(belongs(ad)) verified.set(id,{ad_id:id,ad_name:ad.name,campaign_id:ad.campaign_id,spend:0,impressions:0,inline_link_clicks:0,...verified.get(id),url:ad.url});
-    if(needsSales && saleData?.available) {
-      const totals = verifiedSalesTotals(saleData.sales,details,account,s.campaignIds||[]);
-      result.metrics.sales=totals.sales; result.metrics.revenue=totals.revenue;
-      Object.assign(result.salesAudit,{excludedAccount:totals.excludedAccount,excludedCampaign:totals.excludedCampaign});
-      if(totals.excludedAccount) result.warnings.push(totals.excludedAccount+" venda(s) excluída(s): anúncio sem pertencimento comprovado à conta Meta.");
-      for(const a of totals.byAd) {
-        const existing=commercial.ads.find((x:any)=>x.id===a.id);
-        if(existing) existing.sales=a.sales; else commercial.ads.push({id:a.id,leads:0,sales:a.sales});
+    // Insights were read from this exact account, so they already prove ownership.
+    const details = new Map<string, any>(
+      meta.data.map((a: any) => [
+        a.ad_id,
+        {
+          id: a.ad_id,
+          name: a.ad_name,
+          account_id: account.replace(/^act_/, ""),
+          campaign_id: a.campaign_id,
+        },
+      ]),
+    );
+    const requestedIds = [
+      ...new Set<string>([
+        ...(saleData?.sales.map((x) => x.adId) || []),
+        ...commercial.ads.map((x: any) => x.id),
+        ...(s.campaignIds?.length
+          ? (crm?.leads || []).map((x: any) => x.ad_id).filter(Boolean)
+          : []),
+        ...(s.includeAds ? meta.data.map((x: any) => x.ad_id) : []),
+      ]),
+    ].filter((id) => s.includeAds || !details.has(id));
+    try {
+      for (const [id, detail] of await metaAdDetails(
+        requestedIds,
+        metaKey,
+        s.includeAds,
+      ))
+        details.set(id, detail);
+    } catch {
+      result.warnings.push(
+        "Detalhes/links de alguns anúncios indisponíveis. Os anúncios comprovados na consulta da conta continuam válidos; vínculos não comprovados ficam fora dos cálculos.",
+      );
+    }
+    const accountId = account.replace(/^act_/, "");
+    const belongs = (ad: any) =>
+      ad.account_id === accountId &&
+      (!s.campaignIds?.length || s.campaignIds.includes(ad.campaign_id));
+    for (const [id, ad] of details)
+      if (belongs(ad))
+        verified.set(id, {
+          ad_id: id,
+          ad_name: ad.name,
+          campaign_id: ad.campaign_id,
+          spend: 0,
+          impressions: 0,
+          inline_link_clicks: 0,
+          ...verified.get(id),
+          url: ad.url,
+        });
+    if (crm && s.campaignIds?.length) {
+      commercial = commercialFor(
+        crm.leads.filter(
+          (l: any) => details.has(l.ad_id) && belongs(details.get(l.ad_id)),
+        ),
+      );
+      for (const ad of commercial.ads) ad.sales = 0;
+      for (const key of ["leads", "scheduled", "attended"])
+        result.metrics[key] = commercial.metrics[key];
+      result.warnings.push(
+        "Filtro de campanhas aplicado também a leads, agendamentos, comparecimentos e vendas. Registros sem anúncio comprovado foram excluídos.",
+      );
+    }
+    if (needsSales && saleData?.available) {
+      const totals = verifiedSalesTotals(
+        saleData.sales,
+        details,
+        account,
+        s.campaignIds || [],
+      );
+      result.metrics.sales = totals.sales;
+      result.metrics.revenue = totals.revenue;
+      Object.assign(result.salesAudit, {
+        excludedAccount: totals.excludedAccount,
+        excludedCampaign: totals.excludedCampaign,
+      });
+      if (totals.excludedAccount)
+        result.warnings.push(
+          totals.excludedAccount +
+            " venda(s) excluída(s): anúncio sem pertencimento comprovado à conta Meta.",
+        );
+      for (const a of totals.byAd) {
+        const existing = commercial.ads.find((x: any) => x.id === a.id);
+        if (existing) existing.sales = a.sales;
+        else commercial.ads.push({ id: a.id, leads: 0, sales: a.sales });
       }
     }
     const actualMetaLeads = new Set(
@@ -377,6 +583,37 @@ export async function collectReport(
     ).size;
     result.metrics.cpl =
       sameZone && actualMetaLeads ? totals.spend / actualMetaLeads : null;
+    result.measurement.attributedMetaLeads = actualMetaLeads;
+    if (crm) {
+      try {
+        const cached = await reader.read("meta_ads_insights", {
+          whatsapp_instance_id: inIds(source.instance_ids),
+          meta_ad_account_id: "in.(" + accountId + ",act_" + accountId + ")",
+          date: "gte." + period.startDate,
+        });
+        result.reconciliation = reconcileMedia(
+          meta.daily,
+          cached,
+          period,
+          accountId,
+          source.instance_ids,
+          s.campaignIds || [],
+        );
+        const r = result.reconciliation;
+        if (r.cachedSpend === null)
+          result.warnings.push(
+            "Sem histórico de mídia para este período no vínculo Voxi autorizado. Isso não significa investimento zero. O relatório usa a Meta diretamente e não importa registros de outras contas do CRM.",
+          );
+        else if (Math.abs(r.difference ?? 0) >= 0.02 || r.missingDays.length)
+          result.warnings.push(
+            `Investimento consultado diretamente na Meta: R$ ${r.liveSpend.toFixed(2)}; histórico do Voxi: R$ ${r.cachedSpend.toFixed(2)}. ${r.missingDays.length ? "Dias com gasto na Meta sem registros no Voxi: " + r.missingDays.join(", ") + ". " : ""}O relatório mantém o valor da Meta, sem alterar o Voxi.`,
+          );
+      } catch {
+        result.warnings.push(
+          "Não foi possível comparar o histórico de mídia do Voxi. Investimento consultado diretamente na Meta.",
+        );
+      }
+    }
     if (!sameZone)
       result.warnings.push(
         "Fuso da conta Meta difere do relatório. CPL não é calculado entre períodos desalinhados.",
@@ -396,7 +633,9 @@ export async function collectReport(
       .filter(
         (a: any) =>
           verified.has(a.id) &&
-          (metaOnly || metaRanking || s.ranking === "sales" ? (s.ranking !== "sales" || a.sales > 0) : a.leads >= s.minLeads),
+          (metaOnly || metaRanking || s.ranking === "sales"
+            ? s.ranking !== "sales" || a.sales > 0
+            : a.leads >= s.minLeads),
       )
       .map((a: any) => {
         const m: any = verified.get(a.id);
@@ -429,7 +668,10 @@ export async function collectReport(
           : b[s.ranking] - a[s.ranking] || a.id.localeCompare(b.id),
       )
       .slice(0, s.top);
-    if(s.includeAds && result.ads.some((a:any)=>!a.url)) result.warnings.push("A Meta não disponibilizou link válido para um ou mais destaques. O nome e o resultado serão enviados sem link.");
+    if (s.includeAds && result.ads.some((a: any) => !a.url))
+      result.warnings.push(
+        "A Meta não disponibilizou link válido para um ou mais destaques. O nome e o resultado serão enviados sem link.",
+      );
     const campaigns = new Map<string, any>();
     for (const row of meta.data) {
       const c = campaigns.get(row.campaign_id) || {
@@ -448,35 +690,91 @@ export async function collectReport(
       .map((c) => ({
         ...c,
         ctr: c.impressions ? (100 * c.clicks) / c.impressions : 0,
-        cpc: c.clicks ? c.spend/c.clicks : null,
-        cpm: c.impressions ? 1000*c.spend/c.impressions : null,
+        cpc: c.clicks ? c.spend / c.clicks : null,
+        cpm: c.impressions ? (1000 * c.spend) / c.impressions : null,
       }))
       .sort((a, b) => b.spend - a.spend);
   } catch (e) {
-    result.metrics.sales = null; result.metrics.revenue = null;
-    result.blockingReasons.push("Consulta Meta incompleta. Atualize a prévia antes de enviar.");
+    result.metrics.sales = null;
+    result.metrics.revenue = null;
+    result.blockingReasons.push(
+      "Consulta Meta incompleta. Atualize a prévia antes de enviar.",
+    );
     result.warnings.push(e instanceof Error ? e.message : "Meta indisponível.");
   }
-  if(needsSales && (result.metrics.sales === null || (s.metrics.includes("revenue") && result.metrics.revenue === null))) result.blockingReasons.push("Vendas ou valores indisponíveis. Revise os avisos internos.");
+  if (
+    needsSales &&
+    (result.metrics.sales === null ||
+      (s.metrics.includes("revenue") && result.metrics.revenue === null))
+  )
+    result.blockingReasons.push(
+      "Vendas ou valores indisponíveis. Revise os avisos internos.",
+    );
+  for (const key of ["scheduled", "attended"] as const)
+    if (s.metrics.includes(key) && result.metrics[key] === null)
+      result.blockingReasons.push(
+        `Configure a origem de ${key === "scheduled" ? "agendamentos" : "comparecimentos"}: agenda automática Clinicorp ou etapas personalizadas. Não é um resultado zero.`,
+      );
   result.dataMode = metaOnly ? "meta" : "crm_meta";
   return result;
 }
-export async function metaAdDetails(ids:string[],key:string): Promise<Map<string,any>> {
-  const unique=[...new Set(ids)].filter(id=>/^\d{1,30}$/.test(id));
-  const out=new Map<string,any>();
-  for(let i=0;i<unique.length;i+=50) {
-    const url=new URL("https://graph.facebook.com/v21.0/");
-    url.searchParams.set("ids",unique.slice(i,i+50).join(","));
-    url.searchParams.set("fields","id,name,account_id,campaign_id,preview_shareable_link,creative{instagram_permalink_url}");
-    const response=await fetch(url,{headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(20000)});
-    const body=await response.json();
-    if(!response.ok || body.error) throw new Error("Não foi possível verificar os anúncios na Meta.");
-    for(const id of unique.slice(i,i+50)) {
-      const ad=body[id];if(!ad || ad.error || ad.id!==id || !ad.account_id)continue;
-      const link=[ad.creative?.instagram_permalink_url,ad.preview_shareable_link].find(value=>{
-        try{const u=new URL(value);return u.protocol==="https:" && ["facebook.com","www.facebook.com","fb.me","instagram.com","www.instagram.com"].includes(u.hostname);}catch{return false;}
+export async function metaAdDetails(
+  ids: string[],
+  key: string,
+  includeLinks = false,
+): Promise<Map<string, any>> {
+  const unique = [...new Set(ids)].filter((id) => /^\d{1,30}$/.test(id));
+  const out = new Map<string, any>();
+  for (let i = 0; i < unique.length; i += 50) {
+    const url = new URL("https://graph.facebook.com/v21.0/");
+    url.searchParams.set("ids", unique.slice(i, i + 50).join(","));
+    url.searchParams.set(
+      "fields",
+      "id,name,account_id,campaign_id" +
+        (includeLinks
+          ? ",preview_shareable_link,creative{instagram_permalink_url}"
+          : ""),
+    );
+    let response = await fetch(url, {
+      headers: { Authorization: "Bearer " + key },
+      signal: AbortSignal.timeout(20000),
+    });
+    let body = await response.json();
+    // Optional creative permissions must not make proven account metrics unavailable.
+    if ((!response.ok || body.error) && includeLinks) {
+      url.searchParams.set("fields", "id,name,account_id,campaign_id");
+      response = await fetch(url, {
+        headers: { Authorization: "Bearer " + key },
+        signal: AbortSignal.timeout(20000),
       });
-      out.set(id,{...ad,url:link || null});
+      body = await response.json();
+    }
+    if (!response.ok || body.error)
+      throw new Error("Não foi possível verificar os anúncios na Meta.");
+    for (const id of unique.slice(i, i + 50)) {
+      const ad = body[id];
+      if (!ad || ad.error || ad.id !== id || !ad.account_id) continue;
+      const link = [
+        ad.creative?.instagram_permalink_url,
+        ad.preview_shareable_link,
+      ].find((value) => {
+        try {
+          const u = new URL(value);
+          return (
+            u.protocol === "https:" &&
+            [
+              "facebook.com",
+              "www.facebook.com",
+              "fb.me",
+              "instagram.com",
+              "www.instagram.com",
+            ].includes(u.hostname)
+          );
+        } catch {
+          return false;
+        }
+      });
+      out.set(id, { ...ad, url: link || null });
     }
   }
   return out;
