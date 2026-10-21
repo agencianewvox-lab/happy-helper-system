@@ -67,6 +67,7 @@ function database({
         limit() {
           return query;
         },
+        range() { return query; },
         is() {
           return query;
         },
@@ -94,16 +95,18 @@ function database({
                 ? meeting
                 : clean
                   ? []
-                  : table === "client_meetings"
-                    ? [meeting]
-                    : [
-                        {
-                          seq: 0,
-                          status: "done",
-                          offset_ms: 0,
-                          transcript: "Aprovar a proposta na sexta.",
-                        },
-                      ],
+                  : table === "meeting_utterances"
+                    ? []
+                    : table === "client_meetings"
+                      ? [meeting]
+                      : [
+                          {
+                            seq: 0,
+                            status: "done",
+                            offset_ms: 0,
+                            transcript: "Aprovar a proposta na sexta.",
+                          },
+                        ],
               error: null,
             }),
           );

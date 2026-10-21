@@ -104,7 +104,7 @@ export default function Reunioes() {
             </div>
             <Button disabled={busy || !allowed} onClick={() => void download()}>
               <Download size={16} />
-              {busy ? "Aguarde…" : "Baixar extensão interna"}
+              {busy ? "Aguarde…" : "Baixar extensão · v1.1"}
             </Button>
           </div>
           {!allowed ? (
@@ -165,21 +165,28 @@ export default function Reunioes() {
                     Chrome.
                   </li>
                   <li>
-                    Abra o Meet e clique na extensão. Dê um nome ao computador e
-                    autentique pelo painel.
+                    Recarregue a aba do Meet e clique na extensão: ela abre ao
+                    lado da reunião, no painel lateral do Chrome. Dê um nome ao
+                    computador e autentique pelo painel.
                   </li>
                   <li>
                     O Master aprova o primeiro acesso do gestor na aba
                     Dispositivos. Selecione o cliente e confirme o aviso aos
                     participantes.
                   </li>
+                  <li>
+                    Acompanhe as falas com as legendas CC ativadas em Português
+                    (Brasil). Os nomes são os exibidos pelo Meet; sem
+                    adivinhação por voz.
+                  </li>
                 </ol>
                 <p className="mt-4 text-xs text-muted-foreground">
                   Atualizações são manuais: substitua os arquivos pela nova
                   versão e clique em Recarregar na tela de extensões, fora de
-                  uma reunião. Não compartilhe a pasta com terceiros. O código
-                  da extensão não contém chaves e não concede acesso sem
-                  autenticação.
+                  uma reunião. Recarregue também o Meet. Mantenha a mesma pasta
+                  para preservar a instalação. Não compartilhe a pasta com
+                  terceiros. O código da extensão não contém chaves e não
+                  concede acesso sem autenticação.
                 </p>
                 <p className="mt-3 text-xs text-muted-foreground">
                   Áudio temporário: removido 24h após transcrição confirmada;
@@ -235,6 +242,7 @@ export default function Reunioes() {
                       </select>
                     </label>
                     <MeetingHistory
+                      clientId={client || undefined}
                       meetings={data.meetings.filter(
                         (m) => !client || m.client_id === client,
                       )}

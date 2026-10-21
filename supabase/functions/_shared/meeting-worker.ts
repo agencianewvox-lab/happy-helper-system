@@ -16,11 +16,11 @@ async function transcribe(db: any, chunk: any, key: string) {
   const meeting = check(
     await db
       .from("client_meetings")
-      .select("client_id,owner_id")
+      .select("client_id,owner_id,deleted_at")
       .eq("id", chunk.meeting_id)
       .single(),
   );
-  if (!(await stillAllowed(db, meeting)))
+  if (meeting.deleted_at || !(await stillAllowed(db, meeting)))
     throw new Error("authorization_revoked");
   const blob = check(
     await db.storage.from("meeting-audio").download(chunk.storage_path),
@@ -71,6 +71,19 @@ const summarySchema = {
   },
   required: ["summary", "decisions", "goals", "actions", "openQuestions"],
 };
+export function meetingEvidence(
+  audio: string,
+  captions: { speaker: string; text: string; start_ms: number }[],
+) {
+  if (!captions.length) return audio;
+  const named = captions
+    .map(
+      (c) =>
+        `[${String(Math.floor(c.start_ms / 60000)).padStart(2, "0")}:${String(Math.floor(c.start_ms / 1000) % 60).padStart(2, "0")}] ${c.speaker}: ${c.text}`,
+    )
+    .join("\n");
+  return `DUAS FONTES DA MESMA REUNIÃO. Não conte falas repetidas como fatos distintos. Nomes são rótulos exibidos pelo Meet, não identidade verificada. Atribua nomes SOMENTE aos trechos explicitamente ligados nas legendas; nunca propague para áudio sem nome. Em divergência, indique revisão necessária.\n\nLEGENDAS IDENTIFICADAS DO MEET:\n${named}\n\nTRANSCRIÇÃO DO ÁUDIO DE APOIO (pode repetir as legendas; sem identificação):\n${audio}`;
+}
 async function summarize(transcript: string, key: string) {
   if (!transcript.trim())
     return {
@@ -157,6 +170,7 @@ export async function processMeetings(db: any, key: string) {
         .from("client_meetings")
         .select("*")
         .in("status", ["finalizing", "interrupted"])
+        .is("deleted_at", null)
         .order("started_at")
         .limit(10),
     ) || [];
@@ -223,7 +237,16 @@ export async function processMeetings(db: any, key: string) {
         )
         .join("\n\n");
     try {
-      const summary = await summarize(transcript, key);
+      const captions = [];
+      for (let offset = 0; offset < 5000; offset += 1000) {
+        const page = check(await db.from("meeting_utterances").select("speaker,text,start_ms,id").eq("meeting_id",meeting.id).order("start_ms").order("id").range(offset,offset+999)) || [];
+        captions.push(...page);
+        if (page.length < 1000) break;
+      }
+      const summary = await summarize(
+        meetingEvidence(transcript, captions),
+        key,
+      );
       check(
         await db
           .from("client_meetings")
@@ -239,14 +262,12 @@ export async function processMeetings(db: any, key: string) {
           .eq("status", "processing"),
       );
       check(
-        await db
-          .from("meeting_audit")
-          .insert({
-            actor_id: meeting.owner_id,
-            device_id: meeting.device_id,
-            meeting_id: meeting.id,
-            action: "transcription_ready",
-          }),
+        await db.from("meeting_audit").insert({
+          actor_id: meeting.owner_id,
+          device_id: meeting.device_id,
+          meeting_id: meeting.id,
+          action: "transcription_ready",
+        }),
       );
     } catch (e) {
       check(

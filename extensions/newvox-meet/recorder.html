@@ -3,97 +3,159 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Newvox Reuniões</title>
+    <title>Newvox · Meeting Studio</title>
     <link rel="stylesheet" href="recorder.css" />
   </head>
   <body>
     <header>
-      <span class="brand">new vox<span class="dot">.</span></span
-      ><span class="tag">REUNIÕES / USO INTERNO</span>
+      <div class="logo" aria-hidden="true">N<span>↗</span></div>
+      <div>
+        <strong class="brand">NEWVOX<span> / MEET</span></strong
+        ><small>MEETING STUDIO</small>
+      </div>
+      <span id="status-pill" class="pill">Pronto</span>
     </header>
     <main>
-      <h1>Conversa boa.<br /><span>Histórico organizado.</span></h1>
-      <p class="muted">
-        Somente Master e gestores. Nenhuma senha fica na extensão.
-      </p>
-      <p id="feedback" role="status" aria-live="polite"></p>
-      <section id="login">
+      <div id="feedback" role="status" aria-live="polite" hidden></div>
+      <section id="login" class="surface">
+        <p class="eyebrow">SUA REUNIÃO. SEU CONTEXTO.</p>
+        <h1>Do alinhamento<br />à próxima ação<span>.</span></h1>
+        <p class="muted">
+          Um espaço seguro para registrar, acompanhar e organizar as conversas
+          com seus clientes.
+        </p>
         <label for="device">Nome deste computador</label
         ><input
           id="device"
           maxlength="100"
           placeholder="Ex.: Notebook da Priscilla"
-        /><button id="connect">Autenticar no painel</button
+        />
+        <button id="connect" class="primary">Conectar com o Painel ↗</button
         ><button id="check" class="secondary">
           Já autorizei · verificar acesso
         </button>
-        <p class="muted">
-          O painel abre em uma aba segura. Dispositivos de gestores precisam da
-          aprovação do Master.
+        <p class="fine">
+          A autenticação abre o Painel em uma aba segura. O registro da reunião
+          fica aqui, ao lado do Meet.
         </p>
       </section>
       <section id="workspace" hidden>
         <div class="identity">
-          <strong id="person"></strong
-          ><button id="logout" class="small secondary">Sair</button>
+          <span><i class="online"></i><strong id="person"></strong></span
+          ><button id="logout" class="text-button">Sair</button>
         </div>
-        <label for="client">Cliente desta reunião</label
-        ><select id="client">
-          <option value="">Selecione o cliente</option>
-        </select>
-        <label for="title">Título</label
-        ><input id="title" maxlength="160" value="Alinhamento com o cliente" />
-        <div class="notice">
-          <strong>Todos sabem que a reunião será registrada?</strong>
-          <p>
-            Avise em voz alta ou no chat do Meet. O indicador desta extensão não
-            é exibido aos outros participantes.
-          </p>
+        <section id="setup" class="surface">
+          <p class="eyebrow">PREPARAR REUNIÃO</p>
+          <label for="client">Cliente</label
+          ><select id="client">
+            <option value="">Selecione o cliente</option>
+          </select>
+          <label for="title">Título do encontro</label
+          ><input
+            id="title"
+            maxlength="160"
+            value="Alinhamento com o cliente"
+          />
           <label class="consent"
-            ><input type="checkbox" id="consent" /> Avisei os participantes e
-            confirmei a autorização para registro e processamento pela
-            Newvox.</label
+            ><input type="checkbox" id="consent" /><span
+              >Avisei os participantes e confirmei a autorização para registrar
+              áudio e legendas e processar pela Newvox.</span
+            ></label
           >
-        </div>
-        <button id="start">Iniciar registro de áudio</button>
-        <p class="muted">
-          Abra a reunião e clique no ícone da extensão na própria aba do Meet.
-          Use fones para evitar eco.
-        </p>
-        <div id="capture" hidden>
+          <p class="fine">
+            O aviso não é enviado aos outros participantes. Use fones para
+            evitar eco. As legendas do Meet serão ativadas somente para você.
+          </p>
+          <button id="start" class="primary">● Iniciar reunião</button>
+        </section>
+        <section id="capture" class="surface" hidden>
           <div class="capture-heading">
-            <span class="red-dot"></span
-            ><strong id="capture-title">Registrando</strong
-            ><span id="clock">00:00</span>
+            <span id="record-dot" class="record-dot"></span
+            ><strong id="capture-title">Gravando</strong
+            ><time id="clock">00:00</time>
           </div>
-          <p id="capture-client"></p>
+          <p id="capture-client" class="client-name"></p>
           <div class="meters">
             <div>
-              <small>Áudio capturado</small
+              <small>ÁUDIO DA REUNIÃO</small
               ><meter id="level" min="0" max="100" value="0"></meter>
             </div>
-            <div><small>Seu microfone</small><span id="microphone"></span></div>
+            <div><small>SEU MICROFONE</small><span id="microphone"></span></div>
           </div>
-          <p id="sync"></p>
-          <div class="actions">
-            <button id="pause" class="secondary">Pausar</button
-            ><button id="stop">Encerrar e processar</button>
+          <p id="sync" class="fine"></p>
+        </section>
+        <section id="completion" class="surface complete" hidden>
+          <span class="checkmark">✓</span>
+          <h2 id="completion-title">Registro salvo</h2>
+          <p id="completion-message" class="muted"></p>
+          <button id="new-meeting" class="secondary">
+            Preparar outra reunião
+          </button>
+        </section>
+        <section id="live" class="surface transcript" hidden>
+          <div class="section-heading">
+            <h2>Transcrição ao vivo</h2>
+            <span class="pill blue">MEET CC</span>
           </div>
-        </div>
+          <p id="caption-status" class="fine">Ativando legendas do Meet…</p>
+          <button id="enable-captions" class="text-button">
+            Ativar legendas no Meet
+          </button>
+          <div class="transcript-tools">
+            <input
+              id="search"
+              type="search"
+              placeholder="Buscar uma fala…"
+              aria-label="Buscar na transcrição"
+            /><label class="follow"
+              ><input id="follow" type="checkbox" checked />Acompanhar</label
+            >
+          </div>
+          <div
+            id="transcript"
+            class="timeline"
+            role="region"
+            aria-label="Falas da reunião"
+          >
+            <p class="empty">
+              As falas aparecerão aqui conforme o Meet produzir as legendas.
+            </p>
+          </div>
+          <p class="fine">
+            Nome exibido pelo Meet · horário de captura. Legendas automáticas
+            podem ter erros. Áudio de apoio disponível no Painel, sem
+            identificação presumida.
+          </p>
+        </section>
         <button id="recover" class="secondary" hidden>
           Sincronizar registro pendente</button
-        ><button id="discard" class="small secondary" hidden>
-          Descartar pendência deste computador</button
-        ><a id="history" target="_blank" rel="noopener"
-          >Abrir histórico no painel ↗</a
+        ><button id="discard" class="text-button danger" hidden>
+          Descartar pendência deste computador
+        </button>
+        <a id="history" target="_blank" rel="noopener"
+          >Abrir reunião no Painel ↗</a
         >
       </section>
       <footer>
-        Sessão de até 8 horas; encerra ao fechar o navegador. Captura máxima de
-        4 horas. Sem conexão de segurança por 45 segundos, a captura para.
-        Transcrições podem conter erros e precisam de revisão.
+        USO INTERNO · v1.1.0<br />Sessão de até 8h · reunião de até 4h. Fechar
+        este painel lateral não encerra a captura. Finalize pelo botão abaixo.
       </footer>
     </main>
+    <div id="controls" class="dock" hidden>
+      <button id="pause" class="secondary">Ⅱ Pausar</button
+      ><button id="stop" class="primary">■ Finalizar e salvar</button>
+    </div>
+    <dialog id="stop-confirm">
+      <h2>Finalizar esta reunião?</h2>
+      <p>
+        O áudio e as falas já capturados serão sincronizados. O resumo será
+        organizado no Painel.
+      </p>
+      <div class="actions">
+        <button id="cancel-stop" class="secondary">Continuar reunião</button
+        ><button id="confirm-stop" class="primary">Finalizar e salvar</button>
+      </div>
+    </dialog>
     <script type="module" src="recorder.js"></script>
   </body>
 </html>

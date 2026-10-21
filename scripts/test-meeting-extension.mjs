@@ -13,12 +13,43 @@ const source = (
   )
 ).replace(/^import .*;\r?\n/gm, "");
 const turn = () => new Promise((resolve) => setImmediate(resolve));
-const meetStateSource = await readFile(new URL("../extensions/newvox-meet/meet-state.js",import.meta.url),"utf8");
-test("Meet DOM signal requires an active call, never just the lobby microphone",()=>{
-  for(const [labels,expected] of [[["Desativar microfone"],null],[["Sair da chamada","Desativar microfone"],false],[["Leave call","Turn on microphone"],true],[["Você saiu da reunião"],null]]) {
+const meetStateSource = await readFile(
+  new URL("../extensions/newvox-meet/meet-state.js", import.meta.url),
+  "utf8",
+);
+test("Meet DOM signal requires an active call, never just the lobby microphone", () => {
+  for (const [labels, expected] of [
+    [["Desativar microfone"], null],
+    [["Sair da chamada", "Desativar microfone"], false],
+    [["Leave call", "Turn on microphone"], true],
+    [["Você saiu da reunião"], null],
+  ]) {
     let message;
-    vm.runInNewContext(meetStateSource,{document:{documentElement:{},querySelectorAll:()=>labels.map(label=>({getClientRects:()=>[{}],getAttribute:()=>label}))},MutationObserver:class {observe(){}},setInterval(){},setTimeout(){},clearTimeout(){},chrome:{runtime:{sendMessage(value){message=value;return Promise.resolve();}}}});
-    assert.equal(message.muted,expected);
+    vm.runInNewContext(meetStateSource, {
+      document: {
+        documentElement: {},
+        querySelectorAll: () =>
+          labels.map((label) => ({
+            getClientRects: () => [{}],
+            getAttribute: () => label,
+          })),
+      },
+      MutationObserver: class {
+        observe() {}
+      },
+      setInterval() {},
+      setTimeout() {},
+      clearTimeout() {},
+      chrome: {
+        runtime: {
+          sendMessage(value) {
+            message = value;
+            return Promise.resolve();
+          },
+        },
+      },
+    });
+    assert.equal(message.muted, expected);
   }
 });
 function harness({ delayWrite = false } = {}) {
@@ -31,6 +62,7 @@ function harness({ delayWrite = false } = {}) {
     recorders = [],
     gains = [];
   let listener, saved, releaseWrite;
+  const captions = new Map();
   const writeGate = delayWrite
     ? new Promise((resolve) => {
         releaseWrite = resolve;
@@ -124,6 +156,7 @@ function harness({ delayWrite = false } = {}) {
           return { ok: true };
         }
         if (m.action === "badge") return { ok: true };
+        if (m.action === "captions_control") return { ok: true };
         throw new Error("Unexpected bridge");
       },
     },
@@ -138,6 +171,13 @@ function harness({ delayWrite = false } = {}) {
     allChunks: async () => [...queue.values()],
     countChunks: async () => queue.size,
     deleteChunk: async (key) => queue.delete(key),
+    putCaption: async (item) => captions.set(item.key, item),
+    allCaptions: async () => [...captions.values()],
+    ackCaption: async (item) => {
+      if (captions.get(item.key)?.revision === item.revision)
+        captions.delete(item.key);
+    },
+    deleteCaption: async (key) => captions.delete(key),
     chrome,
     MediaRecorder: Recorder,
     AudioContext: Audio,
@@ -148,6 +188,7 @@ function harness({ delayWrite = false } = {}) {
     Math,
     Promise,
     Uint8Array,
+    TextEncoder,
     Error,
     setTimeout: (fn, ms) => {
       const t = { fn, ms, cleared: false };
@@ -281,4 +322,27 @@ test("consent and one active recording are enforced locally", async () => {
   await h.start();
   await assert.rejects(h.start(), /andamento/);
   await h.send("stop");
+});
+test("captions are accepted only for the active tab and synced before stop", async () => {
+  const h = harness(); await h.start();
+  const cue = {id:"00000000-0000-4000-8000-000000000001",speaker:"Ana",text:"Alinhamento",startMs:0,endMs:10,revision:1};
+  const payload = {tabId:1,room:"abc-defg-hij",meetingId:"meeting-1",items:[cue],captionState:"enabled"};
+  assert.equal((await h.send("captions",{...payload,tabId:2})).active,false);
+  await h.send("captions",payload);
+  assert.equal((await h.send("status")).captions.length,1);
+  await h.send("pause");
+  await h.send("captions",{...payload,items:[{...cue,id:"00000000-0000-4000-8000-000000000002",text:"Pausa privada"}]});
+  assert.equal((await h.send("status")).captions.length,1);
+  await h.send("pause"); await h.send("stop");
+  const captionIndex=h.calls.findIndex(c=>c.action==="captions");
+  assert.ok(captionIndex>=0 && captionIndex<h.calls.findIndex(c=>c.action==="stop"));
+  assert.equal(JSON.stringify(h.calls).includes("Pausa privada"),false);
+});
+test("versioned side panel replaces popup windows", async () => {
+  const manifest=JSON.parse(await readFile(new URL("../extensions/newvox-meet/manifest.json",import.meta.url),"utf8"));
+  const background=await readFile(new URL("../extensions/newvox-meet/background.js",import.meta.url),"utf8");
+  assert.equal(manifest.side_panel.default_path,"recorder.html");
+  assert.ok(manifest.permissions.includes("sidePanel"));
+  assert.ok(background.includes("chrome.sidePanel.open"));
+  assert.ok(!background.includes("chrome.windows.create"));
 });

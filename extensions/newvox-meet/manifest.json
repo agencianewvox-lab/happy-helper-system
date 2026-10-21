@@ -1,15 +1,25 @@
 {
   "manifest_version": 3,
   "name": "Newvox Reuniões — equipe",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "minimum_chrome_version": "116",
   "description": "Registro autorizado das reuniões do Meet na carteira Newvox. Uso interno, com autenticação e aprovação de dispositivos.",
-  "permissions": ["activeTab", "tabCapture", "storage", "offscreen"],
+  "permissions": [
+    "activeTab",
+    "tabCapture",
+    "storage",
+    "offscreen",
+    "sidePanel"
+  ],
+  "side_panel": { "default_path": "recorder.html" },
   "host_permissions": ["https://gorqyovidpdvuockzndm.supabase.co/*"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": { "default_title": "Abrir Newvox Reuniões" },
   "content_scripts": [
-    { "matches": ["https://meet.google.com/*"], "js": ["meet-state.js"] }
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["captions.js", "meet-state.js"]
+    }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; connect-src https://gorqyovidpdvuockzndm.supabase.co"

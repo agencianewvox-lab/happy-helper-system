@@ -1,5 +1,69 @@
 import { api, VERSION } from "./shared.js";
 import { putChunk, allChunks, countChunks, deleteChunk } from "./queue.js";
+import { putCaption, allCaptions, ackCaption, deleteCaption } from "./queue.js";
+let captionWrites = Promise.resolve(),
+  captionFlush = null,
+  captionTimer = null;
+let liveCaptions = new Map(),
+  captionState = "waiting",
+  lastCaptionAt = 0,
+  captionError = "";
+async function captionsControl(control) {
+  if (!current) return;
+  const result = await bridge("captions_control", {
+    control,
+    tabId: current.tabId,
+    meetingId: current.id,
+    started: current.started,
+  });
+  if (result?.error) {
+    captionError = result.error;
+    if (control === "stop") current.partial = true;
+  }
+}
+async function pendingCaptions() {
+  return (await allCaptions()).filter(
+    (c) => c.meetingId === current?.id && c.owner === current?.owner,
+  );
+}
+function flushCaptions() {
+  if (captionFlush) return captionFlush;
+  if (!current) return Promise.resolve();
+  captionFlush = (async () => {
+    await captionWrites;
+    const items = await pendingCaptions();
+    for (let offset = 0; offset < items.length;) {
+      const batch = [];
+      let bytes = 0;
+      while (offset < items.length && batch.length < 5) {
+        const size = new TextEncoder().encode(JSON.stringify(items[offset])).length;
+        if (batch.length && bytes + size > 24000) break;
+        batch.push(items[offset++]); bytes += size;
+      }
+      await api("captions", {
+        meetingId: current.id,
+        items: batch.map(({ id, speaker, text, startMs, endMs, revision }) => ({
+          id,
+          speaker,
+          text,
+          startMs,
+          endMs,
+          revision,
+        })),
+      });
+      for (const item of batch) await ackCaption(item);
+    }
+    captionError = "";
+  })()
+    .catch((e) => {
+      captionError = "Falas aguardando sincronização: " + e.message;
+      throw e;
+    })
+    .finally(() => {
+      captionFlush = null;
+    });
+  return captionFlush;
+}
 let current = null,
   recorder = null,
   context = null,
@@ -13,6 +77,7 @@ let heartbeat = null,
   flushPromise = null,
   finishing = false,
   stopping = false;
+let starting = false;
 let writes = Promise.resolve(),
   partDone = Promise.resolve();
 let micState = { muted: null, at: 0, room: null },
@@ -63,6 +128,8 @@ function flush() {
         }
       }
       if (!recorder && !finishing && current.ended) {
+        await flushCaptions();
+        if ((await pendingCaptions()).length) await flushCaptions();
         await api("stop", {
           meetingId: current.id,
           expectedChunks: current.seq,
@@ -202,10 +269,20 @@ async function start(message) {
     lastVerified = Date.now();
     lastMeetVerified = Date.now();
     error = "";
+    captionError = "";
+    captionState = "waiting";
+    lastCaptionAt = 0;
+    liveCaptions = new Map();
+    captionWrites = Promise.resolve();
     stopping = false;
     writes = Promise.resolve();
     await persist();
     recordPart();
+    await captionsControl("start");
+    captionTimer = setInterval(
+      () => void flushCaptions().catch(() => {}),
+      5000,
+    );
     for (const track of tabStream.getTracks())
       track.onended = () => {
         void stop(true);
@@ -259,6 +336,7 @@ function release() {
   clearTimeout(rotate);
   clearInterval(heartbeat);
   clearInterval(watchdog);
+  clearInterval(captionTimer);
   for (const stream of [tabStream, micStream])
     stream?.getTracks().forEach((t) => {
       t.onended = null;
@@ -276,8 +354,11 @@ async function stop(partial = false) {
   if (!current || finishing || current.ended) return;
   finishing = true;
   stopping = true;
+  await captionsControl("stop");
+  await captionWrites;
   current.partial = !!current.partial || partial;
   current.ended = true;
+  current.endedAt = Date.now();
   current.status = "syncing";
   clearTimeout(rotate);
   try {
@@ -319,18 +400,85 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     return;
   }
   (async () => {
-    if (message.action === "start") return start(message);
+    if (message.action === "captions") {
+      if (
+        !current ||
+        current.ended ||
+        current.status !== "recording" ||
+        message.tabId !== current.tabId ||
+        message.room !== current.room ||
+        message.meetingId !== current.id
+      )
+        return { active: false };
+      if (current.paused) return { active: true, ok: false };
+      if (!Array.isArray(message.items) || message.items.length > 10)
+        throw new Error("Legendas inválidas.");
+      captionState =
+        message.captionState === "enabled" ? "enabled" : "unavailable";
+      for (const item of message.items) {
+        if (
+          !/^[0-9a-f-]{36}$/.test(item.id || "") ||
+          typeof item.speaker !== "string" ||
+          !item.speaker.trim() ||
+          item.speaker.length > 160 ||
+          typeof item.text !== "string" ||
+          !item.text.trim() ||
+          item.text.length > 4000 ||
+          ![item.startMs, item.endMs, item.revision].every(Number.isInteger) ||
+          item.startMs < 0 ||
+          item.endMs < item.startMs ||
+          item.endMs >
+            Math.min(14400000, Date.now() - current.started + 10000) ||
+          item.revision < 1 ||
+          item.revision > 100000
+        )
+          continue;
+        const previous = liveCaptions.get(item.id);
+        if (previous && previous.revision >= item.revision) continue;
+        const saved = {
+          ...item,
+          key: current.id + ":" + item.id,
+          meetingId: current.id,
+          owner: current.owner,
+        };
+        captionWrites = captionWrites
+          .catch(() => {})
+          .then(() => putCaption(saved))
+          .then(() => {
+            liveCaptions.set(item.id, item);
+            while (liveCaptions.size > 200)
+              liveCaptions.delete(liveCaptions.keys().next().value);
+          });
+        lastCaptionAt = Date.now();
+      }
+      await captionWrites;
+      return { ok: true, active: true };
+    }
+    if (message.action === "enable_captions") {
+      await captionsControl("enable");
+      return { ok: true };
+    }
+    if (message.action === "start") {
+      if (starting) throw new Error("O registro já está iniciando. Aguarde.");
+      starting = true;
+      try { return await start(message); } finally { starting = false; }
+    }
     if (message.action === "stop") {
       await stop();
       return { ok: true };
     }
     if (message.action === "pause") {
       if (!recorder) throw new Error("Não há captura ativa.");
+      // Flush the current visible cue before changing the capture gate.
+      if (!current.paused) await captionsControl("pause");
       current.paused = !current.paused;
       if (current.paused) {
         recorder.pause();
         if (micGain) micGain.gain.value = 0;
-      } else recorder.resume();
+      } else {
+        recorder.resume();
+        await captionsControl("resume");
+      }
       await persist();
       await api("heartbeat", { meetingId: current.id, paused: current.paused });
       return { ok: true };
@@ -358,7 +506,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       return { ok: true };
     }
     if (message.action === "discard") {
-      if (recorder || finishing || flushPromise)
+      if (recorder || finishing || flushPromise || captionFlush)
         throw new Error(
           "Encerre a captura e aguarde os envios antes de descartar.",
         );
@@ -369,6 +517,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       current = saved;
       if (current) {
         for (const item of await pending()) await deleteChunk(item.key);
+        for (const item of await pendingCaptions())
+          await deleteCaption(item.key);
       }
       current = null;
       error = "";
@@ -382,6 +532,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         audioLevel,
         micCaptured: !!micGain && micGain.gain.value > 0,
         pending: await countChunks(),
+        captions: [...liveCaptions.values()],
+        captionState,
+        lastCaptionAt,
+        captionError,
       };
     throw new Error("Ação inválida.");
   })().then(respond, (e) => respond({ error: e.message }));

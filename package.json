@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:meetings": "node scripts/test-meeting-extension.mjs && vitest run src/lib/meeting-model.test.ts src/lib/meeting-worker.test.ts src/test/meeting-pairing.test.tsx",
+    "test:meetings": "node scripts/test-meeting-extension.mjs && vitest run src/lib/meeting-model.test.ts src/lib/meeting-worker.test.ts src/lib/meeting-captions.test.ts src/test/meeting-pairing.test.tsx src/test/meeting-transcript.test.tsx",
     "package:meetings": "node scripts/package-meeting-extension.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json"
   },

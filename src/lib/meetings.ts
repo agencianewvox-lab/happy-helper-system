@@ -14,8 +14,21 @@ export type Meeting = {
   version: number;
   uploaded_chunks?: number;
   transcribed_chunks?: number;
+  utterance_count?: number;
+  deleted_at?: string | null;
+};
+export type MeetingUtterance = {
+  id: string;
+  speaker: string;
+  text: string;
+  start_ms: number;
+  end_ms: number;
+  revision: number;
+  source: "meet_captions";
 };
 export type MeetingDetail = Meeting & {
+  description?: string;
+  utterances?: MeetingUtterance[];
   transcript: string | null;
   review_notes: string | null;
   summary: {
@@ -25,7 +38,12 @@ export type MeetingDetail = Meeting & {
     actions: string[];
     openQuestions: string[];
   } | null;
-  chunks: { seq: number; status: string; transcript: string | null }[];
+  chunks: {
+    seq: number;
+    status: string;
+    transcript: string | null;
+    offset_ms?: number;
+  }[];
   tasks: { item_index: number; task_id: string }[];
 };
 export type MeetingDevice = {
@@ -62,6 +80,9 @@ export const meetingStatus: Record<string, string> = {
   failed: "Precisa de atenção",
 };
 export const auditLabels: Record<string, string> = {
+  meeting_edited: "Editou título ou informações",
+  meeting_trashed: "Moveu reunião para a lixeira",
+  meeting_restored: "Restaurou reunião",
   extension_downloaded: "Baixou a extensão",
   session_authorized: "Autorizou uma sessão",
   session_ended: "Encerrou a sessão",
@@ -107,7 +128,7 @@ export async function downloadMeetingExtension() {
   const url = URL.createObjectURL(data),
     a = document.createElement("a");
   a.href = url;
-  a.download = "newvox-reunioes-1.0.0.zip";
+  a.download = "newvox-reunioes-1.1.0.zip";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
@@ -115,4 +136,36 @@ export function meetingDate(value: string | null) {
   return value
     ? new Date(value).toLocaleString("pt-BR")
     : "Ainda não utilizado";
+}
+export function meetingOffset(ms: number) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+export function meetingTranscriptText(m: MeetingDetail) {
+  const captions = (m.utterances || [])
+    .map((c) => `[${meetingOffset(c.start_ms)}] ${c.speaker}: ${c.text}`)
+    .join("\n\n");
+  const audio =
+    m.transcript ||
+    m.chunks
+      .filter((c) => c.transcript)
+      .map((c) => `[${meetingOffset(c.offset_ms || 0)}] ${c.transcript}`)
+      .join("\n\n");
+  return [
+    m.client_name,
+    m.title,
+    meetingDate(m.started_at),
+    m.description || "",
+    m.partial ? "ATENÇÃO: REGISTRO PARCIAL" : "",
+    "FALAS IDENTIFICADAS · LEGENDAS DO MEET (nomes exibidos, sujeitos a revisão)",
+    captions || "Sem falas identificadas nesta reunião.",
+    "ÁUDIO DE APOIO · SEM ATRIBUIÇÃO DE PESSOA (pode repetir o conteúdo acima)",
+    audio || "Ainda não processado.",
+    "RESUMO · RASCUNHO DA IA",
+    m.summary?.summary || "Ainda não disponível.",
+    "REVISÃO HUMANA",
+    m.review_notes || "Ainda não revisada.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }

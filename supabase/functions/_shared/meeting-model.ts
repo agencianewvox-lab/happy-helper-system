@@ -1,4 +1,4 @@
-export const MEETING_VERSION = "1.0.0";
+export const MEETING_VERSION = "1.1.0";
 export const MAX_CHUNKS = 240;
 export const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 export const SESSION_HOURS = 8;
@@ -91,6 +91,10 @@ export function completeChunks(
   );
 }
 export const meetingErrors: Record<string, string> = {
+  meeting_deleted: "Reunião na lixeira. Restaure antes de alterar.",
+  meeting_busy: "Finalize a captura e aguarde o processamento antes de mover para a lixeira.",
+  confirmation_required: "Confirme a operação antes de continuar.",
+  caption_conflict: "Conflito nas falas recebidas. O histórico já salvo foi preservado.",
   forbidden: "Acesso permitido somente ao Master e aos gestores autorizados.",
   session_expired:
     "Sessão encerrada. Conecte a extensão novamente pelo painel.",

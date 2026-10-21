@@ -30,6 +30,10 @@ const webActions = new Set([
   "retry",
   "finalize_partial",
   "download",
+  "live_detail",
+  "edit",
+  "trash",
+  "restore",
 ]);
 const extensionActions = new Set([
   "bootstrap",
@@ -38,6 +42,8 @@ const extensionActions = new Set([
   "stop",
   "logout",
   "upload_chunk",
+  "captions",
+  "live_detail",
 ]);
 function check<T>(result: { data: T; error: unknown }): T {
   if (result.error) throw result.error;
@@ -103,7 +109,7 @@ Deno.serve(async (req) => {
       payload: Record<string, unknown> = {},
     ) =>
       check(
-        await service.rpc("meeting_command", {
+        await service.rpc("meeting_command_v2", {
           p_action: action,
           p_payload: payload,
           ...identity,
@@ -190,7 +196,7 @@ Deno.serve(async (req) => {
             ...headers,
             "Content-Type": "application/octet-stream",
             "Content-Disposition":
-              'attachment; filename="newvox-reunioes-1.0.0.zip"',
+              'attachment; filename="newvox-reunioes-1.1.0.zip"',
           },
         },
       );

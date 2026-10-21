@@ -16,28 +16,13 @@ async function offscreen() {
     });
   await creating;
 }
-chrome.action.onClicked.addListener(async (tab) => {
-  const url = chrome.runtime.getURL("recorder.html");
-  const existing = (await chrome.tabs.query({})).find((t) =>
-    t.url?.startsWith(url),
-  );
-  if (existing) {
-    await chrome.windows.update(existing.windowId, { focused: true });
-    await chrome.runtime
-      .sendMessage({
-        target: "controller",
-        action: "select_tab",
-        tabId: tab.id,
-      })
-      .catch(() => {});
-    return;
-  }
-  await chrome.windows.create({
-    url: `${url}?tab=${tab.id}`,
-    type: "popup",
-    width: 480,
-    height: 820,
-  });
+chrome.action.onClicked.addListener((tab) => {
+  // Must run directly in the user gesture, before storage or network awaits.
+  void chrome.sidePanel.open({ windowId: tab.windowId });
+  void chrome.storage.session.set({ selectedMeetTab: tab.id });
+  void chrome.runtime
+    .sendMessage({ target: "controller", action: "select_tab", tabId: tab.id })
+    .catch(() => {});
 });
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id) return;
@@ -60,6 +45,19 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         await chrome.action.setBadgeBackgroundColor({ color: "#e5484d" });
         return { ok: true };
       }
+      if (message.action === "captions_control") {
+        return chrome.tabs
+          .sendMessage(message.tabId, {
+            target: "newvox-captions",
+            action: message.control,
+            meetingId: message.meetingId,
+            started: message.started,
+          })
+          .catch(() => ({
+            error:
+              "Recarregue a aba do Meet para ativar as legendas identificadas.",
+          }));
+      }
       throw new Error("Ação inválida.");
     })().then(respond, (error) => respond({ error: error.message }));
     return true;
@@ -75,6 +73,26 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       })
       .catch(() => {});
     return;
+  }
+  if (
+    message.target === "meet-captions" &&
+    sender.tab &&
+    sender.frameId === 0 &&
+    parseMeetUrl(sender.tab.url)
+  ) {
+    // Untrusted DOM data: sender fixes the room/tab. Only an active authorized capture may accept it.
+    void chrome.runtime
+      .sendMessage({
+        target: "offscreen",
+        action: "captions",
+        tabId: sender.tab.id,
+        room: parseMeetUrl(sender.tab.url),
+        meetingId: message.meetingId,
+        items: message.items,
+        captionState: message.captionState,
+      })
+      .then(respond, () => respond({ active: false }));
+    return true;
   }
   // Content scripts cannot issue commands or obtain tokens.
   if (
