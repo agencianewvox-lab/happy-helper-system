@@ -1,4 +1,4 @@
-import { BarChart3, Megaphone, ListTodo, CalendarDays, Heart, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Home, Smartphone, Instagram } from "lucide-react";
+import { BarChart3, Megaphone, ListTodo, CalendarDays, Heart, LogOut, AlertCircle, ClipboardCheck, Shield, Settings, Home, Smartphone, Instagram, Mic } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -31,6 +31,7 @@ const navItems = [
   { title: "Social Media", url: "/social", icon: Instagram, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Tarefas", url: "/tarefas", icon: ListTodo, adminOnly: false, masterOnly: false, badgeKey: "tarefas" as const },
   { title: "Agenda", url: "/agenda", icon: CalendarDays, adminOnly: false, masterOnly: false, badgeKey: "agenda" as const },
+  { title: "Reuniões", url: "/reunioes", icon: Mic, adminOnly: false, masterOnly: false, badgeKey: null },
   { title: "Pendências", url: "/pendencias", icon: AlertCircle, adminOnly: false, masterOnly: false, badgeKey: "pendencias" as const },
   
   { title: "Saúde da carteira", url: "/nps", icon: Heart, adminOnly: false, masterOnly: false, badgeKey: null },

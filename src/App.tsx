@@ -18,6 +18,8 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Performance = lazy(() => import("./pages/Performance"));
 const Anuncios = lazy(() => import("./pages/Anuncios"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
+const Reunioes = lazy(() => import("./pages/Reunioes"));
+const MeetingConnect = lazy(() => import("./pages/MeetingConnect"));
 const Social = lazy(() => import("./pages/Social"));
 const InstagramReturn = lazy(() => import("./pages/InstagramReturn"));
 const Chat = lazy(() => import("./pages/Chat"));
@@ -84,6 +86,8 @@ function AppRoutes() {
         <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
         <Route path="/anuncios" element={<ProtectedRoute><Anuncios /></ProtectedRoute>} />
         <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
+        <Route path="/reunioes" element={<ProtectedRoute><Reunioes /></ProtectedRoute>} />
+        <Route path="/reunioes/conectar" element={<MeetingConnect />} />
         <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
         <Route path="/social/instagram/retorno" element={<InstagramReturn />} />
         <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />

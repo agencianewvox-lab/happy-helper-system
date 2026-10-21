@@ -36,6 +36,7 @@ import { ClientWorkspace } from "@/components/ClientWorkspace";
 import { clientWorkspace } from "@/lib/client-workspace";
 import { useProfile } from "@/hooks/useProfile";
 import { DeleteClientDialog } from "@/components/DeleteClientDialog";
+import { MeetingHistory } from "@/components/meetings/MeetingHistory";
 
 interface Conversa {
   id: string;
@@ -303,6 +304,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
             <TabsTrigger value="meta-ads" className="flex-1 gap-1"><Megaphone className="w-3 h-3" /> Ads</TabsTrigger>
             <TabsTrigger value="nps-real" className="flex-1 gap-1">📊 NPS Real</TabsTrigger>
             <TabsTrigger value="notas" className="flex-1 gap-1"><StickyNote className="w-3 h-3" /> Notas</TabsTrigger>
+            <TabsTrigger value="reunioes" className="flex-1 gap-1">Reuniões</TabsTrigger>
             <TabsTrigger value="onboarding" className="flex-1 gap-1">📋 Onboarding</TabsTrigger>
             <TabsTrigger value="social" className="flex-1 gap-1">Social</TabsTrigger>
           </TabsList></div>
@@ -574,6 +576,7 @@ export function ClientDetailModal({ grupo, open, onClose }: Props) {
 
           {/* Tab: Informações */}
           <TabsContent value="ficha" className="mt-4"><ClientWorkspace key={grupo.id} clientId={grupo.id} /></TabsContent>
+          <TabsContent value="reunioes" className="mt-4"><MeetingHistory key={grupo.id} clientId={grupo.id}/></TabsContent>
           <TabsContent value="info" className="space-y-4 mt-4">
             {basicItems.map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/30">

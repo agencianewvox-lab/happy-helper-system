@@ -94,3 +94,9 @@ verify_jwt = false
 verify_jwt = false
 [functions.client-workspace]
 verify_jwt = false
+
+# Auth.getUser + active Auth session, or hashed device session; all roles are rechecked server-side.
+[functions.meetings-api]
+verify_jwt = false
+[functions.meeting-worker]
+verify_jwt = false
