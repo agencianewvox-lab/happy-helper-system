@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     if (!client)
       return reply({ error: "Cliente fora da sua carteira editorial." }, 403);
     if (body.action === "member") {
-      if (!ctx.isMaster)
+      if (ctx.profile.is_master !== true)
         return reply(
           { error: "Somente o Master pode atribuir a carteira." },
           403,

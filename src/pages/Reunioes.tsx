@@ -104,7 +104,7 @@ export default function Reunioes() {
             </div>
             <Button disabled={busy || !allowed} onClick={() => void download()}>
               <Download size={16} />
-              {busy ? "Aguarde…" : "Baixar extensão · v1.1"}
+              {busy ? "Aguarde…" : "Baixar extensão · v1.1.1"}
             </Button>
           </div>
           {!allowed ? (
@@ -173,6 +173,11 @@ export default function Reunioes() {
                     O Master aprova o primeiro acesso do gestor na aba
                     Dispositivos. Selecione o cliente e confirme o aviso aos
                     participantes.
+                  </li>
+                  <li>
+                    Clique em <strong>Configurar microfone</strong> na extensão.
+                    Autorize e teste na janela temporária; depois volte ao Meet
+                    e inicie pela lateral. A permissão do Meet é separada.
                   </li>
                   <li>
                     Acompanhe as falas com as legendas CC ativadas em Português

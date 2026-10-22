@@ -1,4 +1,5 @@
 import { parseMeetUrl } from "./shared.js";
+import { mediaCaptureError } from "./media-permissions.js";
 chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 let creating;
@@ -102,6 +103,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   )
     return;
   (async () => {
+    if (message.action === "microphone_setup") {
+      await chrome.windows.create({
+        url: chrome.runtime.getURL("permission.html"),
+        type: "popup",
+        width: 520,
+        height: 720,
+        focused: true,
+      });
+      return { ok: true };
+    }
     await offscreen();
     if (message.action === "start") {
       const tab = await chrome.tabs.get(message.tabId);
@@ -109,9 +120,14 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         throw new Error(
           "Abra a reunião do Google Meet e clique no ícone da extensão nessa aba.",
         );
-      const streamId = await chrome.tabCapture.getMediaStreamId({
-        targetTabId: message.tabId,
-      });
+      let streamId;
+      try {
+        streamId = await chrome.tabCapture.getMediaStreamId({
+          targetTabId: message.tabId,
+        });
+      } catch (error) {
+        throw new Error(mediaCaptureError(error, "tab"));
+      }
       return chrome.runtime.sendMessage({
         ...message,
         target: "offscreen",

@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import {
+  mediaCaptureError,
+  microphonePermissionState,
+  testMicrophone,
+} from "../extensions/newvox-meet/media-permissions.js";
+import {
   microphoneState,
   parseMeetUrl,
 } from "../extensions/newvox-meet/shared.js";
@@ -52,7 +57,7 @@ test("Meet DOM signal requires an active call, never just the lobby microphone",
     assert.equal(message.muted, expected);
   }
 });
-function harness({ delayWrite = false } = {}) {
+function harness({ delayWrite = false, failCapture = null } = {}) {
   const id = "fake-extension",
     owner = "user-1",
     mid = "meeting-1",
@@ -60,7 +65,8 @@ function harness({ delayWrite = false } = {}) {
     queue = new Map(),
     timers = [],
     recorders = [],
-    gains = [];
+    gains = [],
+    stoppedTracks = [];
   let listener, saved, releaseWrite;
   const captions = new Map();
   const writeGate = delayWrite
@@ -92,7 +98,16 @@ function harness({ delayWrite = false } = {}) {
       });
     }
   }
-  const stream = () => ({ getTracks: () => [{ stop() {}, onended: null }] });
+  const stream = () => ({
+    getTracks: () => [
+      {
+        stop() {
+          stoppedTracks.push(true);
+        },
+        onended: null,
+      },
+    ],
+  });
   class Audio {
     destination = {};
     resume() {
@@ -162,6 +177,7 @@ function harness({ delayWrite = false } = {}) {
     },
   };
   vm.runInNewContext(source, {
+    mediaCaptureError,
     api,
     VERSION: "1.0.0",
     putChunk: async (item) => {
@@ -181,7 +197,19 @@ function harness({ delayWrite = false } = {}) {
     chrome,
     MediaRecorder: Recorder,
     AudioContext: Audio,
-    navigator: { mediaDevices: { getUserMedia: async () => stream() } },
+    navigator: {
+      mediaDevices: {
+        getUserMedia: async (options) => {
+          const source = options.audio?.mandatory ? "tab" : "microphone";
+          if (source === failCapture) {
+            const e = new Error("Permission dismissed");
+            e.name = "NotAllowedError";
+            throw e;
+          }
+          return stream();
+        },
+      },
+    },
     Blob,
     FormData,
     Date,
@@ -224,6 +252,7 @@ function harness({ delayWrite = false } = {}) {
     timers,
     recorders,
     gains,
+    stoppedTracks,
     releaseWrite,
     get saved() {
       return saved;
@@ -324,25 +353,140 @@ test("consent and one active recording are enforced locally", async () => {
   await h.send("stop");
 });
 test("captions are accepted only for the active tab and synced before stop", async () => {
-  const h = harness(); await h.start();
-  const cue = {id:"00000000-0000-4000-8000-000000000001",speaker:"Ana",text:"Alinhamento",startMs:0,endMs:10,revision:1};
-  const payload = {tabId:1,room:"abc-defg-hij",meetingId:"meeting-1",items:[cue],captionState:"enabled"};
-  assert.equal((await h.send("captions",{...payload,tabId:2})).active,false);
-  await h.send("captions",payload);
-  assert.equal((await h.send("status")).captions.length,1);
+  const h = harness();
+  await h.start();
+  const cue = {
+    id: "00000000-0000-4000-8000-000000000001",
+    speaker: "Ana",
+    text: "Alinhamento",
+    startMs: 0,
+    endMs: 10,
+    revision: 1,
+  };
+  const payload = {
+    tabId: 1,
+    room: "abc-defg-hij",
+    meetingId: "meeting-1",
+    items: [cue],
+    captionState: "enabled",
+  };
+  assert.equal(
+    (await h.send("captions", { ...payload, tabId: 2 })).active,
+    false,
+  );
+  await h.send("captions", payload);
+  assert.equal((await h.send("status")).captions.length, 1);
   await h.send("pause");
-  await h.send("captions",{...payload,items:[{...cue,id:"00000000-0000-4000-8000-000000000002",text:"Pausa privada"}]});
-  assert.equal((await h.send("status")).captions.length,1);
-  await h.send("pause"); await h.send("stop");
-  const captionIndex=h.calls.findIndex(c=>c.action==="captions");
-  assert.ok(captionIndex>=0 && captionIndex<h.calls.findIndex(c=>c.action==="stop"));
-  assert.equal(JSON.stringify(h.calls).includes("Pausa privada"),false);
+  await h.send("captions", {
+    ...payload,
+    items: [
+      {
+        ...cue,
+        id: "00000000-0000-4000-8000-000000000002",
+        text: "Pausa privada",
+      },
+    ],
+  });
+  assert.equal((await h.send("status")).captions.length, 1);
+  await h.send("pause");
+  await h.send("stop");
+  const captionIndex = h.calls.findIndex((c) => c.action === "captions");
+  assert.ok(
+    captionIndex >= 0 &&
+      captionIndex < h.calls.findIndex((c) => c.action === "stop"),
+  );
+  assert.equal(JSON.stringify(h.calls).includes("Pausa privada"), false);
 });
 test("versioned side panel replaces popup windows", async () => {
-  const manifest=JSON.parse(await readFile(new URL("../extensions/newvox-meet/manifest.json",import.meta.url),"utf8"));
-  const background=await readFile(new URL("../extensions/newvox-meet/background.js",import.meta.url),"utf8");
-  assert.equal(manifest.side_panel.default_path,"recorder.html");
+  const manifest = JSON.parse(
+    await readFile(
+      new URL("../extensions/newvox-meet/manifest.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const background = await readFile(
+    new URL("../extensions/newvox-meet/background.js", import.meta.url),
+    "utf8",
+  );
+  assert.equal(manifest.side_panel.default_path, "recorder.html");
   assert.ok(manifest.permissions.includes("sidePanel"));
   assert.ok(background.includes("chrome.sidePanel.open"));
-  assert.ok(!background.includes("chrome.windows.create"));
+  assert.ok(!background.includes('getURL("recorder.html"), type: "popup"'));
+  assert.ok(background.includes('getURL("permission.html")'));
+});
+
+test("permission dismissed is actionable and is not a panel role failure", () => {
+  const text = mediaCaptureError({
+    name: "NotAllowedError",
+    message: "Permission dismissed",
+  });
+  assert.match(text, /Configurar microfone/);
+  assert.match(text, /Permitir no Meet não libera/);
+  assert.match(
+    mediaCaptureError({ name: "NotFoundError" }),
+    /Nenhum microfone/,
+  );
+  assert.match(mediaCaptureError({ name: "NotReadableError" }), /Windows/);
+  assert.match(
+    mediaCaptureError(new Error("denied"), "tab"),
+    /ícone da Newvox/,
+  );
+});
+test("dismissed capture permission never starts a meeting and releases an opened tab", async () => {
+  for (const source of ["tab", "microphone"]) {
+    const h = harness({ failCapture: source });
+    await assert.rejects(
+      h.start(),
+      source === "tab" ? /ícone da Newvox/ : /Configurar microfone/,
+    );
+    assert.equal(
+      h.calls.some((c) => c.action === "start"),
+      false,
+    );
+    assert.equal(h.recorders.length, 0);
+    assert.equal(h.stoppedTracks.length, source === "microphone" ? 1 : 0);
+  }
+});
+test("microphone permission test closes every track and never records", async () => {
+  let stopped = 0;
+  await testMicrophone({
+    getUserMedia: async (options) => {
+      assert.deepEqual(options, { audio: true, video: false });
+      return {
+        getAudioTracks: () => [{ readyState: "live" }],
+        getTracks: () => [{ stop: () => stopped++ }],
+      };
+    },
+  });
+  assert.equal(stopped, 1);
+  assert.equal(
+    await microphonePermissionState({
+      query: async () => ({ state: "granted" }),
+    }),
+    "granted",
+  );
+  assert.equal(
+    await microphonePermissionState({
+      query: async () => {
+        throw Error("unsupported");
+      },
+    }),
+    "unknown",
+  );
+});
+test("side panel never requests microphone permission or bypasses permission preflight", async () => {
+  const recorder = await readFile(
+    new URL("../extensions/newvox-meet/recorder.js", import.meta.url),
+    "utf8",
+  );
+  assert.ok(!recorder.includes("getUserMedia"));
+  assert.ok(
+    recorder.indexOf('microphonePermissionState() !== "granted"') <
+      recorder.indexOf('await command("start"'),
+  );
+  const helper = await readFile(
+    new URL("../extensions/newvox-meet/permission.js", import.meta.url),
+    "utf8",
+  );
+  assert.ok(!/api\(|MediaRecorder|fetch\(|command\("start"/.test(helper));
 });

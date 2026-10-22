@@ -1,4 +1,5 @@
 import { api, VERSION } from "./shared.js";
+import { mediaCaptureError } from "./media-permissions.js";
 import { putChunk, allChunks, countChunks, deleteChunk } from "./queue.js";
 import { putCaption, allCaptions, ackCaption, deleteCaption } from "./queue.js";
 let captionWrites = Promise.resolve(),
@@ -219,6 +220,7 @@ async function start(message) {
       "Avise os participantes e confirme a autorização antes de iniciar.",
     );
   const bootstrap = await api("bootstrap");
+  let captureStage = "tab";
   try {
     tabStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -229,10 +231,12 @@ async function start(message) {
       },
       video: false,
     });
+    captureStage = "microphone";
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true },
       video: false,
     });
+    captureStage = "processing";
     context = new AudioContext();
     await context.resume();
     mixed = context.createMediaStreamDestination();
@@ -329,7 +333,7 @@ async function start(message) {
   } catch (e) {
     if (current && recorder) await stop(true);
     else release();
-    throw e;
+    throw captureStage === "processing" ? e : new Error(mediaCaptureError(e, captureStage));
   }
 }
 function release() {

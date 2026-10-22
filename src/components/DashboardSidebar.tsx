@@ -63,11 +63,11 @@ export function DashboardSidebar({ isAdmin, isMaster = false, onSignOut }: Dashb
       <SidebarContent className="pt-5 px-2">
         <div className="flex items-center gap-3 px-3 pb-5"><img src={newvoxLogo} alt="New Vox" className="h-9 w-9 rounded-xl" />{!collapsed && <div><p className="font-semibold tracking-tight">new vox</p><p className="text-[9px] tracking-[.2em] text-muted-foreground">WORKSPACE</p></div>}</div>
         {/* Master badge */}
-        {isMaster && !collapsed && (
+        {(isMaster || isAdmin) && !collapsed && (
           <div className="px-4 pb-2">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
               <Shield className="w-3 h-3" />
-              Master
+              {isMaster ? "Master" : "ADM · carteira completa"}
             </span>
           </div>
         )}

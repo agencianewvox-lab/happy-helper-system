@@ -9,17 +9,17 @@ import { MetaAdsTab } from "@/components/MetaAdsTab";
 import { Input } from "@/components/ui/input";
 
 export default function Anuncios() {
-  const { isAdmin, isMaster, gestorFilter, profile, loading } = useProfile();
+  const { isAdmin, isMaster, canViewAllClients, profile, loading } = useProfile();
   const { signOut } = useAuth();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ["ads-portfolio", profile?.user_id, isMaster, gestorFilter],
+    queryKey: ["ads-portfolio", profile?.user_id, canViewAllClients],
     enabled: !loading && Boolean(profile),
     queryFn: async () => {
-      if (!isMaster && !gestorFilter) return [];
+      if (!profile || (!canViewAllClients && profile.role !== "gestor")) return [];
       let request = supabase.from("whatsapp_grupos").select("id,group_id,nome,gestor_responsavel,ad_account_id").order("nome");
-      if (!isMaster) request = request.eq("gestor_responsavel", gestorFilter!);
+      if (!canViewAllClients) request = request.eq("manager_user_id", profile.user_id);
       const { data, error } = await request;
       if (error) throw error;
       return data;

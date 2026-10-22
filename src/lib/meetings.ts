@@ -128,7 +128,7 @@ export async function downloadMeetingExtension() {
   const url = URL.createObjectURL(data),
     a = document.createElement("a");
   a.href = url;
-  a.download = "newvox-reunioes-1.1.0.zip";
+  a.download = "newvox-reunioes-1.1.1.zip";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }

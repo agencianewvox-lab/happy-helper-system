@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
             ...headers,
             "Content-Type": "application/octet-stream",
             "Content-Disposition":
-              'attachment; filename="newvox-reunioes-1.1.0.zip"',
+              'attachment; filename="newvox-reunioes-1.1.1.zip"',
           },
         },
       );

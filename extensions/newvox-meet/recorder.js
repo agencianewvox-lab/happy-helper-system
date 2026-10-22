@@ -1,4 +1,5 @@
 import { api, digest, PANEL, VERSION, tokenStorage } from "./shared.js";
+import { microphonePermissionState } from "./media-permissions.js";
 const $ = (id) => document.getElementById(id);
 let actor = null,
   busy = false,
@@ -104,6 +105,10 @@ async function check() {
 $("connect").onclick = () =>
   attempt(connect, $("connect"), "Abrindo autenticação…");
 $("check").onclick = () => attempt(check, $("check"), "Validando acesso…");
+$("configure-microphone").onclick = () => attempt(async () => {
+  await command("microphone_setup");
+  feedback("Autorize o microfone na janela de configuração. Depois volte aqui e clique em Iniciar reunião. A gravação ainda não começou.");
+}, $("configure-microphone"), "Abrindo configuração…");
 $("start").onclick = () =>
   attempt(
     async () => {
@@ -119,11 +124,11 @@ $("start").onclick = () =>
         throw new Error(
           "Clique no ícone da extensão na aba do Meet antes de iniciar.",
         );
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-      });
-      mic.getTracks().forEach((t) => t.stop());
+      if (await microphonePermissionState() !== "granted") {
+        await command("microphone_setup");
+        feedback("Primeiro autorize o microfone da Newvox na janela aberta. Depois volte e clique novamente em Iniciar reunião. Permitir apenas no Meet não é suficiente.");
+        return;
+      }
       await command("start", {
         tabId,
         clientId: $("client").value,
@@ -317,6 +322,7 @@ function render() {
     done = c?.status === "processing";
   captureActive = !!(recording || syncing);
   $("start").disabled = busy || captureActive;
+  $("configure-microphone").disabled = busy || captureActive;
   $("client").disabled =
     $("title").disabled =
     $("consent").disabled =
@@ -400,6 +406,10 @@ async function poll() {
   polling = true;
   try {
     state = (await command("status")) || {};
+    if (!captureActive && !busy) {
+      const permission = await microphonePermissionState();
+      $("microphone-permission").textContent = permission === "granted" ? "Microfone autorizado para a Newvox." : permission === "denied" ? "Microfone bloqueado para a extensão. Abra a configuração para liberar." : "Autorize o microfone da extensão antes de iniciar.";
+    }
     const c = state.current;
     if (
       actor &&

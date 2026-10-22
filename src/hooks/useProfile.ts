@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { staffAccess } from "@/lib/staff-access";
 
 export interface Profile {
   id: string;
@@ -37,9 +38,8 @@ export function useProfile() {
   if (error) console.error("Profile fetch error:", error);
   const loading = authLoading || (!!user && isPending);
 
-  const isAdmin = profile?.role === "admin";
-  const isMaster = profile?.is_master === true;
-  const gestorFilter = profile ? GESTOR_NAME_MAP[profile.full_name] || null : null;
+  const access = staffAccess(profile);
+  const gestorFilter = profile?.role === "gestor" ? GESTOR_NAME_MAP[profile.full_name] || profile.full_name : null;
 
-  return { profile, loading, isAdmin, isMaster, gestorFilter };
+  return { profile, loading, ...access, gestorFilter };
 }

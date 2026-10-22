@@ -1,7 +1,7 @@
 export const PANEL = "https://paineldecontrole.newvox.site";
 export const API =
   "https://gorqyovidpdvuockzndm.supabase.co/functions/v1/meetings-api";
-export const VERSION = "1.1.0";
+export const VERSION = "1.1.1";
 // Offscreen documents only expose chrome.runtime. Delegate storage to the trusted worker.
 export const tokenStorage = () =>
   chrome.storage?.session || {

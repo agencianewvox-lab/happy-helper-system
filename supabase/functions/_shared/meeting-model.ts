@@ -1,4 +1,4 @@
-export const MEETING_VERSION = "1.1.0";
+export const MEETING_VERSION = "1.1.1";
 export const MAX_CHUNKS = 240;
 export const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 export const SESSION_HOURS = 8;

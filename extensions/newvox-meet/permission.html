@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Newvox · Autorizar microfone</title>
+    <link rel="stylesheet" href="recorder.css" />
+  </head>
+  <body>
+    <header>
+      <div class="logo" aria-hidden="true">N<span>↗</span></div>
+      <div>
+        <strong class="brand">NEWVOX / MEET</strong
+        ><small>CONFIGURAÇÃO DO ÁUDIO</small>
+      </div>
+    </header>
+    <main>
+      <section class="surface">
+        <p class="eyebrow">ANTES DE INICIAR</p>
+        <h1>Libere seu microfone<span>.</span></h1>
+        <p class="muted">
+          A permissão do Meet é separada da permissão da extensão. Esta janela
+          permite que o Chrome mostre o pedido de autorização fora do painel
+          lateral.
+        </p>
+        <p id="permission-status" role="status" aria-live="polite" class="fine">
+          Clique abaixo e escolha Permitir quando o Chrome perguntar.
+        </p>
+        <button id="allow-microphone" class="primary">
+          Autorizar e testar microfone
+        </button>
+        <button id="microphone-settings" class="secondary">
+          Abrir configurações de microfone do Chrome
+        </button>
+        <p class="fine">
+          Se houver bloqueio: procure a Newvox nas permissões do Chrome. No
+          Windows, confira Privacidade e segurança → Microfone → permitir acesso
+          aos aplicativos da área de trabalho. Não é necessário liberar câmera.
+        </p>
+        <button id="close-permission" class="secondary">
+          Fechar e voltar à reunião
+        </button>
+        <p class="fine">
+          Este teste abre e fecha o microfone imediatamente. Não grava, não
+          envia áudio e não inicia a reunião. Depois de autorizar, volte à
+          lateral e clique em Iniciar reunião.
+        </p>
+      </section>
+    </main>
+    <script type="module" src="permission.js"></script>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-# Newvox Reuniões — instalação interna 1.1.0
+# Newvox Reuniões — instalação interna 1.1.1
 
 1. Extraia o ZIP para uma pasta fixa. Não execute a partir do ZIP.
 2. Abra chrome://extensions, ative Modo do desenvolvedor e escolha Carregar sem compactação.
@@ -6,13 +6,13 @@
 4. Abra a reunião em meet.google.com. Se a aba já estava aberta antes da instalação/atualização, recarregue-a. Clique no ícone, dê um nome ao computador e autentique no Painel.
 5. Confira o mesmo código nas duas telas. Autorize apenas conexões que você iniciou. O Master precisa aprovar o primeiro dispositivo de cada gestor em Reuniões > Dispositivos.
 6. Volte e clique em Já autorizei. Selecione o cliente, título e confirme o aviso/autorização de todos os participantes. Inicie somente depois de entrar na chamada.
-7. Conceda acesso ao microfone quando o Chrome pedir. Fale brevemente e confira o medidor. O áudio remoto continua audível.
+7. Clique em **Configurar microfone**. Na janela temporária, clique em **Autorizar e testar microfone** e permita no Chrome. A permissão do Meet não libera a extensão. O teste fecha o microfone imediatamente, sem gravar ou enviar áudio. Feche essa janela, volte ao Meet, clique no ícone Newvox e inicie pela lateral. Fale brevemente e confira o medidor. O áudio remoto continua audível.
 8. A extensão abre no painel lateral do Chrome. As legendas CC do Meet são ativadas após iniciar; selecione Português (Brasil) se solicitado. Falas e nomes aparecem conforme as legendas são produzidas. Se não ativar automaticamente, use o botão CC.
 9. Ao terminar, clique em Finalizar e salvar e confirme. Aguarde “Áudio e falas sincronizados” antes de fechar o Chrome. “Transcrição concluída” só aparece após o processamento do servidor. Fechar apenas o painel lateral NÃO encerra o registro.
 
 ## Segurança e limites
 
-- Apenas Master e gestores; carteira conferida no servidor a cada operação. Não inclui Social Media.
+- Apenas Master, ADM e gestores; carteira conferida no servidor a cada operação. ADM tem a carteira completa; gestores, somente os clientes atribuídos. Não inclui Social Media.
 - A senha do Painel e a chave da OpenAI nunca ficam na extensão. A autorização temporária dura no máximo 8 horas, termina ao sair do Painel ou por revogação e não persiste após fechar o Chrome.
 - O Master vê dispositivos, última comunicação, aprovação, bloqueio e registro de uso. Nome/versão do computador são informações declaradas, não prova de integridade. Instalação sem Web Store não impede cópia ou adulteração: o controle efetivo é no servidor. Não instale códigos modificados.
 - Não há gravação silenciosa automática, vídeo, câmera, download do Drive nem bot convidado. Quem inicia é responsável por avisar os participantes; a extensão NÃO envia aviso na conversa do Meet.
@@ -26,6 +26,8 @@
 - O processamento consome a API OpenAI configurada no servidor do Painel. Não é gratuito nem ilimitado.
 
 ## Falhas e atualizações
+
+“Permission dismissed” significa que o Chrome não concluiu a autorização de captura; não é uma negação do perfil no Painel. Desde a versão 1.1.1, a autorização do microfone acontece numa janela temporária própria, não na lateral. Se continuar bloqueada, use o botão de configurações do Chrome e confira também o acesso ao microfone para aplicativos da área de trabalho no Windows. Para falha de captura da aba, volte à aba do Meet e clique no ícone Newvox antes de iniciar novamente. Não é necessário autorizar câmera.
 
 Se o navegador fechar inesperadamente, autentique de novo e use Sincronizar registro pendente. Não inicie outra reunião antes de resolver a pendência. Se o computador não puder ser recuperado, um usuário autorizado pode finalizar apenas os trechos disponíveis no Painel, explicitamente como registro parcial.
 

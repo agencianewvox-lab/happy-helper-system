@@ -169,7 +169,7 @@ export default function NpsReal() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const { isMaster, gestorFilter, loading: profileLoading } = useProfile();
+  const { canViewAllClients, profile, loading: profileLoading } = useProfile();
   const [loadError, setLoadError] = useState(false);
   const [period, setPeriod] = useState("90");
 
@@ -180,9 +180,9 @@ export default function NpsReal() {
       setLoading(true);
       setLoadError(false);
       try {
-        if (!isMaster && !gestorFilter) { if (active) { setSurveys([]); setGrupos([]); } return; }
+        if (!profile || (!canViewAllClients && profile.role !== "gestor")) { if (active) { setSurveys([]); setGrupos([]); } return; }
         let query = supabase.from("whatsapp_grupos").select("group_id, nome, gestor_responsavel, categoria, responsavel_master");
-        if (!isMaster) query = query.eq("gestor_responsavel", gestorFilter!);
+        if (!canViewAllClients) query = query.eq("manager_user_id", profile.user_id);
         const groupResult = await query;
         if (groupResult.error) throw groupResult.error;
         const visible = groupResult.data || [];
@@ -194,7 +194,7 @@ export default function NpsReal() {
     }
     fetchData();
     return () => { active = false; };
-  }, [isMaster, gestorFilter, profileLoading]);
+  }, [canViewAllClients, profile, profileLoading]);
 
   const gruposMap = useMemo(() => {
     const map: Record<string, GrupoInfo> = {};
@@ -336,13 +336,13 @@ export default function NpsReal() {
                     <TableHead>Categoria</TableHead>
                     <TableHead>Respostas</TableHead>
                     <TableHead>Enviar NPS</TableHead>
-                    {isMaster && <TableHead>Detalhes</TableHead>}
+                    {canViewAllClients && <TableHead>Detalhes</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredGrupos.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isMaster ? 6 : 5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={canViewAllClients ? 6 : 5} className="text-center text-muted-foreground py-8">
                         Nenhum cliente encontrado
                       </TableCell>
                     </TableRow>
@@ -375,7 +375,7 @@ export default function NpsReal() {
                               responsavelMaster={g.responsavel_master}
                             />
                           </TableCell>
-                          {isMaster && (
+                          {canViewAllClients && (
                             <TableCell>
                               <Button
                                 variant="ghost"
